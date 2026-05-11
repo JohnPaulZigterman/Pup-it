@@ -10,11 +10,12 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pick a tiny format, then make it yours." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Make A Short" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export Short" })).toBeVisible();
+  await expect(page.locator("header").getByRole("button", { name: "Finish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Rigs" }).first().click();
   await expect(page.getByRole("heading", { name: "Build Your Rig" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rig Check" })).toBeVisible();
+  await expect(page.locator(".buildToolStrip")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assemble Parts" })).toBeVisible();
   await page.locator(".partBuilderRow").filter({ hasText: "Head" }).getByRole("button", { name: "Doodle" }).click();
   await expect(page.getByRole("heading", { name: "Playground Lab" })).toBeVisible();

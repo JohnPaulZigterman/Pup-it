@@ -2450,7 +2450,7 @@ function App() {
       { id: `short-${Date.now()}`, type: "short-package", exportedAt: new Date().toISOString() },
       ...current
     ]);
-    setStatus("Exported short package. Use Preview WEBM for quick video and Submit to DoinkTV for review handoff.");
+    setStatus("Exported short package. Use 720p WEBM for review video and Submit to DoinkTV for handoff.");
   };
 
   const updateDoinkSubmission = (patch) => {
@@ -2504,7 +2504,7 @@ function App() {
 
   const queueVideoExport = () => {
     setMode("edit");
-    setStatus("Use Preview WEBM for a quick video. The next render milestone is matching the full live stage more exactly.");
+    setStatus("Use 720p WEBM for a quick review video. The next render milestone is matching the full live stage more exactly.");
   };
 
   const exportSelectedTakeVideo = async () => {
@@ -2515,7 +2515,7 @@ function App() {
       const blob = await exportTakePreviewVideo(selectedTake, {
         onFrame: (progress) => {
           if (progress === 0 || progress >= 0.98) return;
-          setStatus(`Rendering preview video ${Math.round(progress * 100)}%.`);
+          setStatus(`Rendering 720p WEBM ${Math.round(progress * 100)}%.`);
         }
       });
       const url = URL.createObjectURL(blob);
@@ -2532,7 +2532,7 @@ function App() {
         { id: `video-${Date.now()}`, type: "preview-webm", exportedAt: new Date().toISOString() },
         ...current
       ]);
-      setStatus("Preview WEBM exported. Submit to DoinkTV with the package when the short is ready for review.");
+      setStatus("720p WEBM exported. Submit to DoinkTV with the package when the short is ready for review.");
     } catch (error) {
       setStatus(error.message || "Preview video export failed in this browser.");
     } finally {
@@ -2800,28 +2800,13 @@ function App() {
           onRunCommand={runCommand}
         />
         <div className="transport">
-          <div className="modeSwitch" aria-label="Workflow mode">
-            {workflowSteps.map((step) => (
-              <button
-                key={step.id}
-                className={mode === step.mode ? "selected" : ""}
-                onClick={() => setMode(step.mode)}
-              >
-                {step.label}
-              </button>
-            ))}
-          </div>
           <button className={recording ? "danger active" : ""} onClick={toggleTake}>
             {recording ? <Square size={17} /> : <Circle size={17} />}
             {recording ? "Stop" : "Record"}
           </button>
           <button onClick={openReviewMode}>
-            <Video size={17} />
-            Review
-          </button>
-          <button onClick={exportProject}>
-            <Save size={17} />
-            Export Short
+            <ListChecks size={17} />
+            Finish
           </button>
           <button className={micLive ? "active" : ""} onClick={toggleMic}>
             {micLive ? <Mic size={17} /> : <MicOff size={17} />}
@@ -4714,6 +4699,20 @@ function SceneLibraryEditor({
           <RefreshCw size={16} />
           Refresh
         </button>
+        <div className="finishActionBar" aria-label="Finish actions">
+          <button onClick={onExportVideo} disabled={!selectedTake || videoExporting}>
+            <Video size={16} />
+            {videoExporting ? "Rendering" : "Export WEBM"}
+          </button>
+          <button onClick={onExportProject}>
+            <Save size={16} />
+            Package
+          </button>
+          <button onClick={onSubmitToDoinkTv} disabled={!hasSubmissionSource || doinkSubmitting}>
+            <ExternalLink size={16} />
+            DoinkTV
+          </button>
+        </div>
       </div>
 
       <div className="dockGroup">
@@ -5338,6 +5337,8 @@ function CharacterEditor({
   ];
   const missingRigParts = rigCheckItems.filter((item) => item.required && !item.ok);
   const rigReady = missingRigParts.length === 0;
+  const firstMissingPart = missingRigParts[0]?.quickFixSlot || (!characterParts.head ? "head" : "torso");
+  const firstMissingPartConfig = getCatalogItem(characterPartCatalog, firstMissingPart);
   const design = {
     name: performer.state.characterDesign?.name || `${baseCharacter.name} Puppet`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
@@ -5358,6 +5359,78 @@ function CharacterEditor({
                 : "This is only a rig. Add shapes, doodles, or images to make the character yours."}
             </small>
           </div>
+        </div>
+        <div className="buildToolStrip" aria-label="Fast rig tools">
+          <button
+            type="button"
+            title="Add a simple shape to the next missing part"
+            onClick={() =>
+              onPartChange(firstMissingPart, {
+                label: firstMissingPartConfig.label,
+                mode: "shape",
+                shape: firstMissingPart === "torso" ? "bean" : "circle",
+                source: ""
+              })
+            }
+          >
+            <Square size={15} />
+            Shape
+          </button>
+          <button
+            type="button"
+            title="Make a rough drawn head placeholder"
+            onClick={() =>
+              onPartChange("head", {
+                label: getCatalogItem(characterPartCatalog, "head").label,
+                mode: "drawn",
+                shape: "scribble",
+                source: ""
+              })
+            }
+          >
+            <MousePointer2 size={15} />
+            Doodle
+          </button>
+          <button
+            type="button"
+            title="Open the head image slot"
+            onClick={() =>
+              onPartChange("head", {
+                label: getCatalogItem(characterPartCatalog, "head").label,
+                mode: "image",
+                shape: characterParts.head?.shape || "oval",
+                source: characterParts.head?.source || ""
+              })
+            }
+          >
+            <Library size={15} />
+            Image
+          </button>
+          <button
+            type="button"
+            title="Try a quick color shuffle"
+            onClick={() =>
+              onDesignChange({
+                color: pickRandom(characterColorSwatches),
+                accent: pickRandom(characterColorSwatches)
+              })
+            }
+          >
+            <Palette size={15} />
+            Color
+          </button>
+          <button type="button" title="Clone the head part" onClick={() => onPartDuplicate("head")}>
+            <Copy size={15} />
+            Clone
+          </button>
+          <button
+            type="button"
+            title="Hide or show the head part"
+            onClick={() => onPartChange("head", { hidden: !characterParts.head?.hidden })}
+          >
+            <X size={15} />
+            {characterParts.head?.hidden ? "Show" : "Hide"}
+          </button>
         </div>
       </div>
 

@@ -58,7 +58,7 @@ export const publicVersionMilestones = [
   { id: "perform", name: "Joy Loop", detail: "Record, replay, laugh, trim, export." },
   { id: "toybox", name: "Toybox Identity", detail: "Original rigs, props, textures, and weird behavior." },
   { id: "formats", name: "Comedy Formats", detail: "Arguments, fake ads, desk bits, street pieces, bumpers." },
-  { id: "render", name: "Render Path", detail: "Preview WEBM now, stage-matched video next, backend reliability later." }
+  { id: "render", name: "Render Path", detail: "720p WEBM now, stage-matched video next, backend reliability later." }
 ];
 
 export function computeBeginnerProgress({
