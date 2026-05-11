@@ -100,6 +100,7 @@ import "./styles.css";
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
 const DOINKTV_SUBMISSION_URL = import.meta.env.VITE_DOINKTV_SUBMISSION_URL || "";
 const SHOW_STORAGE_KEY = "pup-it-shows-v1";
+const AUTOSAVE_DRAFT_KEY = "pup-it-autosave-draft-v1";
 const partSwapTargets = {
   leftArm: "rightArm",
   rightArm: "leftArm",
@@ -830,6 +831,32 @@ async function exportTakePreviewVideo(take, { onFrame } = {}) {
   return stopped;
 }
 
+function createTakeThumbnailDataUrl(take) {
+  if (!take) return "";
+  const width = 1280;
+  const height = 720;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  drawPreviewVideoFrame(ctx, {
+    take,
+    performers: makePreviewPerformers(take),
+    atMs: take.trimStartMs || 0,
+    width,
+    height
+  });
+  return canvas.toDataURL("image/png");
+}
+
+function downloadDataUrl(dataUrl, filename) {
+  if (!dataUrl) return;
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  link.click();
+}
+
 function makeShowId(showName) {
   const slug = (showName || "untitled-show")
     .trim()
@@ -1028,6 +1055,7 @@ function App() {
   const [savedShows, setSavedShows] = useState([]);
   const [selectedShowId, setSelectedShowId] = useState("");
   const [entryLoadedShowId, setEntryLoadedShowId] = useState("");
+  const [autosaveDraft, setAutosaveDraft] = useState(null);
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
   const [character, setCharacter] = useState(defaultCharacterId);
   const [scene, setScene] = useState(sceneCatalog[0].id);
@@ -1317,6 +1345,17 @@ function App() {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(AUTOSAVE_DRAFT_KEY);
+      if (!stored) return;
+      const draft = JSON.parse(stored);
+      if (draft?.schemaVersion === "pup-it.show.v1") setAutosaveDraft(draft);
+    } catch (_error) {
+      setAutosaveDraft(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -2580,12 +2619,36 @@ function App() {
 
   const exportProject = () => {
     const project = createCurrentProjectExport();
+    const selectedThumbnail = selectedTake ? createTakeThumbnailDataUrl(selectedTake) : "";
+    if (selectedThumbnail) {
+      project.publishingPackage.thumbnail = {
+        ...project.publishingPackage.thumbnail,
+        source: "selected-take-preview",
+        takeId: selectedTake.id,
+        dataUrl: selectedThumbnail,
+        fileName: `pup-it-${selectedTake.id || "take"}-thumbnail.png`
+      };
+    }
     downloadJson(project, `pup-it-${roomId}-project.json`);
     setExportHistory((current) => [
       { id: `short-${Date.now()}`, type: "short-package", exportedAt: new Date().toISOString() },
       ...current
     ]);
     setStatus("Exported short package. Use 720p WEBM for review video and Submit to DoinkTV for handoff.");
+  };
+
+  const exportSelectedTakeThumbnail = () => {
+    if (!selectedTake) return;
+    const safeName = (selectedTake.name || selectedTake.id || "take")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    downloadDataUrl(createTakeThumbnailDataUrl(selectedTake), `pup-it-${safeName || "take"}-thumbnail.png`);
+    setExportHistory((current) => [
+      { id: `thumbnail-${Date.now()}`, type: "thumbnail-png", exportedAt: new Date().toISOString() },
+      ...current
+    ]);
+    setStatus("Thumbnail PNG exported for the selected take.");
   };
 
   const updateDoinkSubmission = (patch) => {
@@ -2776,13 +2839,14 @@ function App() {
     { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
     { id: "kitchen", label: "Find kitchen scene pieces", keywords: "kitchen diner room background furniture", action: () => openAssetSearch("kitchen", "setting") },
     { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
-    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review", action: openReviewMode },
+    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review finish", action: openReviewMode },
     { id: "board", label: "Open storyboard mode", keywords: "storyboard panel comic strip planning", action: () => setMode("storyboard") },
     { id: "save", label: "Save show", keywords: "save autosave show session project", action: () => saveShowSession() },
     { id: "undo", label: "Undo last creative edit", keywords: "undo revert back history", action: undoLastAction, disabled: !historyPast.length },
     { id: "redo", label: "Redo creative edit", keywords: "redo forward history", action: redoLastAction, disabled: !historyFuture.length },
-    { id: "export", label: "Export short package", keywords: "export publish package video project", action: exportProject },
-    { id: "video-export", label: "Prepare video export", keywords: "render video mp4 export movie", action: queueVideoExport },
+    { id: "export", label: "Export short package", keywords: "finish export publish package video project", action: exportProject },
+    { id: "video-export", label: "Prepare video export", keywords: "finish render video webm mp4 export movie", action: queueVideoExport },
+    { id: "submit-doinktv", label: "Submit to DoinkTV", keywords: "finish submit doinktv publish review package", action: submitToDoinkTv },
     { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
     { id: "texture-polish", label: "Add mixed-media texture", keywords: "texture paper pattern style weird", action: () => applyPolishPass("texture") },
     { id: "punch-polish", label: "Punch in for a reaction", keywords: "camera close reaction punch button", action: () => applyPolishPass("camera") }
@@ -2878,7 +2942,9 @@ function App() {
     if (!joined) return undefined;
     const timer = window.setTimeout(() => {
       try {
-        window.localStorage.setItem("pup-it-autosave-draft-v1", JSON.stringify(createShowSession()));
+        const session = createShowSession();
+        window.localStorage.setItem(AUTOSAVE_DRAFT_KEY, JSON.stringify(session));
+        setAutosaveDraft(session);
         setLastAutosaveAt(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
       } catch (_error) {
         setLastAutosaveAt("paused");
@@ -2971,6 +3037,25 @@ function App() {
   const loadEntryShow = (showId = selectedShowId) => {
     const session = savedShows.find((show) => show.id === showId);
     if (!session) return;
+    loadEntrySession(session, "saved show");
+  };
+
+  const loadAutosaveDraft = () => {
+    if (!autosaveDraft) return;
+    loadEntrySession(autosaveDraft, "autosaved draft");
+  };
+
+  const dismissAutosaveDraft = () => {
+    try {
+      window.localStorage.removeItem(AUTOSAVE_DRAFT_KEY);
+    } catch (_error) {
+      // Ignore storage cleanup failures.
+    }
+    setAutosaveDraft(null);
+    setStatus("Autosaved draft dismissed.");
+  };
+
+  const loadEntrySession = (session, sourceLabel = "show") => {
     clearPlayback();
     setEntryLoadedShowId(session.id);
     setSelectedShowId(session.id);
@@ -2993,7 +3078,7 @@ function App() {
       setCharacter(castMember.character || character);
       setName(castMember.name || name);
     }
-    setStatus(`Ready to continue "${session.showName}". Join when you want to enter the stage.`);
+    setStatus(`Loaded ${sourceLabel} "${session.showName}". Join when you want to enter the stage.`);
   };
 
   const exportShowSession = () => {
@@ -3026,6 +3111,25 @@ function App() {
             </div>
           </div>
           <form onSubmit={joinRoom} className="joinForm">
+            {autosaveDraft && (
+              <div className="entryContinuePanel autosaveEntryPanel">
+                <strong>Autosaved draft found</strong>
+                <small>
+                  {autosaveDraft.showName || "Untitled Show"} from{" "}
+                  {autosaveDraft.savedAt ? new Date(autosaveDraft.savedAt).toLocaleString() : "your last session"}.
+                </small>
+                <div className="entryShowActions">
+                  <button type="button" onClick={loadAutosaveDraft}>
+                    <RefreshCw size={16} />
+                    Restore Draft
+                  </button>
+                  <button type="button" onClick={dismissAutosaveDraft}>
+                    <X size={16} />
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
             {savedShows.length > 0 && (
               <div className="entryContinuePanel">
                 <strong>Continue a saved show</strong>
@@ -3207,6 +3311,7 @@ function App() {
             templates={showStarterTemplates}
             shortFormats={shortFormatTemplates}
             progress={beginnerProgress}
+            selectedTake={selectedTake}
             takeCount={takeLibrary.length}
             panelCount={storyboardPanels.length}
             timelineCount={productionTimeline.length}
@@ -3452,6 +3557,7 @@ function App() {
             takes={takeLibrary}
             selectedTake={selectedTake}
             playbackActive={playbackActive}
+            projectExport={createCurrentProjectExport()}
             onRefresh={loadTakeLibrary}
             onSelectTake={selectTake}
             onPlay={playSelectedTake}
@@ -3461,6 +3567,7 @@ function App() {
             onSaveTakeAsScene={saveSelectedTakeAsScene}
             onExportProject={exportProject}
             onExportVideo={exportSelectedTakeVideo}
+            onExportThumbnail={exportSelectedTakeThumbnail}
             videoExporting={videoExporting}
             doinkSubmission={doinkSubmission}
             doinkSubmitting={doinkSubmitting}
@@ -3614,16 +3721,20 @@ function CommandSearch({ inputRef, query, commands, focused, onQueryChange, onFo
         aria-label="Command search"
       />
       <div className="commandResults">
-        {visibleCommands.map((command) => (
-          <button
-            key={command.id}
-            disabled={command.disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onRunCommand(command)}
-          >
-            {command.label}
-          </button>
-        ))}
+        {visibleCommands.length ? (
+          visibleCommands.map((command) => (
+            <button
+              key={command.id}
+              disabled={command.disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onRunCommand(command)}
+            >
+              {command.label}
+            </button>
+          ))
+        ) : (
+          <button disabled>No matching action</button>
+        )}
       </div>
     </div>
   );
@@ -3635,6 +3746,7 @@ function ShowDashboard({
   templates,
   shortFormats,
   progress,
+  selectedTake,
   takeCount,
   panelCount,
   timelineCount,
@@ -3647,6 +3759,46 @@ function ShowDashboard({
   onLoadShow
 }) {
   const canFinish = progress.readyToExport;
+  const trialSteps = [
+    {
+      label: "Pick a bit",
+      done: progress.hasStartedShort,
+      actionLabel: "Start",
+      action: () => onStartQuickShort("argument")
+    },
+    {
+      label: "Make the performer yours",
+      done: progress.hasRig,
+      actionLabel: "Rig",
+      action: () => onModeChange("build")
+    },
+    {
+      label: "Put one thing in the set",
+      done: progress.hasSet,
+      actionLabel: "Set",
+      action: () => onAssetSearch("furniture", "object")
+    },
+    {
+      label: "Record a quick take",
+      done: progress.hasTake,
+      actionLabel: "Perform",
+      action: () => onModeChange("perform")
+    },
+    {
+      label: "Replay and keep the best",
+      done: progress.hasCut,
+      actionLabel: selectedTake ? "Review" : "Finish",
+      action: () => onModeChange("edit")
+    },
+    {
+      label: "Export enough to share",
+      done: progress.exported,
+      actionLabel: canFinish ? "Export" : "Finish",
+      action: canFinish ? onExport : () => onModeChange("edit")
+    }
+  ];
+  const trialDoneCount = trialSteps.filter((step) => step.done).length;
+  const nextTrialStep = trialSteps.find((step) => !step.done) || trialSteps[trialSteps.length - 1];
   return (
     <div className="showDashboard">
       <section className="dashboardHero">
@@ -3686,6 +3838,31 @@ function ShowDashboard({
           <span>Finish</span>
           <strong>{canFinish ? "Export Short" : "Review the Cut"}</strong>
         </button>
+      </section>
+
+      <section className="fiveMinuteTrialPanel" aria-label="Five minute cartoon trial">
+        <div>
+          <span className="eyebrow">5-Minute Cartoon Trial</span>
+          <h2>Can this become a finished little short before you overthink it?</h2>
+          <p>One weird setup, one customized rig, one object in the room, one take, one export. Good enough counts.</p>
+        </div>
+        <div className="trialMeter">
+          <strong>{trialDoneCount}/6</strong>
+          <span>steps done</span>
+          <button onClick={nextTrialStep.action}>{nextTrialStep.actionLabel}</button>
+        </div>
+        <div className="trialChecklist">
+          {trialSteps.map((step, index) => (
+            <button
+              key={step.label}
+              className={`${step.done ? "done" : ""} ${step === nextTrialStep ? "current" : ""}`}
+              onClick={step.action}
+            >
+              <span>{index + 1}</span>
+              <strong>{step.label}</strong>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="makeShortPanel" aria-label="Make a short">
@@ -5214,6 +5391,7 @@ function SceneLibraryEditor({
   takes,
   selectedTake,
   playbackActive,
+  projectExport,
   onRefresh,
   onSelectTake,
   onPlay,
@@ -5223,6 +5401,7 @@ function SceneLibraryEditor({
   onSaveTakeAsScene,
   onExportProject,
   onExportVideo,
+  onExportThumbnail,
   videoExporting,
   doinkSubmission,
   doinkSubmitting,
@@ -5248,6 +5427,10 @@ function SceneLibraryEditor({
     : [];
   const reviewReadyStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
   const hasSubmissionSource = Boolean(selectedTake || takes.length || timeline.length);
+  const packageChecklist = projectExport?.publishingPackage?.broadcastChecklist || [];
+  const readiness = projectExport?.publishingPackage?.packageReadiness || {};
+  const reviewTarget = projectExport?.publishingPackage?.reviewTarget;
+  const readyCount = packageChecklist.filter((item) => item.done).length;
   return (
     <div className="sceneEditor">
       <div className="dockGroup">
@@ -5267,6 +5450,10 @@ function SceneLibraryEditor({
           <button onClick={onExportVideo} disabled={!selectedTake || videoExporting}>
             <Video size={16} />
             {videoExporting ? "Rendering" : "Export WEBM"}
+          </button>
+          <button onClick={onExportThumbnail} disabled={!selectedTake}>
+            <Camera size={16} />
+            Thumbnail
           </button>
           <button onClick={onExportProject}>
             <Save size={16} />
@@ -5400,19 +5587,32 @@ function SceneLibraryEditor({
             )}
           </div>
 
-          <div className="dockGroup exportPlanPanel finishReadinessPanel">
-            <h2>Finish Readiness</h2>
-            <small className="controlHint">Use the Finish actions at the top for WEBM, package, and DoinkTV submission.</small>
-            <div className="renderChecklist">
-              <span className={selectedTake ? "done" : ""}>Take</span>
-              <span className={selectedTake.tracks.audio.length ? "done" : ""}>Audio</span>
-              <span className={selectedTake.sceneObjects?.length ? "done" : ""}>Props</span>
-              <span className={timeline.length ? "done" : ""}>Cut</span>
-              <span className={reviewReadyStatuses.includes(episodeStatus) ? "done" : ""}>Review</span>
-            </div>
-          </div>
         </>
       )}
+
+      <div className="dockGroup exportPlanPanel finishReadinessPanel">
+        <h2>Finish Readiness</h2>
+        <small className="controlHint">
+          This mirrors the package manifest. It is not asking for perfection, just enough for a reviewable short.
+        </small>
+        <div className="readinessHeader">
+          <strong>{readyCount}/{packageChecklist.length || 1}</strong>
+          <span>{reviewTarget ? `${reviewTarget.type}: ${reviewTarget.name}` : "No review target yet"}</span>
+        </div>
+        <div className="renderChecklist">
+          {packageChecklist.map((item) => (
+            <span className={item.done ? "done" : ""} key={item.id}>
+              {item.label}
+            </span>
+          ))}
+          <span className={readiness.hasVideoPlaceholder ? "done" : ""}>WEBM path planned</span>
+          <span className={reviewReadyStatuses.includes(episodeStatus) ? "done" : ""}>Review status set</span>
+        </div>
+        <small className="controlHint">
+          {projectExport?.renderPlan?.preferredPreviewVideoName || "Export a WEBM"} /{" "}
+          {projectExport?.renderPlan?.preferredThumbnailName || "export a thumbnail"}
+        </small>
+      </div>
 
       <div className="dockGroup doinkSubmissionPanel">
         <h2>Submit to DoinkTV</h2>

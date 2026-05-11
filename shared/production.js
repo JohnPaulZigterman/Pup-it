@@ -79,6 +79,21 @@ export const directorActionCatalog = [
     selfState: { pose: "surprise", expression: "weird", mouthOpen: 0.18 }
   },
   {
+    id: "hold-for-laugh",
+    name: "Hold Laugh",
+    soundSting: "tap",
+    cameraShot: "close",
+    selfState: { pose: "deadpan", expression: "weird", idleMotion: "held", mouthOpen: 0.04 }
+  },
+  {
+    id: "public-access-zoom",
+    name: "Bad Zoom",
+    soundSting: "button",
+    cameraShot: "reaction",
+    lightingPreset: "flat-tv",
+    selfState: { pose: "listen", expression: "neutral", idleMotion: "subtle" }
+  },
+  {
     id: "button",
     name: "Button",
     soundSting: "thump",
@@ -176,6 +191,23 @@ export function createProjectExport({
         scene,
         cameraShot
       };
+  const bestTake = takes.find((take) => take.best) || takes[0] || null;
+  const packageReadiness = {
+    hasVideoPlaceholder: true,
+    hasReviewTarget: Boolean(bestTake || timeline.length || storyboardPanels.length),
+    hasThumbnail: Boolean(thumbnail),
+    hasCaptions: captions.some((caption) => caption.text),
+    hasCredits: credits.length > 0,
+    hasLicenseMetadata: true,
+    hasSeparateAudioTrackMetadata: takes.some((take) => take.audioTrackCount || take.tracks?.audio?.length)
+  };
+  const broadcastChecklist = [
+    { id: "review-target", label: "Best take, cut, or board selected", done: packageReadiness.hasReviewTarget },
+    { id: "thumbnail", label: "Thumbnail included", done: packageReadiness.hasThumbnail },
+    { id: "captions", label: "Captions drafted", done: packageReadiness.hasCaptions },
+    { id: "credits", label: "Credits/license notes attached", done: packageReadiness.hasCredits },
+    { id: "audio-tracks", label: "Separate audio track metadata present", done: packageReadiness.hasSeparateAudioTrackMetadata }
+  ];
 
   return {
     schemaVersion: "pup-it.project.v1",
@@ -194,6 +226,8 @@ export function createProjectExport({
     assetReferences,
     renderPlan: {
       videoPath: null,
+      preferredPreviewVideoName: bestTake ? `pup-it-${bestTake.id || "take"}-preview.webm` : null,
+      preferredThumbnailName: bestTake ? `pup-it-${bestTake.id || "take"}-thumbnail.png` : "pup-it-thumbnail.png",
       nextRenderer: "browser-preview-now, WebCodecs or FFmpeg worker next",
       deterministicRender: true,
       separateAudioTracks: true
@@ -203,7 +237,22 @@ export function createProjectExport({
       thumbnail,
       captions,
       credits,
-      licenseMetadata: credits
+      licenseMetadata: credits,
+      broadcastChecklist,
+      packageReadiness,
+      reviewTarget: bestTake
+        ? {
+            type: "take",
+            id: bestTake.id,
+            name: bestTake.name || "Untitled take",
+            durationMs: bestTake.durationMs,
+            scene: bestTake.scene
+          }
+        : timeline[0]
+        ? { type: "timeline", id: timeline[0].id, name: timeline[0].title }
+        : storyboardPanels[0]
+        ? { type: "storyboard", id: storyboardPanels[0].id, name: storyboardPanels[0].title }
+        : null
     },
     showToolbox,
     exportedAt,
@@ -252,7 +301,7 @@ export function createShowToolbox({
       backgroundTheme: style.backgroundTheme || null,
       objectStyle: style.objectStyle || null
     },
-    sets: sceneSets.map((set) => ({ id: set.id, name: set.name, objectCount: set.objects?.length || 0 })),
+    sets: sceneSets.map((set) => ({ id: set.id, name: set.name, objectCount: set.sceneObjects?.length || set.objects?.length || 0 })),
     props: sceneObjects.map((object) => ({
       id: object.id,
       name: object.name,
