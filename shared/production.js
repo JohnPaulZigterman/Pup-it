@@ -218,3 +218,59 @@ export function createProjectExport({
     }))
   };
 }
+
+export function createDoinkTvSubmissionPackage({
+  project,
+  submission = {},
+  selectedTake = null,
+  previewVideoFileName = null,
+  projectPackageFileName = null,
+  submittedAt = new Date().toISOString()
+}) {
+  const timelineDuration = (project.timeline || []).reduce((total, clip) => {
+    const duration = typeof clip.duration === "number" ? clip.duration : 0;
+    return total + duration;
+  }, 0);
+  const durationMs = selectedTake?.durationMs || timelineDuration || 0;
+  const credits = project.publishingPackage?.credits || [];
+
+  return {
+    schemaVersion: "pup-it.doinktv-submission.v1",
+    source: "pup-it",
+    targetChannel: "DoinkTV",
+    hostSite: "chillnet.me",
+    status: "submitted_for_review",
+    submittedAt,
+    title: submission.title || `${project.showName || "Untitled Show"} Short`,
+    description: submission.description || "",
+    creatorName: submission.creatorName || "",
+    creatorContact: submission.creatorContact || "",
+    showName: project.showName,
+    roomId: project.roomId,
+    episodeTitle: submission.episodeTitle || selectedTake?.name || `${project.showName || "Untitled Show"} Episode`,
+    preferredBlock: submission.preferredBlock || "short",
+    schedulingNotes: submission.schedulingNotes || "",
+    contentNotes: submission.contentNotes || "",
+    rightsNotes:
+      submission.rightsNotes ||
+      "Created in Pup-It. Confirm imported material rights before public broadcast.",
+    durationMs,
+    previewVideoFileName,
+    projectPackageFileName,
+    thumbnail: project.publishingPackage?.thumbnail || null,
+    captions: project.publishingPackage?.captions || [],
+    credits,
+    licenseMetadata: project.publishingPackage?.licenseMetadata || credits,
+    audioTracks: (project.takes || []).map((take) => ({
+      takeId: take.id,
+      takeName: take.name,
+      audioTrackCount: take.audioTrackCount || 0
+    })),
+    adminReview: {
+      approved: false,
+      requestedChanges: "",
+      scheduleSlot: null
+    },
+    project
+  };
+}

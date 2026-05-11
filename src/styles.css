@@ -3198,6 +3198,51 @@ input[type="color"] {
   color: var(--ink);
 }
 
+.doinkSubmissionPanel {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(151, 218, 161, 0.34), transparent 44%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.submissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.submissionGrid .wideField {
+  grid-column: 1 / -1;
+}
+
+.submissionGrid textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+}
+
+.submissionChecklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.submissionChecklist span {
+  min-height: 28px;
+  padding: 7px 8px;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+  color: #4b4e68;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.submissionChecklist span.done {
+  background: var(--pond);
+  color: var(--ink);
+}
+
 .libraryActions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

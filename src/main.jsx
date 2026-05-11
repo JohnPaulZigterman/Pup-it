@@ -43,6 +43,7 @@ import {
 } from "../shared/assetLibrary.js";
 import {
   cameraShotCatalog,
+  createDoinkTvSubmissionPackage,
   createProjectExport,
   createTimelineClip,
   directorActionCatalog,
@@ -89,6 +90,7 @@ import { Puppet } from "./renderer/Puppet.jsx";
 import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
+const DOINKTV_SUBMISSION_URL = import.meta.env.VITE_DOINKTV_SUBMISSION_URL || "";
 const SHOW_STORAGE_KEY = "pup-it-shows-v1";
 const partSwapTargets = {
   leftArm: "rightArm",
@@ -928,7 +930,8 @@ function showSessionFromPersistedShow(show) {
     assetReferences: show.assetReferences || [],
     storyboardPanels: showBible.storyboardPanels || [],
     productionTimeline: showBible.productionTimeline || [],
-    takes: showBible.takes || []
+    takes: showBible.takes || [],
+    doinkSubmission: showBible.doinkSubmission || {}
   };
 }
 
@@ -962,7 +965,8 @@ async function persistShowSession(session) {
         sceneObjects: session.sceneObjects,
         sceneSets: session.sceneSets,
         floorMarks: session.floorMarks,
-        takes: session.takes
+        takes: session.takes,
+        doinkSubmission: session.doinkSubmission
       }
     })
   });
@@ -1110,6 +1114,17 @@ function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
   const [startedShortFormat, setStartedShortFormat] = useState("");
   const [exportHistory, setExportHistory] = useState([]);
+  const [doinkSubmitting, setDoinkSubmitting] = useState(false);
+  const [doinkSubmission, setDoinkSubmission] = useState({
+    title: "",
+    creatorName: "",
+    creatorContact: "",
+    description: "",
+    preferredBlock: "short",
+    contentNotes: "",
+    rightsNotes: "Created in Pup-It. Confirm imported material rights before broadcast.",
+    schedulingNotes: ""
+  });
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
@@ -2128,6 +2143,16 @@ function App() {
     ]);
   };
 
+  const downloadJson = (payload, filename) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const loadTakeLibrary = async () => {
     const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes`);
     if (!response.ok) {
@@ -2386,8 +2411,8 @@ function App() {
     setStatus(`Ready to perform "${panel.title}".`);
   };
 
-  const exportProject = () => {
-    const project = createProjectExport({
+  const createCurrentProjectExport = () =>
+    createProjectExport({
       roomId,
       showName,
       scene,
@@ -2410,18 +2435,64 @@ function App() {
       timeline: productionTimeline,
       takes: takeLibrary
     });
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `pup-it-${roomId}-project.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+
+  const exportProject = () => {
+    const project = createCurrentProjectExport();
+    downloadJson(project, `pup-it-${roomId}-project.json`);
     setExportHistory((current) => [
       { id: `short-${Date.now()}`, type: "short-package", exportedAt: new Date().toISOString() },
       ...current
     ]);
-    setStatus("Exported short package. Video export is queued as the next render feature.");
+    setStatus("Exported short package. Use Preview WEBM for quick video and Submit to DoinkTV for review handoff.");
+  };
+
+  const updateDoinkSubmission = (patch) => {
+    setDoinkSubmission((current) => ({ ...current, ...patch }));
+  };
+
+  const submitToDoinkTv = async () => {
+    if (doinkSubmitting) return;
+    const project = createCurrentProjectExport();
+    const submissionTake = selectedTake || takeLibrary[0] || null;
+    const projectPackageFileName = `pup-it-${roomId}-project.json`;
+    const previewVideoFileName = submissionTake
+      ? `pup-it-${submissionTake.id || "take"}-preview.webm`
+      : null;
+    const submissionPackage = createDoinkTvSubmissionPackage({
+      project,
+      submission: {
+        ...doinkSubmission,
+        title: doinkSubmission.title.trim() || `${showName || "Untitled Show"} Short`
+      },
+      selectedTake: submissionTake,
+      previewVideoFileName,
+      projectPackageFileName
+    });
+
+    setDoinkSubmitting(true);
+    try {
+      if (DOINKTV_SUBMISSION_URL) {
+        const response = await fetch(DOINKTV_SUBMISSION_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(submissionPackage)
+        });
+        if (!response.ok) throw new Error("DoinkTV submission endpoint rejected the package.");
+        setStatus("Submitted to DoinkTV for admin review.");
+      } else {
+        downloadJson(submissionPackage, `pup-it-${roomId}-doinktv-submission.json`);
+        setStatus("Created a DoinkTV submission package. Add VITE_DOINKTV_SUBMISSION_URL later for direct admin intake.");
+      }
+      setEpisodeStatus("submitted");
+      setExportHistory((current) => [
+        { id: `doinktv-${Date.now()}`, type: "doinktv-submission", exportedAt: new Date().toISOString() },
+        ...current
+      ]);
+    } catch (error) {
+      setStatus(error.message || "DoinkTV submission failed. Export the package and try again.");
+    } finally {
+      setDoinkSubmitting(false);
+    }
   };
 
   const queueVideoExport = () => {
@@ -2577,7 +2648,8 @@ function App() {
       assetReferences,
       storyboardPanels,
       productionTimeline,
-      takes: takeLibrary.map(summarizeTakeForShow)
+      takes: takeLibrary.map(summarizeTakeForShow),
+      doinkSubmission
     };
   };
 
@@ -2633,6 +2705,7 @@ function App() {
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
     setAssetReferences(session.assetReferences || []);
+    setDoinkSubmission((current) => ({ ...current, ...(session.doinkSubmission || {}) }));
     setPreviewPerformers(null);
     changeScene(session.scene || sceneCatalog[0].id);
     const castMember =
@@ -2999,6 +3072,11 @@ function App() {
             onQueueVideoExport={queueVideoExport}
             onExportVideo={exportSelectedTakeVideo}
             videoExporting={videoExporting}
+            doinkSubmission={doinkSubmission}
+            doinkSubmitting={doinkSubmitting}
+            doinkEndpointConfigured={Boolean(DOINKTV_SUBMISSION_URL)}
+            onDoinkSubmissionChange={updateDoinkSubmission}
+            onSubmitToDoinkTv={submitToDoinkTv}
             onAddTakeToTimeline={addTakeToTimeline}
             timeline={productionTimeline}
             episodeStatus={episodeStatus}
@@ -3675,7 +3753,7 @@ function ShowBiblePanel({
         <span className={boardCount ? "done" : ""}>Board</span>
         <span className={timelineCount ? "done" : ""}>Cut</span>
         <span className={referenceCount ? "done" : ""}>Credits</span>
-        <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
+        <span className={["submitted", "ready_for_review", "approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
       </div>
       <div className="libraryActions">
         <button onClick={() => onModeChange("build")}>Rigs</button>
@@ -4562,6 +4640,11 @@ function SceneLibraryEditor({
   onQueueVideoExport,
   onExportVideo,
   videoExporting,
+  doinkSubmission,
+  doinkSubmitting,
+  doinkEndpointConfigured,
+  onDoinkSubmissionChange,
+  onSubmitToDoinkTv,
   onAddTakeToTimeline,
   timeline,
   episodeStatus,
@@ -4579,6 +4662,8 @@ function SceneLibraryEditor({
         { id: "audio", label: "Audio", count: selectedTake.tracks.audio.length }
       ]
     : [];
+  const reviewReadyStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
+  const hasSubmissionSource = Boolean(selectedTake || takes.length || timeline.length);
   return (
     <div className="sceneEditor">
       <div className="dockGroup">
@@ -4717,7 +4802,7 @@ function SceneLibraryEditor({
               <span className={selectedTake.tracks.audio.length ? "done" : ""}>Audio</span>
               <span className={selectedTake.sceneObjects?.length ? "done" : ""}>Props</span>
               <span className={timeline.length ? "done" : ""}>Cut</span>
-              <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
+              <span className={reviewReadyStatuses.includes(episodeStatus) ? "done" : ""}>Review</span>
             </div>
             <div className="libraryActions">
               <button onClick={onExportProject}>
@@ -4741,6 +4826,102 @@ function SceneLibraryEditor({
         </>
       )}
 
+      <div className="dockGroup doinkSubmissionPanel">
+        <h2>Submit to DoinkTV</h2>
+        <small className="controlHint">
+          Send admins a review package with project data, credits, captions, take info, and broadcast notes.
+          {doinkEndpointConfigured ? " Direct intake is configured." : " For now this downloads a handoff JSON."}
+        </small>
+        <div className="submissionGrid">
+          <label>
+            Short Title
+            <input
+              value={doinkSubmission.title}
+              placeholder={selectedTake?.name || "Untitled DoinkTV short"}
+              onChange={(event) => onDoinkSubmissionChange({ title: event.target.value })}
+            />
+          </label>
+          <label>
+            Creator
+            <input
+              value={doinkSubmission.creatorName}
+              placeholder="Who should admins credit?"
+              onChange={(event) => onDoinkSubmissionChange({ creatorName: event.target.value })}
+            />
+          </label>
+          <label>
+            Contact
+            <input
+              value={doinkSubmission.creatorContact}
+              placeholder="Email, handle, or internal note"
+              onChange={(event) => onDoinkSubmissionChange({ creatorContact: event.target.value })}
+            />
+          </label>
+          <label>
+            DoinkTV Block
+            <select
+              value={doinkSubmission.preferredBlock}
+              onChange={(event) => onDoinkSubmissionChange({ preferredBlock: event.target.value })}
+            >
+              <option value="short">Short</option>
+              <option value="bump">Bump</option>
+              <option value="episode">Episode</option>
+              <option value="late-night">Late Night</option>
+              <option value="experimental">Experimental</option>
+            </select>
+          </label>
+          <label className="wideField">
+            Description
+            <textarea
+              rows={3}
+              value={doinkSubmission.description}
+              placeholder="What is this short, and why should it air?"
+              onChange={(event) => onDoinkSubmissionChange({ description: event.target.value })}
+            />
+          </label>
+          <label className="wideField">
+            Content Notes
+            <textarea
+              rows={2}
+              value={doinkSubmission.contentNotes}
+              placeholder="Warnings, rating notes, or anything admins should know."
+              onChange={(event) => onDoinkSubmissionChange({ contentNotes: event.target.value })}
+            />
+          </label>
+          <label className="wideField">
+            Rights And Credits
+            <textarea
+              rows={2}
+              value={doinkSubmission.rightsNotes}
+              onChange={(event) => onDoinkSubmissionChange({ rightsNotes: event.target.value })}
+            />
+          </label>
+          <label className="wideField">
+            Scheduling Notes
+            <textarea
+              rows={2}
+              value={doinkSubmission.schedulingNotes}
+              placeholder="Preferred slot, theme night, episode order, or leave blank."
+              onChange={(event) => onDoinkSubmissionChange({ schedulingNotes: event.target.value })}
+            />
+          </label>
+        </div>
+        <div className="submissionChecklist">
+          <span className={hasSubmissionSource ? "done" : ""}>Take or cut</span>
+          <span className={selectedTake ? "done" : ""}>Preview target</span>
+          <span className={doinkSubmission.creatorName.trim() ? "done" : ""}>Credit name</span>
+          <span className={doinkSubmission.rightsNotes.trim() ? "done" : ""}>Rights note</span>
+        </div>
+        <button
+          className="wideAction"
+          onClick={onSubmitToDoinkTv}
+          disabled={!hasSubmissionSource || doinkSubmitting}
+        >
+          <ExternalLink size={16} />
+          {doinkSubmitting ? "Submitting" : "Submit to DoinkTV"}
+        </button>
+      </div>
+
       <div className="dockGroup">
         <h2>Episode Pipeline</h2>
         <label>
@@ -4749,9 +4930,12 @@ function SceneLibraryEditor({
             <option value="draft">Draft</option>
             <option value="rough_cut">Rough Cut</option>
             <option value="ready_for_review">Ready for Review</option>
+            <option value="submitted">Submitted to DoinkTV</option>
+            <option value="needs_changes">Needs Changes</option>
             <option value="approved">Approved</option>
             <option value="scheduled">Scheduled</option>
             <option value="published">Published</option>
+            <option value="rejected">Rejected</option>
           </select>
         </label>
         <div className="pipelineChecklist">

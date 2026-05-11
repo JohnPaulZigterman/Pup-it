@@ -28,6 +28,15 @@ npm run dev
 The client runs on Vite's default port, usually `http://localhost:5173`.
 The realtime server runs on `http://localhost:4111`.
 
+Copy `.env.example` to `.env` if you need local overrides:
+
+```bash
+VITE_SERVER_URL=http://localhost:4111
+VITE_DOINKTV_SUBMISSION_URL=
+```
+
+`VITE_DOINKTV_SUBMISSION_URL` is optional. When it is empty, the app downloads a DoinkTV submission package JSON for admin handoff. When it points to an intake endpoint, the **Submit to DoinkTV** button posts that package directly.
+
 ## Postgres Persistence
 
 Pup-It is set up to use Postgres for durable show and episode data while keeping live performance rooms in memory for fast realtime puppeteering.
