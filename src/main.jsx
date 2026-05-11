@@ -5060,6 +5060,8 @@ function PerformControls({
   const motionEnergy = Math.min(100, Math.round((self?.state.groundSpeed || 0) * 100));
   const depthPercent = Math.round(((self?.state.depthProgress ?? 0.65) || 0) * 100);
   const intentLabel = self?.state.motionIntent === "settling" ? "settling" : self?.state.walking ? "moving" : "ready";
+  const mouthPercent = Math.min(100, Math.round((self?.state.mouthOpen || 0) * 100));
+  const performanceReady = Boolean(self && (micLive || (self.state.mouthControl || "audio") !== "audio"));
   const livePads = [
     {
       id: "reaction",
@@ -5213,6 +5215,12 @@ function PerformControls({
       <div className="dockGroup performanceLoopPanel">
         <h2>Performance Loop</h2>
         <small className="controlHint">Keep the reward close: rehearse, record a short take, then jump straight to replay.</small>
+        <div className="performanceReadiness" aria-label="Performance readiness">
+          <span className={self ? "done" : ""}>Rig</span>
+          <span className={performanceReady ? "done" : ""}>Mouth</span>
+          <span className={cameraFollow ? "done" : ""}>Camera</span>
+          <span className={recording ? "active" : ""}>Take</span>
+        </div>
         <div className="performanceLoopActions">
           <button className={recording ? "danger active" : ""} onClick={onRecordToggle}>
             <Circle size={16} />
@@ -5259,6 +5267,11 @@ function PerformControls({
           <span>Floor</span>
           <div><i style={{ width: `${depthPercent}%` }} /></div>
           <small>{depthPercent}%</small>
+        </div>
+        <div className="feelMeter">
+          <span>Mouth</span>
+          <div><i style={{ width: `${mouthPercent}%` }} /></div>
+          <small>{mouthPercent}%</small>
         </div>
         <small className="controlHint">Hold Shift to scoot, Alt for tiny adjustments. Movement still stays locked to the scene floor.</small>
       </div>

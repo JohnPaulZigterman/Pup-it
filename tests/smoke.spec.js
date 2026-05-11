@@ -64,6 +64,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Performance Presets" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Motion" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live Pad" })).toBeVisible();
+  await expect(page.getByLabel("Performance readiness")).toBeVisible();
   await expect(page.getByRole("button", { name: "TV Ready" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Audio" })).toHaveClass(/selected/);
   await page.getByRole("button", { name: "5 Big Reaction Face, punch-in, and weird expression." }).click();
@@ -77,6 +78,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
   await expect(page.getByLabel("Finish mode path")).toBeVisible();
   await expect(page.getByText("Render Check")).toBeVisible();
+  await expect(page.getByLabel("Render pipeline")).toBeVisible();
   await expect(page.getByText("DoinkTV Handoff")).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();
   await expect(page.getByText("Ready Enough Score")).toBeVisible();

@@ -90,6 +90,16 @@ export function SceneLibraryEditor({
   const renderModel = renderJob?.request?.renderModel || null;
   const renderHealth = renderJob?.output?.renderHealth || null;
   const renderSucceeded = renderJob?.status === "succeeded" && Boolean(finalVideoPath);
+  const renderStage =
+    backendRendering
+      ? "rendering"
+      : renderJob?.status === "failed"
+        ? "failed"
+        : renderSucceeded
+          ? "ready"
+          : hasSubmissionSource
+            ? "queued"
+            : "waiting";
   const renderDurationMs =
     renderHealth?.durationMs ||
     renderModel?.durationMs ||
@@ -124,6 +134,13 @@ export function SceneLibraryEditor({
     { id: "thumbnail", label: "Thumbnail", value: renderHealth?.hasThumbnail || renderSucceeded ? "Included with render" : "Generated from stage", ready: renderHealth?.hasThumbnail || renderSucceeded },
     { id: "audio", label: "Audio tracks", value: audioStatus, ready: audioReady },
     { id: "rights", label: "Rights note", value: doinkSubmission.rightsNotes.trim() ? "Included" : "Needs creator note", ready: Boolean(doinkSubmission.rightsNotes.trim()) }
+  ];
+  const renderPipelineSteps = [
+    { id: "source", label: "Source", done: hasSubmissionSource, detail: finishTargetLabel },
+    { id: "queue", label: "Queue", done: backendRendering || Boolean(renderJob), detail: backendRendering ? "In progress" : renderJob ? renderJob.status : "Not sent yet" },
+    { id: "frames", label: "Frames", done: renderHealth?.hasVideo || renderSucceeded, detail: `${renderClipCount || 1} clip${(renderClipCount || 1) === 1 ? "" : "s"}` },
+    { id: "audio", label: "Audio", done: Boolean(audioMux) || audioReady, detail: audioStatus },
+    { id: "deliver", label: "Deliver", done: renderSucceeded, detail: finalVideoPath || "WEBM pending" }
   ];
   const finishSpineSteps = [
     { id: "review", label: "Review", done: Boolean(selectedTake || timeline.length), actionLabel: selectedTake ? "Replay" : "Pick Take", action: selectedTake ? onPlay : onRefresh },
@@ -274,10 +291,19 @@ export function SceneLibraryEditor({
           </div>
         </div>
         <div className="renderReliabilityPanel">
-          <div>
+          <div className={`renderStageBanner renderStage-${renderStage}`}>
             <span className="eyebrow">Render Check</span>
             <strong>{backendRendering ? "Rendering review copy..." : renderSucceeded ? "Review render ready." : "Ready to render a review copy."}</strong>
             <small>{finishTargetLabel} / {formatDuration(renderDurationMs)} / {renderClipCount || 1} clip{(renderClipCount || 1) === 1 ? "" : "s"}</small>
+          </div>
+          <div className="renderPipelineSteps" aria-label="Render pipeline">
+            {renderPipelineSteps.map((step, index) => (
+              <span className={step.done ? "done" : ""} key={step.id}>
+                <i>{index + 1}</i>
+                <strong>{step.label}</strong>
+                <small>{step.detail}</small>
+              </span>
+            ))}
           </div>
           <div className="renderHealthGrid">
             <span className={hasSubmissionSource ? "done" : ""}>Source</span>
