@@ -476,30 +476,60 @@ function renderHtml() {
         };
       }
 
+      function segmentAt(model, ms) {
+        const segments = model.timelineSegments || [];
+        if (!segments.length) return null;
+        return segments.find((segment) => ms >= segment.startMs && ms < segment.startMs + segment.durationMs) || segments[segments.length - 1];
+      }
+
+      function modelForFrame(model, ms) {
+        const segment = segmentAt(model, ms);
+        if (!segment) return { model, localMs: ms + Math.max(0, model.trimStartMs || model.take?.trimStartMs || 0) };
+        const take = segment.take || {};
+        const localMs = Math.max(0, ms - segment.startMs + (segment.trimStartMs || take.trimStartMs || 0));
+        return {
+          model: {
+            ...model,
+            scene: take.scene || model.scene,
+            cameraShot: take.cameraShot || segment.shot || model.cameraShot,
+            lightingPreset: take.lightingPreset || model.lightingPreset,
+            backgroundTheme: take.backgroundTheme || model.backgroundTheme,
+            objectStyle: take.objectStyle || model.objectStyle,
+            directorCamera: take.directorCamera || model.directorCamera,
+            sceneObjects: take.sceneObjects || model.sceneObjects,
+            floorMarks: take.floorMarks || model.floorMarks,
+            take,
+            subtitle: segment.title || model.subtitle
+          },
+          localMs
+        };
+      }
+
       function drawFrame(model, ms) {
-        const take = model.take || {};
-        const performers = performerStateAt(take, ms);
-        drawBackground(model);
-        const camera = cameraSettings(model, performers);
+        const frame = modelForFrame(model, ms);
+        const activeModel = frame.model;
+        const take = activeModel.take || {};
+        const performers = performerStateAt(take, frame.localMs);
+        drawBackground(activeModel);
+        const camera = cameraSettings(activeModel, performers);
         ctx.save();
         ctx.translate(W * 0.5, H * 0.52);
         ctx.scale(camera.scale, camera.scale);
         ctx.translate(-W * 0.5 + camera.panX / camera.scale, -H * 0.52 + camera.panY / camera.scale);
-        drawObjects(model.sceneObjects || take.sceneObjects || []);
-        performers.forEach((performer) => drawPuppet(performer, ms));
+        drawObjects(activeModel.sceneObjects || take.sceneObjects || []);
+        performers.forEach((performer) => drawPuppet(performer, frame.localMs));
         ctx.restore();
-        applyLighting(model);
-        drawTitle(model);
+        applyLighting(activeModel);
+        drawTitle(activeModel);
       }
 
       window.renderPupIt = async function renderPupIt(request) {
         const model = request.renderModel || request;
         const take = model.take || {};
-        const duration = Math.max(1000, Math.min(model.durationMs || take.durationMs || 5000, 12000));
-        const trimOffset = Math.max(0, model.trimStartMs || take.trimStartMs || 0);
+        const duration = Math.max(1000, Math.min(model.durationMs || take.durationMs || 5000, 45000));
         const fps = 24;
         model.subtitle = (model.reviewTarget?.type || "preview") + " / " + Math.round(duration / 1000) + "s";
-        drawFrame(model, trimOffset);
+        drawFrame(model, 0);
         const thumbnail = canvas.toDataURL("image/png").split(",")[1];
 
         if (!window.MediaRecorder || !canvas.captureStream) {
@@ -522,7 +552,7 @@ function renderHtml() {
         recorder.start();
         const frameMs = 1000 / fps;
         for (let ms = 0; ms <= duration; ms += frameMs) {
-          drawFrame(model, ms + trimOffset);
+          drawFrame(model, ms);
           await new Promise((resolve) => setTimeout(resolve, frameMs));
         }
         recorder.stop();

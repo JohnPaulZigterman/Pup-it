@@ -2743,6 +2743,8 @@ function App() {
       project,
       selectedTake: submissionTake,
       timeline: productionTimeline,
+      timelineTakes: takeLibrary,
+      finishTarget,
       title: doinkSubmission.title || submissionTake?.name || `${showName} Short`,
       requestedBy: doinkSubmission.creatorName || name
     });
