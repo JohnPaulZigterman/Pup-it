@@ -2367,6 +2367,63 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.livePadPanel {
+  border-color: var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(215, 109, 88, 0.18), rgba(141, 183, 255, 0.18)),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.livePadGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.livePadGrid button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 2px 7px;
+  align-items: center;
+  min-height: 68px;
+  padding: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 60%),
+    var(--paper);
+  text-align: left;
+}
+
+.livePadGrid button > span {
+  grid-row: span 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--nicotine);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.livePadGrid strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.livePadGrid small {
+  color: #4b4e68;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 .puppetFeelPanel {
   border-color: var(--honey);
   background:

@@ -1289,6 +1289,10 @@ function App() {
       if (event.key === "2") setPose("listen");
       if (event.key === "3") setPose("point");
       if (event.key === "4") setPose("shrug");
+      if (event.key === "5") applyDirectorAction("reaction");
+      if (event.key === "6") applyDirectorAction("hold-for-laugh");
+      if (event.key === "7") applyDirectorAction("prop-reveal");
+      if (event.key === "8") applyDirectorAction("lights-shift");
       if (event.key.toLowerCase() === "z") triggerMacro("wave");
       if (event.key.toLowerCase() === "x") triggerMacro("hop");
       if (event.key.toLowerCase() === "c") triggerMacro("panic");
@@ -4919,6 +4923,51 @@ function PerformControls({
   const motionEnergy = Math.min(100, Math.round((self?.state.groundSpeed || 0) * 100));
   const depthPercent = Math.round(((self?.state.depthProgress ?? 0.65) || 0) * 100);
   const intentLabel = self?.state.motionIntent === "settling" ? "settling" : self?.state.walking ? "moving" : "ready";
+  const livePads = [
+    {
+      id: "reaction",
+      label: "Big Reaction",
+      keyHint: "5",
+      description: "Face, punch-in, and weird expression.",
+      action: () => {
+        onExpressionChange("weird");
+        onPoseChange("surprise");
+        onDirectorAction("reaction");
+      }
+    },
+    {
+      id: "dead-air",
+      label: "Dead Air",
+      keyHint: "6",
+      description: "Awkward hold with close framing.",
+      action: () => {
+        onExpressionChange("neutral");
+        onPoseChange("deadpan");
+        onDirectorAction("hold-for-laugh");
+      }
+    },
+    {
+      id: "panic",
+      label: "Panic Button",
+      keyHint: "C",
+      description: "Macro panic, shake, and noisy impact.",
+      action: () => {
+        onExpressionChange("mad");
+        onMacroTrigger("panic");
+        onDirectorAction("lights-shift");
+      }
+    },
+    {
+      id: "reveal",
+      label: "Reveal Thing",
+      keyHint: "7",
+      description: "Cue a prop and punch the camera.",
+      action: () => {
+        onPoseChange("point");
+        onDirectorAction("prop-reveal");
+      }
+    }
+  ];
 
   return (
     <>
@@ -5036,6 +5085,20 @@ function PerformControls({
             <Play size={16} />
             Replay Takes
           </button>
+        </div>
+      </div>
+
+      <div className="dockGroup livePadPanel">
+        <h2>Live Pad</h2>
+        <small className="controlHint">Big playable buttons for moments performers want constantly. They stack face, pose, camera, cue, and sound.</small>
+        <div className="livePadGrid">
+          {livePads.map((pad) => (
+            <button type="button" key={pad.id} onClick={pad.action}>
+              <span>{pad.keyHint}</span>
+              <strong>{pad.label}</strong>
+              <small>{pad.description}</small>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -5206,6 +5269,8 @@ function PerformControls({
           <strong>Mouth auto-match</strong>
           <span>1-4</span>
           <strong>Quick poses</strong>
+          <span>5-8</span>
+          <strong>Live cues</strong>
           <span>Z / X / C</span>
           <strong>Wave, hop, panic</strong>
           <span>H</span>
