@@ -1684,8 +1684,36 @@ input[type="color"] {
 
 .partBuilderActions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
+}
+
+.partFileButton,
+.fileImportDrop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.partFileButton input,
+.fileImportDrop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .partStretchControl {
@@ -1896,6 +1924,16 @@ input[type="color"] {
 
 .assetSearchRow input {
   min-width: 0;
+}
+
+.fileImportDrop {
+  width: 100%;
+  min-height: 40px;
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(141, 183, 255, 0.18), transparent 45%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
 }
 
 .assetTargetBar {
@@ -2582,6 +2620,51 @@ input[type="color"] {
     var(--surface-grain),
     var(--surface);
   background-blend-mode: multiply, normal;
+}
+
+.styleRemixPanel {
+  border-color: var(--mustard);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(255, 214, 102, 0.2), transparent 44%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.styleRemixSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.styleRemixSummary span {
+  min-height: 30px;
+  padding: 7px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.48);
+  color: #4b4e68;
+  font-size: 12px;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickRemixGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quickRemixGrid button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 6px;
+  font-size: 11px;
 }
 
 .styleSummary strong {

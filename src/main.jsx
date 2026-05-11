@@ -99,7 +99,7 @@ const tutorialSteps = [
   {
     mode: "build",
     title: "Build The Space",
-    body: "Choose a rig model, then assemble the puppet from shapes, doodle placeholders, imported images, styles, parts, and behaviors."
+    body: "Start with a rig model, then assemble the puppet from shapes, doodle placeholders, imported images, styles, parts, and behaviors."
   },
   {
     mode: "storyboard",
@@ -115,8 +115,8 @@ const tutorialSteps = [
 
 const workflowSteps = [
   { id: "home", label: "Setup", mode: "home", description: "Choose a show, template, or next task." },
-  { id: "cast", label: "Cast", mode: "build", description: "Design performers and reusable character rigs." },
-  { id: "sets", label: "Sets", mode: "assets", description: "Find settings, props, textures, and references." },
+  { id: "cast", label: "Rigs", mode: "build", description: "Build performer rigs and make them original." },
+  { id: "sets", label: "Materials", mode: "assets", description: "Gather raw settings, props, textures, and references." },
   { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
   { id: "edit", label: "Edit", mode: "edit", description: "Review takes and assemble the episode." },
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
@@ -125,7 +125,7 @@ const workflowSteps = [
 const showStarterTemplates = [
   {
     id: "two-hander",
-    name: "Two Characters Talking",
+    name: "Two-Rig Dialogue",
     description: "Readable blocking and soft TV lighting for a fast dialogue scene.",
     scene: "studio",
     cameraShot: "two-shot",
@@ -2398,7 +2398,7 @@ function ContextualInspector({
         <small>{recording ? "Recording take" : micLive ? "Mic armed" : "Ready"}</small>
       </div>
       <div className="inspectorFacts">
-        <span>Character</span>
+        <span>Rig</span>
         <strong>{characterName}</strong>
         <span>Scene</span>
         <strong>{scene.name}</strong>
@@ -2637,6 +2637,46 @@ function PerformControls({
         <strong>{selectedPerspective.name}</strong>
         <small>{selectedPerspective.description}</small>
         <small>{selectedScene.perspectiveNote}</small>
+      </div>
+
+      <div className="dockGroup styleRemixPanel">
+        <h2>Style Remix</h2>
+        <div className="styleRemixSummary">
+          <span>{getCatalogItem(backgroundThemeCatalog, backgroundTheme).name}</span>
+          <span>{getCatalogItem(objectStyleCatalog, objectStyle).name}</span>
+        </div>
+        <div className="quickRemixGrid">
+          <button
+            type="button"
+            onClick={() => {
+              onBackgroundThemeChange("painted-depth");
+              onObjectStyleChange("soft-material");
+            }}
+          >
+            <Sparkles size={15} />
+            Painted
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onBackgroundThemeChange("pattern-held");
+              onObjectStyleChange("paper-cut");
+            }}
+          >
+            <Sparkles size={15} />
+            Cutout
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onBackgroundThemeChange("abstract-gallery");
+              onObjectStyleChange("textured-cutout");
+            }}
+          >
+            <Sparkles size={15} />
+            Strange
+          </button>
+        </div>
       </div>
 
       <div className="dockGroup">
@@ -2938,16 +2978,26 @@ function AssetLibraryPanel({
     const matchesSearch = !searchQuery || getAssetSearchText(asset).includes(searchQuery);
     return matchesFormat && matchesTarget && matchesSearch;
   });
+  const importLocalImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageUrl(String(reader.result || ""));
+      setImageName((current) => current || file.name.replace(/\.[^.]+$/, ""));
+      setImageLicense("Team-owned / local import");
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="assetLibrary">
       <div className="dockGroup">
-        <h2>Asset Library</h2>
+        <h2>Raw Materials</h2>
         <div className="editorHeader">
           <Library size={18} />
           <div>
-            <strong>Curated Free Sources</strong>
-            <small>CC0 assets can be imported directly. Mixed-license sources stay reference-only.</small>
+            <strong>Find pieces for your show</strong>
+            <small>Search for raw settings, objects, rigs, textures, and reference material to transform.</small>
           </div>
         </div>
         <label className="assetSearchRow">
@@ -2997,14 +3047,23 @@ function AssetLibraryPanel({
       </div>
 
       <div className="dockGroup">
-        <h2>Import Image URL</h2>
+        <h2>Import Material</h2>
         <label>
           Name
           <input value={imageName} onChange={(event) => setImageName(event.target.value)} placeholder="Couch, skyline, weird sign..." />
         </label>
+        <label className="fileImportDrop">
+          <FolderOpen size={16} />
+          Add local image
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => importLocalImage(event.target.files?.[0])}
+          />
+        </label>
         <label>
-          Image URL
-          <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." />
+          Image URL or imported file
+          <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://... or local import" />
         </label>
         <label>
           License / rights note
@@ -3025,7 +3084,7 @@ function AssetLibraryPanel({
           }}
         >
           <Plus size={16} />
-          Place Image
+          Place Material
         </button>
         <small className="controlHint">Use cleared, CC0, public-domain, or team-owned images for production.</small>
       </div>
@@ -3105,7 +3164,7 @@ function AssetLibraryPanel({
                     disabled={!safe || !asset.targets?.some((targetItem) => ["object", "setting", "sprite"].includes(targetItem))}
                     onClick={() => onPlaceAsset(asset)}
                   >
-                    Place
+                    Use as Material
                   </button>
                   {asset.sourceUrl ? (
                     <a href={asset.sourceUrl} target="_blank" rel="noreferrer">
@@ -3314,7 +3373,7 @@ function SceneLibraryEditor({
       {selectedTake && (
         <>
           <div className="dockGroup">
-            <h2>Timeline</h2>
+            <h2>Take Lanes</h2>
             <div className="editorStats">
               <span>
                 <strong>{formatDuration(selectedTake.durationMs)}</strong>
@@ -3333,6 +3392,9 @@ function SceneLibraryEditor({
                 Cast
               </span>
             </div>
+            <small className="controlHint">
+              Next pass: movement, mouth, camera, prop cues, and audio become separate editable lanes.
+            </small>
           </div>
 
           <div className="dockGroup">
@@ -3358,7 +3420,7 @@ function SceneLibraryEditor({
             </button>
             <button onClick={() => onAddTakeToTimeline(selectedTake)}>
               <Plus size={16} />
-              Timeline
+              Add to Cut
             </button>
             <button onClick={() => onExport(selectedTake)}>
               <Video size={16} />
@@ -3383,7 +3445,7 @@ function SceneLibraryEditor({
         </label>
         <div className="pipelineChecklist">
           <span className={takes.length ? "done" : ""}>Takes recorded</span>
-          <span className={timeline.length ? "done" : ""}>Timeline assembled</span>
+          <span className={timeline.length ? "done" : ""}>Episode cut assembled</span>
           <span className={selectedTake?.audioTrackCount || selectedTake?.tracks?.audio?.length ? "done" : ""}>
             Character audio tracked
           </span>
@@ -3404,8 +3466,11 @@ function SceneLibraryEditor({
 
 function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
   return (
-    <div className="dockGroup">
-      <h2>Production Timeline</h2>
+    <div className="dockGroup productionTimelinePanel">
+      <h2>Episode Assembly</h2>
+      <small className="controlHint">
+        This is the rough cut shelf for now. Detailed lane editing will move here as recording gets richer.
+      </small>
       {clips.length ? (
         <div className="timelineList">
           {clips.map((clip, index) => (
@@ -3424,11 +3489,11 @@ function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">No timeline clips yet.</div>
+        <div className="emptyState">No episode clips yet.</div>
       )}
       <button className="wideAction" onClick={onExportProject}>
         <Video size={16} />
-        Export Project
+        Export Episode Package
       </button>
     </div>
   );
@@ -3725,7 +3790,7 @@ function CharacterEditor({
       <div className="dockGroup buildPartsPanel">
         <h2>Assemble Parts</h2>
         <small className="controlHint">
-          Start with simple shapes, mark a rough drawn part, or paste an image URL for each body piece.
+          Start with simple shapes, mark a rough drawn part, or import your own image for each body piece.
         </small>
         <div className="partBuilderList">
           {characterPartCatalog.map((part) => (
@@ -3792,7 +3857,7 @@ function CharacterEditor({
       </div>
 
       <div className="dockGroup">
-        <h2>Animation Style</h2>
+        <h2>Character Style Remix</h2>
         <div className="styleSummary">
           <strong>{selectedStyle.family}</strong>
           <small>
@@ -3889,6 +3954,17 @@ function CharacterEditor({
 
 function PartBuilderRow({ part, value = {}, onChange, onClear }) {
   const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
+  const importPartImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () =>
+      onChange({
+        mode: "image",
+        source: String(reader.result || ""),
+        shape: value.shape || "oval"
+      });
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="partBuilderRow">
@@ -3918,7 +3994,7 @@ function PartBuilderRow({ part, value = {}, onChange, onClear }) {
       </select>
       <input
         value={value.source || ""}
-        placeholder="Image URL"
+        placeholder="Image URL or imported file"
         onChange={(event) =>
           onChange({
             mode: "image",
@@ -3928,6 +4004,14 @@ function PartBuilderRow({ part, value = {}, onChange, onClear }) {
         }
       />
       <div className="partBuilderActions">
+        <label className="partFileButton">
+          Import
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => importPartImage(event.target.files?.[0])}
+          />
+        </label>
         <button
           type="button"
           onClick={() =>

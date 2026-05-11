@@ -10,7 +10,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
   await expect(page.getByText("Rehearse", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Cast" }).first().click();
+  await page.getByRole("button", { name: "Rigs" }).first().click();
   await expect(page.getByRole("heading", { name: "Build The Space" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assemble Parts" })).toBeVisible();
   await page.locator(".partBuilderRow").filter({ hasText: "Head" }).getByRole("button", { name: "Doodle" }).click();
@@ -18,9 +18,9 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByRole("button", { name: "Odd Body Push the silhouette first, then keep whatever feels funny." }).click();
   await expect(page.getByRole("heading", { name: "Behavior" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Sets" }).first().click();
+  await page.getByRole("button", { name: "Materials" }).first().click();
   await page.getByPlaceholder("rigs, mouths, diner setting, parody reference...").fill("furniture");
-  await page.locator(".assetActions").getByRole("button", { name: "Place" }).first().click();
+  await page.locator(".assetActions").getByRole("button", { name: "Use as Material" }).first().click();
 
   await expect(page.getByRole("heading", { name: "Scene Objects" })).toBeVisible();
   await expect(page.locator(".sceneObjectEditor")).toHaveCount(1);
