@@ -2,18 +2,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { createRenderModel } from "../shared/renderModel.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const renderRoot = path.resolve(__dirname, "../renders");
-const rendererVersion = "pup-it-headless-chromium-v1";
-
-function safeSlug(value) {
-  return (value || "pup-it-render")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 72) || "pup-it-render";
-}
+const rendererVersion = "pup-it-headless-chromium-v2";
 
 function renderHtml() {
   return `<!doctype html>
@@ -63,8 +56,8 @@ function renderHtml() {
         return themes[backgroundTheme] || ({ studio: ["#f5f1e8", "#d9d1c3"], street: ["#dfe8ef", "#b7c8c6"], space: ["#242335", "#0f1020"] }[scene] || ["#f5f1e8", "#d9d1c3"]);
       }
 
-      function drawBackground(frame) {
-        const [top, bottom] = sceneColors(frame.scene, frame.backgroundTheme);
+      function drawBackground(model) {
+        const [top, bottom] = sceneColors(model.scene, model.backgroundTheme);
         const gradient = ctx.createLinearGradient(0, 0, 0, H);
         gradient.addColorStop(0, top);
         gradient.addColorStop(1, bottom);
@@ -78,6 +71,28 @@ function renderHtml() {
         ctx.ellipse(W * 0.5, H * 0.78, W * 0.44, H * 0.12, 0, 0, Math.PI * 2);
         ctx.fill();
         drawGrain();
+      }
+
+      function applyLighting(model) {
+        ctx.save();
+        if (model.lightingPreset === "dramatic") {
+          const gradient = ctx.createRadialGradient(W * 0.5, H * 0.45, 80, W * 0.5, H * 0.48, W * 0.72);
+          gradient.addColorStop(0, "rgba(255,255,255,0.1)");
+          gradient.addColorStop(0.56, "rgba(38,41,54,0.04)");
+          gradient.addColorStop(1, "rgba(18,19,28,0.38)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, W, H);
+        } else if (model.lightingPreset === "night") {
+          ctx.fillStyle = "rgba(35,46,78,0.34)";
+          ctx.fillRect(0, 0, W, H);
+        } else if (model.lightingPreset === "flat-tv") {
+          ctx.fillStyle = "rgba(255,255,255,0.12)";
+          ctx.fillRect(0, 0, W, H);
+        } else if (model.lightingPreset === "cozy") {
+          ctx.fillStyle = "rgba(255,207,138,0.16)";
+          ctx.fillRect(0, 0, W, H);
+        }
+        ctx.restore();
       }
 
       function drawObjects(objects) {
@@ -249,7 +264,7 @@ function renderHtml() {
         ctx.restore();
       }
 
-      function drawTitle(frame, take) {
+      function drawTitle(model) {
         ctx.fillStyle = "rgba(245,241,232,0.82)";
         ctx.fillRect(24, 24, 440, 58);
         ctx.strokeStyle = "#262936";
@@ -257,32 +272,58 @@ function renderHtml() {
         ctx.strokeRect(24, 24, 440, 58);
         ctx.fillStyle = "#262936";
         ctx.font = "800 22px Arial";
-        ctx.fillText(frame.title || take?.name || "Pup-It backend render", 42, 56);
+        ctx.fillText(model.title || "Pup-It backend render", 42, 56);
         ctx.font = "700 13px Arial";
-        ctx.fillText(frame.subtitle || "Headless Chromium render", 42, 75);
+        ctx.fillText(model.subtitle || (model.cameraShot + " / " + model.lightingPreset), 42, 75);
       }
 
-      function drawFrame(frame, ms) {
-        const take = frame.take || {};
-        drawBackground(frame);
-        drawObjects(frame.sceneObjects || take.sceneObjects || []);
-        performerStateAt(take, ms).forEach((performer) => drawPuppet(performer, ms));
-        drawTitle(frame, take);
+      function cameraSettings(model, performers) {
+        const shotScale = {
+          wide: 1,
+          "two-shot": 1.08,
+          close: 1.24,
+          reaction: 1.34
+        }[model.cameraShot] || 1;
+        const focus = performers.length
+          ? performers.reduce((acc, performer) => ({
+              x: acc.x + (performer.state?.x || 50),
+              y: acc.y + (performer.state?.y || 64)
+            }), { x: 0, y: 0 })
+          : { x: 50, y: 64 };
+        const count = performers.length || 1;
+        const focusX = focus.x / count / 100 * W;
+        const focusY = focus.y / count / 100 * H;
+        const follow = model.directorCamera?.follow;
+        return {
+          scale: shotScale * (model.directorCamera?.punchScale || 1),
+          panX: follow || shotScale > 1 ? W * 0.5 - focusX : 0,
+          panY: follow || shotScale > 1 ? H * 0.58 - focusY : 0
+        };
+      }
+
+      function drawFrame(model, ms) {
+        const take = model.take || {};
+        const performers = performerStateAt(take, ms);
+        drawBackground(model);
+        const camera = cameraSettings(model, performers);
+        ctx.save();
+        ctx.translate(W * 0.5, H * 0.52);
+        ctx.scale(camera.scale, camera.scale);
+        ctx.translate(-W * 0.5 + camera.panX / camera.scale, -H * 0.52 + camera.panY / camera.scale);
+        drawObjects(model.sceneObjects || take.sceneObjects || []);
+        performers.forEach((performer) => drawPuppet(performer, ms));
+        ctx.restore();
+        applyLighting(model);
+        drawTitle(model);
       }
 
       window.renderPupIt = async function renderPupIt(request) {
-        const take = request.selectedTake || request.project?.takes?.find((item) => item.best) || request.project?.takes?.[0] || {};
-        const duration = Math.max(1000, Math.min(take.durationMs || request.durationMs || 5000, 12000));
+        const model = request.renderModel || request;
+        const take = model.take || {};
+        const duration = Math.max(1000, Math.min(model.durationMs || take.durationMs || 5000, 12000));
         const fps = 24;
-        const frame = {
-          take,
-          scene: take.scene || request.project?.scene || "studio",
-          sceneObjects: take.sceneObjects || request.project?.sceneObjects || [],
-          backgroundTheme: take.backgroundTheme || request.project?.backgroundTheme || "painted-depth",
-          title: request.title || take.name || request.project?.showName || "Pup-It render",
-          subtitle: (request.project?.publishingPackage?.reviewTarget?.type || "preview") + " / " + Math.round(duration / 1000) + "s"
-        };
-        drawFrame(frame, 0);
+        model.subtitle = (model.reviewTarget?.type || "preview") + " / " + Math.round(duration / 1000) + "s";
+        drawFrame(model, 0);
         const thumbnail = canvas.toDataURL("image/png").split(",")[1];
 
         if (!window.MediaRecorder || !canvas.captureStream) {
@@ -305,7 +346,7 @@ function renderHtml() {
         recorder.start();
         const frameMs = 1000 / fps;
         for (let ms = 0; ms <= duration; ms += frameMs) {
-          drawFrame(frame, ms);
+          drawFrame(model, ms);
           await new Promise((resolve) => setTimeout(resolve, frameMs));
         }
         recorder.stop();
@@ -318,9 +359,8 @@ function renderHtml() {
 }
 
 export async function renderWithHeadlessChromium(request, jobId) {
-  const project = request.project || {};
-  const take = request.selectedTake || project.takes?.find((item) => item.best) || project.takes?.[0] || null;
-  const safeName = safeSlug(request.title || take?.name || project.showName || "pup-it-render");
+  const renderModel = request.renderModel || createRenderModel(request);
+  const safeName = renderModel.slug;
   const jobDir = path.join(renderRoot, jobId);
   await mkdir(jobDir, { recursive: true });
 
@@ -329,7 +369,7 @@ export async function renderWithHeadlessChromium(request, jobId) {
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
     await page.setContent(renderHtml(), { waitUntil: "domcontentloaded" });
-    const result = await page.evaluate((payload) => window.renderPupIt(payload), request);
+    const result = await page.evaluate((payload) => window.renderPupIt(payload), { ...request, renderModel });
     const videoFile = `${safeName}.webm`;
     const thumbnailFile = `${safeName}.png`;
     const manifestFile = "manifest.json";
@@ -357,7 +397,7 @@ export async function renderWithHeadlessChromium(request, jobId) {
       createdAt: new Date().toISOString()
     };
 
-    await writeFile(manifestPath, JSON.stringify({ request, output }, null, 2));
+    await writeFile(manifestPath, JSON.stringify({ request, renderModel, output }, null, 2));
     await page.close();
     return output;
   } finally {

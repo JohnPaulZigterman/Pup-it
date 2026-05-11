@@ -78,6 +78,7 @@ import {
 } from "../shared/catalogs.js";
 import { clampPointToFloor } from "../shared/depth.js";
 import { createPerformerState, defaultCharacterId, defaultRoomId } from "../shared/schema.js";
+import { createRenderModel } from "../shared/renderModel.js";
 import {
   hasInput,
   indexPerformers,
@@ -2685,6 +2686,13 @@ function App() {
     if (backendRendering) return;
     const project = createCurrentProjectExport();
     const submissionTake = selectedTake || takeLibrary.find((take) => take.best) || takeLibrary[0] || null;
+    const renderModel = createRenderModel({
+      project,
+      selectedTake: submissionTake,
+      timeline: productionTimeline,
+      title: doinkSubmission.title || selectedTake?.name || `${showName} Short`,
+      requestedBy: doinkSubmission.creatorName || name
+    });
     setBackendRendering(true);
     setStatus("Sending the short to the backend render queue.");
     try {
@@ -2697,6 +2705,7 @@ function App() {
           project,
           selectedTake: submissionTake,
           timeline: productionTimeline,
+          renderModel,
           requestedBy: doinkSubmission.creatorName || name
         })
       });
