@@ -69,6 +69,29 @@ test("motion feel presets expose performance-layer movement values", () => {
   expect(moved.settleAmount).toBeGreaterThan(0);
 });
 
+test("smooth motion reaches useful speed quickly and settles cleanly", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });
+  const started = step(base, { dx: 1, dy: 0 }, studio, 6);
+  const continued = step(started, { dx: 1, dy: 0 }, studio, 12);
+  const stopped = step(continued, { dx: 0, dy: 0 }, studio, 16);
+
+  expect(started.x - base.x).toBeGreaterThan(3);
+  expect(continued.groundSpeed).toBeGreaterThan(0.75);
+  expect(stopped.groundSpeed).toBeLessThan(0.08);
+  expect(stopped.walking).toBe(false);
+});
+
+test("depth movement starts without visible hesitation", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });
+  const moved = step(base, { dx: 0, dy: -1 }, studio, 8);
+  const travel = Math.abs(getDepthProgress(base.y, studio) - getDepthProgress(moved.y, studio));
+
+  expect(travel).toBeGreaterThan(0.08);
+  expect(moved.y).toBeLessThan(base.y);
+});
+
 test("direction reversal is responsive without jumping off the floor", () => {
   const studio = scene("studio");
   const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });

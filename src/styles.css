@@ -3599,9 +3599,8 @@ input[type="color"] {
   height: 196px;
   transform-origin: bottom center;
   transition:
-    left 82ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    top 82ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 110ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    filter 120ms ease,
+    opacity 120ms ease;
   will-change: left, top, transform;
   --outline: #2b2d42;
   --line-width: 4px;
@@ -3624,6 +3623,15 @@ input[type="color"] {
     saturate(1.02);
 }
 
+.puppet:not(.self) {
+  transition:
+    left 70ms linear,
+    top 70ms linear,
+    transform 80ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+
 .puppet.self .nameTag {
   background: var(--nicotine);
   color: var(--ink);
@@ -3636,7 +3644,11 @@ input[type="color"] {
     translateY(calc(var(--walk-bounce) * -1.8px + var(--settle) * 1.2px))
     scaleX(var(--facing));
   transform-origin: center bottom;
-  transition: transform 130ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: none;
+}
+
+.puppet:not(.self) .puppetRig {
+  transition: transform 90ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .castShadow {
@@ -4851,6 +4863,10 @@ input[type="color"] {
   font-size: 9px;
   font-weight: 900;
   transform: translateX(-50%) rotate(-2deg);
+}
+
+.hideStageLabels.rigModel.needsParts .puppetBody::before {
+  content: "";
 }
 
 .rigModel.needsParts .puppetBody::after {

@@ -42,10 +42,10 @@ export function inputFromPressedKeys(pressed, deltaMs = 16.67) {
   let dy = 0;
   let dScale = 0;
 
-  if (pressed.has("ArrowLeft") || pressed.has("a")) dx -= 1.2;
-  if (pressed.has("ArrowRight") || pressed.has("d")) dx += 1.2;
-  if (pressed.has("ArrowUp") || pressed.has("w")) dy -= 1.2;
-  if (pressed.has("ArrowDown") || pressed.has("s")) dy += 1.2;
+  if (pressed.has("ArrowLeft") || pressed.has("a")) dx -= 1;
+  if (pressed.has("ArrowRight") || pressed.has("d")) dx += 1;
+  if (pressed.has("ArrowUp") || pressed.has("w")) dy -= 1;
+  if (pressed.has("ArrowDown") || pressed.has("s")) dy += 1;
   if (pressed.has("q")) dScale -= 0.005;
   if (pressed.has("e")) dScale += 0.005;
 

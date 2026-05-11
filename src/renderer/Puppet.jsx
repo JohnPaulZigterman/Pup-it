@@ -12,7 +12,7 @@ function hasCustomPart(part) {
   return Boolean(!part?.hidden && (part?.source || part?.mode === "drawn" || part?.shape));
 }
 
-function PuppetPart({ part, className, label }) {
+function PuppetPart({ part, className, label, showLabel }) {
   if (!hasCustomPart(part)) return null;
   const style = {
     "--part-scale": part.scale || 1,
@@ -29,12 +29,12 @@ function PuppetPart({ part, className, label }) {
       style={style}
       aria-hidden="true"
     >
-      {part.label || label}
+      {showLabel ? part.label || label : null}
     </span>
   );
 }
 
-export function Puppet({ performer, isSelf, depthModel }) {
+export function Puppet({ performer, isSelf, depthModel, showLabels = false }) {
   const character = getCatalogItem(characterCatalog, performer.character);
   const expression = getCatalogItem(expressionCatalog, performer.state.expression);
   const pose = getCatalogItem(poseCatalog, performer.state.pose);
@@ -82,6 +82,7 @@ export function Puppet({ performer, isSelf, depthModel }) {
         canBlink ? "auto-blink" : "",
         isWalking ? `walking walk-${rig.walkCycle}` : "",
         state.macro ? `macro-${state.macro}` : "",
+        showLabels ? "showStageLabels" : "hideStageLabels",
         isSelf ? "self" : ""
       ].join(" ")}
       style={{
@@ -122,36 +123,36 @@ export function Puppet({ performer, isSelf, depthModel }) {
         "--mouth-open": mouthOpen
       }}
     >
-      <div className="nameTag">{performer.name}</div>
+      {showLabels ? <div className="nameTag">{performer.name}</div> : null}
       <div className="castShadow" aria-hidden="true" />
       <div className="puppetRig">
         {rig.arms ? (
           <>
             <div className="limb arm armLeft">
-              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" />
+              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" showLabel={showLabels} />
             </div>
             <div className="limb arm armRight">
-              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" />
+              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" showLabel={showLabels} />
             </div>
           </>
         ) : null}
         {rig.legs ? (
           <>
             <div className="limb leg legLeft">
-              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" />
+              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" showLabel={showLabels} />
             </div>
             <div className="limb leg legRight">
-              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" />
+              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" showLabel={showLabels} />
             </div>
           </>
         ) : null}
         <div className="puppetBody">
-          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" />
-          <PuppetPart part={parts.torso} className="partTorso" label="torso" />
-          <PuppetPart part={parts.head} className="partHead" label="head" />
-          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" />
-          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" />
-          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" />
+          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" showLabel={showLabels} />
+          <PuppetPart part={parts.torso} className="partTorso" label="torso" showLabel={showLabels} />
+          <PuppetPart part={parts.head} className="partHead" label="head" showLabel={showLabels} />
+          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" showLabel={showLabels} />
+          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" showLabel={showLabels} />
+          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" showLabel={showLabels} />
           <div className="animalFeature ears" aria-hidden="true" />
           <div className="animalFeature snout" aria-hidden="true" />
           <div className="animalFeature beak" aria-hidden="true" />

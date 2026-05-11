@@ -1123,6 +1123,7 @@ function App() {
       setRecording(snapshot.recording);
       setPerformers(indexPerformers(snapshot.performers));
       setJoined(true);
+      setMode("perform");
       setStatus(`Live in room "${snapshot.id}". Open another tab to test multiplayer.`);
     });
     socket.on("performer:joined", (performer) => {
@@ -1173,6 +1174,13 @@ function App() {
     const pressed = new Set();
     let frame = null;
     let lastFrameAt = performance.now();
+    let lastNetworkEmitAt = 0;
+    const emitPerformerState = (state, now, { force = false } = {}) => {
+      if (!socketRef.current?.connected) return;
+      if (!force && now - lastNetworkEmitAt < 33) return;
+      lastNetworkEmitAt = now;
+      socketRef.current.emit("performer:update", state);
+    };
 
     const update = (now = performance.now()) => {
       const deltaMs = Math.min(48, Math.max(8, now - lastFrameAt || 16.67));
@@ -1197,13 +1205,13 @@ function App() {
               travelLean: 0
             }
           };
-          socketRef.current.emit("performer:update", nextPerformer.state);
+          emitPerformerState(nextPerformer.state, now, { force: true });
           return upsertPerformer(current, nextPerformer);
         }
 
         const nextPerformer = movePerformerFromInput(performer, input, selectedScene);
         const nextState = nextPerformer.state;
-        socketRef.current.emit("performer:update", nextState);
+        emitPerformerState(nextState, now);
         return upsertPerformer(current, nextPerformer);
       });
 
@@ -2176,6 +2184,7 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
+  const showStageMarkers = mode !== "perform";
   const activeShowToolbox = useMemo(
     () =>
       createShowToolbox({
@@ -2826,7 +2835,7 @@ function App() {
             ? "dashboardStage"
             : mode === "storyboard"
             ? "storyboardStage"
-            : `stage perspective-${selectedScene.perspective || "front-stage"} ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
+            : `stage ${showStageMarkers ? "stage-editing" : "stage-live"} perspective-${selectedScene.perspective || "front-stage"} ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
         }
         style={
           mode === "home" || mode === "storyboard"
@@ -2877,10 +2886,14 @@ function App() {
             <div className="stageTexture" />
             <div className="stageCamera">
               <div className="stageLighting" />
-              <div className="horizonGuide" data-label={selectedScene.focusLabel || "Focus"} />
-              <div className="focusPoint" aria-hidden="true" />
+              {showStageMarkers ? (
+                <>
+                  <div className="horizonGuide" data-label={selectedScene.focusLabel || "Focus"} />
+                  <div className="focusPoint" aria-hidden="true" />
+                </>
+              ) : null}
               <div className="setFloor" />
-              {floorMarks.map((mark) => (
+              {showStageMarkers && floorMarks.map((mark) => (
                 <FloorMark key={mark.id} mark={mark} onActivate={moveSelfToMark} />
               ))}
               {sceneObjects.map((object) => (
@@ -2889,6 +2902,7 @@ function App() {
                   object={object}
                   selected={object.id === selectedSceneObjectId}
                   onSelect={setSelectedSceneObjectId}
+                  showLabel={showStageMarkers}
                 />
               ))}
               {stagePerformers.map((performer) => (
@@ -2897,6 +2911,7 @@ function App() {
                   performer={performer}
                   isSelf={performer.id === selfId}
                   depthModel={selectedScene}
+                  showLabels={showStageMarkers}
                 />
               ))}
             </div>
@@ -3583,7 +3598,7 @@ function BeginnerRoadmap({
   );
 }
 
-function SceneObject({ object, selected, onSelect }) {
+function SceneObject({ object, selected, onSelect, showLabel = true }) {
   const Component = onSelect ? "button" : "div";
   return (
     <Component
@@ -3599,7 +3614,7 @@ function SceneObject({ object, selected, onSelect }) {
       onClick={onSelect && !object.locked ? () => onSelect(object.id) : undefined}
     >
       {object.imageUrl && <img src={object.imageUrl} alt="" />}
-      <span>{object.name}</span>
+      {showLabel ? <span>{object.name}</span> : null}
     </Component>
   );
 }
@@ -5061,7 +5076,7 @@ function PanelFrame({ panel }) {
           <SceneObject key={object.id} object={object} selected={false} />
         ))}
         {panel.performers.map((performer) => (
-          <Puppet key={performer.id} performer={performer} isSelf={false} depthModel={panelScene} />
+          <Puppet key={performer.id} performer={performer} isSelf={false} depthModel={panelScene} showLabels />
         ))}
       </div>
     </div>

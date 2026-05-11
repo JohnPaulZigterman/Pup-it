@@ -35,7 +35,7 @@ export const perspectiveProfiles = {
     lateralNear: 1,
     verticalFar: 0.72,
     verticalNear: 1,
-    floorSpeed: 0.012,
+    floorSpeed: 0.014,
     scaleDepthStrength: 0.72,
     scaleCurve: 1.08,
     horizonSoftness: 0.16
@@ -52,7 +52,7 @@ export const perspectiveProfiles = {
     lateralNear: 0.98,
     verticalFar: 0.6,
     verticalNear: 0.92,
-    floorSpeed: 0.011,
+    floorSpeed: 0.0135,
     scaleDepthStrength: 0.86,
     scaleCurve: 1.18,
     horizonSoftness: 0.2
@@ -69,7 +69,7 @@ export const perspectiveProfiles = {
     lateralNear: 0.96,
     verticalFar: 0.34,
     verticalNear: 0.48,
-    floorSpeed: 0.012,
+    floorSpeed: 0.0135,
     scaleDepthStrength: 0.22,
     scaleCurve: 1,
     horizonSoftness: 0.22
@@ -86,7 +86,7 @@ export const perspectiveProfiles = {
     lateralNear: 0.86,
     verticalFar: 0.64,
     verticalNear: 0.78,
-    floorSpeed: 0.01,
+    floorSpeed: 0.012,
     scaleDepthStrength: 0.34,
     scaleCurve: 1.05,
     horizonSoftness: 0.28
@@ -146,6 +146,12 @@ export function getMotionProfile(id = "smooth") {
 
 export function hasResidualMotion(state, threshold = 0.00035) {
   return Math.hypot(state.motionVx || 0, state.motionVy || 0) > threshold;
+}
+
+function snapVelocity(value, target, floorSpeed) {
+  const snapThreshold = Math.max(0.00024, floorSpeed * 0.055);
+  if (target === 0 && Math.abs(value) < snapThreshold) return 0;
+  return value;
 }
 
 export function getFloorAtY(y, depthModel = defaultDepthModel) {
@@ -254,10 +260,12 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
   let motionVx = easeVelocity(beforeVx, targetVx, easingX, frameScale);
   let motionVy = easeVelocity(beforeVy, targetVy, easingY, frameScale);
 
-  if (targetVx === 0 && Math.abs(motionVx) < 0.00016) motionVx = 0;
-  if (targetVy === 0 && Math.abs(motionVy) < 0.00016) motionVy = 0;
+  const floorSpeed = model.floorSpeed || 0.012;
 
-  if (targetVx === 0 && targetVy === 0 && Math.hypot(motionVx, motionVy) < 0.00025) {
+  motionVx = snapVelocity(motionVx, targetVx, floorSpeed);
+  motionVy = snapVelocity(motionVy, targetVy, floorSpeed);
+
+  if (targetVx === 0 && targetVy === 0 && Math.hypot(motionVx, motionVy) < floorSpeed * 0.1) {
     motionVx = 0;
     motionVy = 0;
   }
@@ -280,7 +288,6 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
   }
 
   const nextScale = clamp(state.scale + input.dScale * frameScale, model.minTrim, model.maxTrim);
-  const floorSpeed = model.floorSpeed || 0.012;
   const groundSpeed = Math.hypot(motionVx, motionVy) / floorSpeed;
   const accelerationX = motionVx - beforeVx;
   const accelerationY = motionVy - beforeVy;
