@@ -2075,6 +2075,10 @@ input[type="color"] {
   color: #4b4e68;
 }
 
+.takeNameField {
+  margin-top: 8px;
+}
+
 .showObjectMap {
   display: flex;
   flex-wrap: wrap;
@@ -2085,6 +2089,23 @@ input[type="color"] {
   padding: 4px 6px;
   border: 1px solid var(--ink);
   background: var(--paper);
+  color: #4b4e68;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.toolboxSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.toolboxSummary span {
+  min-height: 24px;
+  padding: 5px 6px;
+  border: 1px dashed rgba(43, 45, 66, 0.45);
+  background: rgba(255, 255, 255, 0.22);
   color: #4b4e68;
   font-size: 10px;
   font-weight: 900;

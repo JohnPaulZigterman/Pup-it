@@ -140,6 +140,7 @@ export function createProjectExport({
   storyboardPanels,
   timeline,
   takes,
+  showToolbox = null,
   exportedAt = new Date().toISOString()
 }) {
   const credits = [
@@ -204,6 +205,7 @@ export function createProjectExport({
       credits,
       licenseMetadata: credits
     },
+    showToolbox,
     exportedAt,
     storyboardPanels,
     timeline,
@@ -216,6 +218,69 @@ export function createProjectExport({
       audioTrackCount: take.audioTrackCount,
       motionEventCount: take.motionEventCount
     }))
+  };
+}
+
+export function createShowToolbox({
+  showName,
+  cast = [],
+  sceneObjects = [],
+  sceneSets = [],
+  assetReferences = [],
+  storyboardPanels = [],
+  timeline = [],
+  takes = [],
+  style = {},
+  episodeStatus = "draft",
+  doinkSubmission = {}
+}) {
+  return {
+    schemaVersion: "pup-it.show-toolbox.v1",
+    showName: showName || "Untitled Show",
+    status: episodeStatus,
+    cast: cast.map((performer) => ({
+      id: performer.id,
+      name: performer.name,
+      character: performer.character,
+      stylePreset: performer.state?.stylePreset || null,
+      partCount: Object.values(performer.state?.characterParts || {}).filter(Boolean).length
+    })),
+    styleGuide: {
+      family: style.family || "Flexible",
+      theme: style.theme || "Show Native",
+      texturePreset: style.texturePreset || "paper-grain",
+      backgroundTheme: style.backgroundTheme || null,
+      objectStyle: style.objectStyle || null
+    },
+    sets: sceneSets.map((set) => ({ id: set.id, name: set.name, objectCount: set.objects?.length || 0 })),
+    props: sceneObjects.map((object) => ({
+      id: object.id,
+      name: object.name,
+      shape: object.shape,
+      texturePreset: object.texturePreset,
+      sourceUrl: object.sourceUrl || null
+    })),
+    credits: assetReferences.map((asset) => ({
+      name: asset.name,
+      sourceUrl: asset.sourceUrl,
+      license: asset.license,
+      attribution: asset.attribution || asset.license || "Check source before publishing."
+    })),
+    boards: storyboardPanels.map((panel) => ({ id: panel.id, title: panel.title, scene: panel.scene, shot: panel.shot })),
+    cuts: timeline.map((clip) => ({ id: clip.id, title: clip.title, sourceType: clip.sourceType, duration: clip.duration })),
+    takes: takes.map((take) => ({
+      id: take.id,
+      name: take.name,
+      durationMs: take.durationMs,
+      audioTrackCount: take.audioTrackCount || take.tracks?.audio?.length || 0,
+      best: Boolean(take.best)
+    })),
+    submission: {
+      targetChannel: "DoinkTV",
+      preferredBlock: doinkSubmission.preferredBlock || "short",
+      title: doinkSubmission.title || "",
+      creatorName: doinkSubmission.creatorName || ""
+    }
   };
 }
 

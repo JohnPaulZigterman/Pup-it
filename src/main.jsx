@@ -45,6 +45,7 @@ import {
   cameraShotCatalog,
   createDoinkTvSubmissionPackage,
   createProjectExport,
+  createShowToolbox,
   createTimelineClip,
   directorActionCatalog,
   lightingPresetCatalog
@@ -87,6 +88,13 @@ import {
   upsertPerformer
 } from "./engine/performanceState.js";
 import { Puppet } from "./renderer/Puppet.jsx";
+import {
+  computeBeginnerProgress,
+  developmentPathCards,
+  publicVersionMilestones,
+  tutorialSteps,
+  workflowSteps
+} from "./workflow/shortFlow.js";
 import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
@@ -152,69 +160,6 @@ const performancePresetCatalog = [
     cameraShot: "close",
     lightingPreset: "flat-tv"
   }
-];
-
-const tutorialSteps = [
-  {
-    mode: "perform",
-    title: "Perform Live",
-    body: "Move your character with WASD or arrow keys, let mic audio drive the mouth by default, and trigger expressions, poses, and macros from the dock."
-  },
-  {
-    mode: "build",
-    title: "Build The Space",
-    body: "Start with a rig model, then assemble the puppet from shapes, doodle placeholders, imported images, styles, parts, and behaviors."
-  },
-  {
-    mode: "storyboard",
-    title: "Plan The Scene",
-    body: "Storyboard mode captures the current stage as comic-strip panels, then lets you label beats, shot sizes, and timing before recording."
-  },
-  {
-    mode: "edit",
-    title: "Review Takes",
-    body: "Edit mode keeps recorded performances inside the app so you can browse scenes, play them back, and export takes with separate character audio tracks."
-  }
-];
-
-const workflowSteps = [
-  { id: "home", label: "Setup", mode: "home", description: "Choose a show, template, or next task." },
-  { id: "cast", label: "Rigs", mode: "build", description: "Build performer rigs and make them original." },
-  { id: "sets", label: "Materials", mode: "assets", description: "Gather raw settings, props, textures, and references." },
-  { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
-  { id: "edit", label: "Edit", mode: "edit", description: "Review takes and assemble the episode." },
-  { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
-];
-
-const developmentPathCards = [
-  {
-    id: "five-minute",
-    label: "1",
-    name: "Five-Minute Cartoon",
-    promise: "Start, build, perform, replay, export.",
-    focus: "Keep the beginner rail obvious enough that a first short can happen before the user starts managing software."
-  },
-  {
-    id: "toybox",
-    label: "2",
-    name: "Creation Toybox",
-    promise: "Make the show’s people, props, textures, and weird rules feel original.",
-    focus: "Treat presets as raw material. Shapes, doodles, imports, mutations, and behaviors should push users toward their own voice."
-  },
-  {
-    id: "studio",
-    label: "3",
-    name: "Performance Studio",
-    promise: "Make performing feel smooth, funny, and worth replaying.",
-    focus: "Motion, mouth, cue deck, camera, stings, and take review should feel like a playable comedy instrument."
-  }
-];
-
-const publicVersionMilestones = [
-  { id: "perform", name: "Joy Loop", detail: "Record, replay, laugh, trim, export." },
-  { id: "toybox", name: "Toybox Identity", detail: "Original rigs, props, textures, and weird behavior." },
-  { id: "formats", name: "Comedy Formats", detail: "Arguments, fake ads, desk bits, street pieces, bumpers." },
-  { id: "render", name: "Render Path", detail: "Preview WEBM now, stage-matched video next, backend reliability later." }
 ];
 
 const styleMutationControls = [
@@ -846,7 +791,7 @@ async function exportTakePreviewVideo(take, { onFrame } = {}) {
   if (!take || !window.MediaRecorder) throw new Error("Browser video export is not available here.");
   const width = 1280;
   const height = 720;
-  const fps = 12;
+  const fps = 24;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -865,16 +810,19 @@ async function exportTakePreviewVideo(take, { onFrame } = {}) {
   let performers = makePreviewPerformers(take);
   const events = [...(take.tracks?.motion || [])].sort((a, b) => a.at - b.at);
   let eventIndex = 0;
-  const durationMs = Math.max(1000, Math.min(take.durationMs || 5000, 45000));
+  const trimStartMs = take.trimStartMs || 0;
+  const trimEndMs = take.trimEndMs ?? take.durationMs ?? 5000;
+  const durationMs = Math.max(1000, Math.min(trimEndMs - trimStartMs, 45000));
   const frameMs = 1000 / fps;
 
   recorder.start();
   for (let atMs = 0; atMs <= durationMs; atMs += frameMs) {
-    while (eventIndex < events.length && (events[eventIndex].at || 0) <= atMs) {
+    const renderAtMs = trimStartMs + atMs;
+    while (eventIndex < events.length && (events[eventIndex].at || 0) <= renderAtMs) {
       performers = applyTakeEventToPreview(performers, events[eventIndex]);
       eventIndex += 1;
     }
-    drawPreviewVideoFrame(ctx, { take, performers, atMs, width, height });
+    drawPreviewVideoFrame(ctx, { take, performers, atMs: renderAtMs, width, height });
     onFrame?.(Math.min(1, atMs / durationMs));
     await new Promise((resolve) => window.setTimeout(resolve, frameMs));
   }
@@ -931,7 +879,8 @@ function showSessionFromPersistedShow(show) {
     storyboardPanels: showBible.storyboardPanels || [],
     productionTimeline: showBible.productionTimeline || [],
     takes: showBible.takes || [],
-    doinkSubmission: showBible.doinkSubmission || {}
+    doinkSubmission: showBible.doinkSubmission || {},
+    showToolbox: showBible.showToolbox || {}
   };
 }
 
@@ -966,7 +915,8 @@ async function persistShowSession(session) {
         sceneSets: session.sceneSets,
         floorMarks: session.floorMarks,
         takes: session.takes,
-        doinkSubmission: session.doinkSubmission
+        doinkSubmission: session.doinkSubmission,
+        showToolbox: session.showToolbox
       }
     })
   });
@@ -1017,7 +967,8 @@ function summarizeTakeForShow(take) {
     durationMs: take.durationMs,
     performerCount: take.performerCount,
     audioTrackCount: take.audioTrackCount,
-    motionEventCount: take.motionEventCount
+    motionEventCount: take.motionEventCount,
+    best: Boolean(take.best)
   };
 }
 
@@ -1144,17 +1095,19 @@ function App() {
         return part?.source || part?.shape || part?.mode === "drawn";
       })
   );
-  const beginnerProgress = {
-    hasShow: Boolean(showName.trim()),
-    hasStartedShort: Boolean(startedShortFormat),
-    hasRig: hasCustomRigParts,
-    hasSet: sceneObjects.length > 0 || sceneSets.length > 0,
-    hasRehearsed: mode === "perform" || takeLibrary.length > 0 || selectedTake,
-    hasTake: takeLibrary.length > 0 || selectedTake,
-    hasCut: productionTimeline.length > 0,
-    readyToExport: productionTimeline.length > 0 || selectedTake,
-    exported: exportHistory.length > 0
-  };
+  const beginnerProgress = computeBeginnerProgress({
+    showName,
+    hasCustomRigParts,
+    sceneObjectCount: sceneObjects.length,
+    sceneSetCount: sceneSets.length,
+    mode,
+    takeCount: takeLibrary.length,
+    selectedTake,
+    timelineCount: productionTimeline.length,
+    exportCount: exportHistory.length,
+    startedShortFormat,
+    episodeStatus
+  });
   const activeStylePreset = self?.state.stylePreset || selfCharacter.stylePreset;
   const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
   const activeTexturePreset = activeAnimationStyle.texturePreset || "paper-grain";
@@ -2243,6 +2196,41 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
+  const activeShowToolbox = useMemo(
+    () =>
+      createShowToolbox({
+        showName,
+        cast: activePerformers,
+        sceneObjects,
+        sceneSets,
+        assetReferences,
+        storyboardPanels,
+        timeline: productionTimeline,
+        takes: takeLibrary,
+        style: {
+          ...activeAnimationStyle,
+          backgroundTheme,
+          objectStyle
+        },
+        episodeStatus,
+        doinkSubmission
+      }),
+    [
+      showName,
+      activePerformers,
+      sceneObjects,
+      sceneSets,
+      assetReferences,
+      storyboardPanels,
+      productionTimeline,
+      takeLibrary,
+      activeAnimationStyle,
+      backgroundTheme,
+      objectStyle,
+      episodeStatus,
+      doinkSubmission
+    ]
+  );
   const cameraTarget = useMemo(
     () => (cameraFollow ? stagePerformers.find((performer) => performer.id === selfId) || stagePerformers[0] || null : null),
     [cameraFollow, selfId, stagePerformers]
@@ -2377,6 +2365,24 @@ function App() {
     setStatus(`Trimmed ${edge} by half a second for review.`);
   };
 
+  const updateSelectedTakeMeta = (patch) => {
+    if (!selectedTake) return;
+    const nextTake = { ...selectedTake, ...patch };
+    setSelectedTake(nextTake);
+    setTakeLibrary((current) =>
+      current.map((take) => (take.id === nextTake.id ? { ...take, ...patch } : take))
+    );
+  };
+
+  const markSelectedTakeBest = () => {
+    if (!selectedTake) return;
+    setSelectedTake({ ...selectedTake, best: true });
+    setTakeLibrary((current) =>
+      current.map((take) => ({ ...take, best: take.id === selectedTake.id }))
+    );
+    setStatus(`Marked "${selectedTake.name || "take"}" as the best take for this short.`);
+  };
+
   const saveSelectedTakeAsScene = () => {
     if (!selectedTake) return;
     const panel = createStoryboardPanel({
@@ -2433,7 +2439,8 @@ function App() {
       assetReferences,
       storyboardPanels,
       timeline: productionTimeline,
-      takes: takeLibrary
+      takes: takeLibrary,
+      showToolbox: activeShowToolbox
     });
 
   const exportProject = () => {
@@ -2503,7 +2510,7 @@ function App() {
   const exportSelectedTakeVideo = async () => {
     if (!selectedTake || videoExporting) return;
     setVideoExporting(true);
-    setStatus("Rendering a browser preview video. Keep this tab open for a moment.");
+    setStatus("Rendering a 720p WEBM deliverable from the selected trim. Keep this tab open for a moment.");
     try {
       const blob = await exportTakePreviewVideo(selectedTake, {
         onFrame: (progress) => {
@@ -2514,14 +2521,18 @@ function App() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `pup-it-${selectedTake.id || "take"}-preview.webm`;
+      const safeName = (selectedTake.name || selectedTake.id || "take")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      link.download = `pup-it-${safeName || "take"}-preview.webm`;
       link.click();
       URL.revokeObjectURL(url);
       setExportHistory((current) => [
         { id: `video-${Date.now()}`, type: "preview-webm", exportedAt: new Date().toISOString() },
         ...current
       ]);
-      setStatus("Preview WEBM exported. Package export still carries project data, tracks, credits, and metadata.");
+      setStatus("Preview WEBM exported. Submit to DoinkTV with the package when the short is ready for review.");
     } catch (error) {
       setStatus(error.message || "Preview video export failed in this browser.");
     } finally {
@@ -2649,7 +2660,8 @@ function App() {
       storyboardPanels,
       productionTimeline,
       takes: takeLibrary.map(summarizeTakeForShow),
-      doinkSubmission
+      doinkSubmission,
+      showToolbox: activeShowToolbox
     };
   };
 
@@ -2950,6 +2962,7 @@ function App() {
           onReplay={playSelectedTake}
           onSaveScene={saveSelectedTakeAsScene}
           onExport={exportProject}
+          onSubmitToDoinkTv={submitToDoinkTv}
           onAddToCut={() => selectedTake && addTakeToTimeline(selectedTake)}
         />
 
@@ -2962,6 +2975,7 @@ function App() {
           macroCount={macroCatalog.length}
           boardCount={storyboardPanels.length}
           timelineCount={productionTimeline.length}
+          toolbox={activeShowToolbox}
           activeStyle={activeAnimationStyle}
           episodeStatus={episodeStatus}
           onSaveShow={saveShowSession}
@@ -3065,6 +3079,8 @@ function App() {
             onRefresh={loadTakeLibrary}
             onSelectTake={selectTake}
             onPlay={playSelectedTake}
+            onTakeMetaChange={updateSelectedTakeMeta}
+            onMarkBestTake={markSelectedTakeBest}
             onQuickTrim={quickTrimSelectedTake}
             onSaveTakeAsScene={saveSelectedTakeAsScene}
             onExport={downloadTake}
@@ -3481,6 +3497,7 @@ function BeginnerRoadmap({
   onReplay,
   onSaveScene,
   onExport,
+  onSubmitToDoinkTv,
   onAddToCut
 }) {
   const steps = [
@@ -3531,12 +3548,21 @@ function BeginnerRoadmap({
     },
     {
       id: "export",
-      label: "Export package",
-      body: "Bundle the cut, captions, credits, and license notes for the outside world.",
-      complete: "Export started. Make another bit while the idea is warm.",
+      label: "Export review file",
+      body: "Bundle the cut, captions, credits, and license notes so the short can leave the room.",
+      complete: "The short has a package. One more click sends it toward the channel.",
       done: progress.exported,
       action: progress.readyToExport ? onExport : () => onModeChange("edit"),
       actionLabel: progress.readyToExport ? "Export" : "Finish"
+    },
+    {
+      id: "submit",
+      label: "Submit to DoinkTV",
+      body: "Send a review handoff for approval and scheduling.",
+      complete: "Submitted. Start the next weird little bit.",
+      done: progress.hasSubmitted,
+      action: progress.readyToExport ? onSubmitToDoinkTv : () => onModeChange("edit"),
+      actionLabel: progress.readyToExport ? "Submit" : "Review"
     }
   ];
   const nextStep = steps.find((step) => !step.done) || steps[steps.length - 1];
@@ -3550,6 +3576,7 @@ function BeginnerRoadmap({
         <span>Perform</span>
         <span>Replay</span>
         <span>Export</span>
+        <span>Submit</span>
       </div>
       <div className="nextBestStep">
         <span>Next Best Step</span>
@@ -3694,6 +3721,7 @@ function ShowBiblePanel({
   macroCount,
   boardCount,
   timelineCount,
+  toolbox,
   activeStyle,
   episodeStatus,
   onSaveShow,
@@ -3747,6 +3775,11 @@ function ShowBiblePanel({
         <span>Cut</span>
         <span>Export</span>
       </div>
+      <div className="toolboxSummary">
+        <span>{toolbox?.styleGuide?.family || activeStyle.family}</span>
+        <span>{toolbox?.submission?.targetChannel || "DoinkTV"}</span>
+        <span>{toolbox?.takes?.filter((take) => take.best).length || 0} best takes</span>
+      </div>
       <div className="publicReadinessList">
         <span className={castCount ? "done" : ""}>Cast</span>
         <span className={sceneSetCount || propCount ? "done" : ""}>World</span>
@@ -3760,7 +3793,7 @@ function ShowBiblePanel({
         <button onClick={() => onModeChange("assets")}>Props</button>
         <button onClick={onSaveShow}>
           <Save size={16} />
-          Save Bible
+          Save Toolbox
         </button>
       </div>
     </div>
@@ -4633,6 +4666,8 @@ function SceneLibraryEditor({
   onRefresh,
   onSelectTake,
   onPlay,
+  onTakeMetaChange,
+  onMarkBestTake,
   onQuickTrim,
   onSaveTakeAsScene,
   onExport,
@@ -4667,12 +4702,12 @@ function SceneLibraryEditor({
   return (
     <div className="sceneEditor">
       <div className="dockGroup">
-        <h2>Scene Library</h2>
+        <h2>Finish Short</h2>
         <div className="editorHeader">
           <Library size={18} />
           <div>
             <strong>{selectedTake?.name || "Recorded Scenes"}</strong>
-            <small>{takes.length} saved in this room</small>
+            <small>Replay, name, trim, export, and submit. {takes.length} saved in this room.</small>
           </div>
         </div>
         <button className="wideAction" onClick={onRefresh}>
@@ -4691,7 +4726,7 @@ function SceneLibraryEditor({
                 className={`takeButton ${selectedTake?.id === take.id ? "selected" : ""}`}
                 onClick={() => onSelectTake(take.id)}
               >
-                <span>{take.name}</span>
+                <span>{take.best ? `Best: ${take.name || "take"}` : take.name || "Untitled take"}</span>
                 <small>
                   {take.scene} / {formatDuration(take.durationMs)}
                 </small>
@@ -4713,10 +4748,22 @@ function SceneLibraryEditor({
             <span className="eyebrow">Fresh Take</span>
             <strong>That is a cartoon now.</strong>
             <small>Play it back, trim the rough edges, save the scene, or push it straight into the cut.</small>
+            <label className="takeNameField">
+              Take Name
+              <input
+                value={selectedTake.name || ""}
+                placeholder="Name the take before exporting"
+                onChange={(event) => onTakeMetaChange({ name: event.target.value })}
+              />
+            </label>
             <div className="libraryActions">
               <button className={playbackActive ? "active" : ""} onClick={onPlay}>
                 <Play size={16} />
                 {playbackActive ? "Replaying" : "Replay"}
+              </button>
+              <button className={selectedTake.best ? "active" : ""} onClick={onMarkBestTake}>
+                <Sparkles size={16} />
+                {selectedTake.best ? "Best Take" : "Mark Best"}
               </button>
               <button onClick={() => onQuickTrim("start")}>
                 <ChevronLeft size={16} />
@@ -4736,7 +4783,7 @@ function SceneLibraryEditor({
               </button>
               <button onClick={onExportVideo} disabled={videoExporting}>
                 <Video size={16} />
-                {videoExporting ? "Rendering" : "Preview WEBM"}
+                {videoExporting ? "Rendering" : "720p WEBM"}
               </button>
             </div>
           </div>
@@ -4796,7 +4843,7 @@ function SceneLibraryEditor({
 
           <div className="dockGroup exportPlanPanel">
             <h2>Export Short</h2>
-            <small className="controlHint">Preview WEBM gives a quick browser video; package export carries the project data, audio tracks, credits, and metadata.</small>
+            <small className="controlHint">720p WEBM gives a real browser-rendered review file; package export carries project data, audio tracks, credits, and metadata.</small>
             <div className="renderChecklist">
               <span className="done">Preview</span>
               <span className={selectedTake.tracks.audio.length ? "done" : ""}>Audio</span>
@@ -4815,7 +4862,7 @@ function SceneLibraryEditor({
               </button>
               <button onClick={onExportVideo} disabled={videoExporting}>
                 <Clapperboard size={16} />
-                {videoExporting ? "Rendering" : "Preview WEBM"}
+                {videoExporting ? "Rendering" : "720p WEBM"}
               </button>
               <button onClick={onQueueVideoExport}>
                 <Clapperboard size={16} />
@@ -5283,12 +5330,14 @@ function CharacterEditor({
     return part?.source || part?.shape || part?.mode === "drawn";
   });
   const rigCheckItems = [
-    { id: "head", label: "Head", required: true, ok: Boolean(characterParts.head?.source || characterParts.head?.shape || characterParts.head?.mode === "drawn") },
-    { id: "torso", label: "Torso", required: true, ok: Boolean(characterParts.torso?.source || characterParts.torso?.shape || characterParts.torso?.mode === "drawn") },
-    { id: "leftArm", label: "Arms", required: Boolean(rig.arms), ok: !rig.arms || Boolean(characterParts.leftArm?.source || characterParts.rightArm?.source || characterParts.leftArm?.shape || characterParts.rightArm?.shape || characterParts.leftArm?.mode === "drawn" || characterParts.rightArm?.mode === "drawn") },
-    { id: "leftLeg", label: "Legs", required: Boolean(rig.legs), ok: !rig.legs || Boolean(characterParts.leftLeg?.source || characterParts.rightLeg?.source || characterParts.leftLeg?.shape || characterParts.rightLeg?.shape || characterParts.leftLeg?.mode === "drawn" || characterParts.rightLeg?.mode === "drawn") }
+    { id: "head", label: "Head shape", required: true, quickFixSlot: "head", ok: Boolean(characterParts.head?.source || characterParts.head?.shape || characterParts.head?.mode === "drawn") },
+    { id: "torso", label: "Body shape", required: true, quickFixSlot: "torso", ok: Boolean(characterParts.torso?.source || characterParts.torso?.shape || characterParts.torso?.mode === "drawn") },
+    { id: "face", label: "Mouth on head", required: true, quickFixSlot: "head", ok: Boolean(characterParts.head?.source || characterParts.head?.shape || characterParts.head?.mode === "drawn" || rig.singleShape) },
+    { id: "leftArm", label: rig.arms ? "Arms readable" : "Arms hidden", required: Boolean(rig.arms), quickFixSlot: "leftArm", ok: !rig.arms || Boolean(characterParts.leftArm?.source || characterParts.rightArm?.source || characterParts.leftArm?.shape || characterParts.rightArm?.shape || characterParts.leftArm?.mode === "drawn" || characterParts.rightArm?.mode === "drawn") },
+    { id: "leftLeg", label: rig.legs ? "Legs readable" : "Legs hidden", required: Boolean(rig.legs), quickFixSlot: "leftLeg", ok: !rig.legs || Boolean(characterParts.leftLeg?.source || characterParts.rightLeg?.source || characterParts.leftLeg?.shape || characterParts.rightLeg?.shape || characterParts.leftLeg?.mode === "drawn" || characterParts.rightLeg?.mode === "drawn") }
   ];
   const missingRigParts = rigCheckItems.filter((item) => item.required && !item.ok);
+  const rigReady = missingRigParts.length === 0;
   const design = {
     name: performer.state.characterDesign?.name || `${baseCharacter.name} Puppet`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
@@ -5315,7 +5364,9 @@ function CharacterEditor({
       <div className={`dockGroup rigCheckPanel ${missingRigParts.length ? "needsAttention" : "ready"}`}>
         <h2>Rig Check</h2>
         <small className="controlHint">
-          Forgiving setup: stick-rig defaults still perform, but these quick fixes make the character read better on camera.
+          {rigReady
+            ? "Ready to perform. The face is anchored to the head and the required parts read on camera."
+            : "Forgiving setup: stick-rig defaults still perform, but these quick fixes make the character read better on camera."}
         </small>
         <div className="rigCheckList">
           {rigCheckItems.map((item) => (
@@ -5325,10 +5376,10 @@ function CharacterEditor({
               {!item.ok && item.required && (
                 <button
                   onClick={() =>
-                    onPartChange(item.id, {
-                      label: getCatalogItem(characterPartCatalog, item.id).label,
+                    onPartChange(item.quickFixSlot || item.id, {
+                      label: getCatalogItem(characterPartCatalog, item.quickFixSlot || item.id).label,
                       mode: "shape",
-                      shape: item.id === "torso" ? "bean" : "circle"
+                      shape: item.quickFixSlot === "torso" ? "bean" : "circle"
                     })
                   }
                 >
