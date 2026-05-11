@@ -27,8 +27,8 @@ export function createRenderModel({
   const durationMs = Math.max(
     1000,
     Math.min(
-      take?.trimEndMs && take?.trimStartMs
-        ? take.trimEndMs - take.trimStartMs
+      typeof take?.trimEndMs === "number"
+        ? take.trimEndMs - (take.trimStartMs || 0)
         : take?.durationMs || timeline[0]?.duration || 5000,
       45000
     )
@@ -46,6 +46,8 @@ export function createRenderModel({
     backgroundTheme: take?.backgroundTheme || project.backgroundTheme || "painted-depth",
     objectStyle: take?.objectStyle || project.objectStyle || "soft-material",
     directorCamera: take?.directorCamera || project.directorCamera || {},
+    trimStartMs: take?.trimStartMs || 0,
+    trimEndMs: take?.trimEndMs || null,
     durationMs,
     take,
     timeline,

@@ -1086,6 +1086,7 @@ function App() {
   const [videoExporting, setVideoExporting] = useState(false);
   const [backendRendering, setBackendRendering] = useState(false);
   const [renderJob, setRenderJob] = useState(null);
+  const [finishTarget, setFinishTarget] = useState("selected-take");
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const [productionTimeline, setProductionTimeline] = useState([]);
@@ -2565,8 +2566,9 @@ function App() {
     const nextTake =
       edge === "start"
         ? { ...selectedTake, trimStartMs: Math.min(currentStart + trimMs, Math.max(0, currentEnd - 1000)) }
-        : { ...selectedTake, trimEndMs: Math.max(currentStart + 1000, currentEnd - trimMs), durationMs: Math.max(1000, currentEnd - trimMs - currentStart) };
+        : { ...selectedTake, trimEndMs: Math.max(currentStart + 1000, currentEnd - trimMs) };
     setSelectedTake(nextTake);
+    setTakeLibrary((current) => current.map((take) => (take.id === nextTake.id ? nextTake : take)));
     setStatus(`Trimmed ${edge} by half a second for review.`);
   };
 
@@ -2648,16 +2650,62 @@ function App() {
       showToolbox: activeShowToolbox
     });
 
+  const resolveFinishTake = (target = finishTarget) => {
+    const bestTake = takeLibrary.find((take) => take.best) || null;
+    if (target === "best-take") return bestTake || selectedTake || takeLibrary[0] || null;
+    if (target === "rough-cut") {
+      const timelineTakeClip = productionTimeline.find((clip) => clip.sourceType === "take");
+      return (
+        takeLibrary.find((take) => take.id === timelineTakeClip?.sourceId) ||
+        selectedTake ||
+        bestTake ||
+        takeLibrary[0] ||
+        null
+      );
+    }
+    return selectedTake || bestTake || takeLibrary[0] || null;
+  };
+
+  const describeFinishTarget = (target = finishTarget) => {
+    if (target === "rough-cut") {
+      return productionTimeline.length
+        ? `Rough cut: ${productionTimeline.length} clip${productionTimeline.length === 1 ? "" : "s"}`
+        : "Rough cut: add clips first";
+    }
+    if (target === "best-take") {
+      const bestTake = takeLibrary.find((take) => take.best);
+      return bestTake ? `Best take: ${bestTake.name || "Untitled take"}` : "Best take: mark a keeper";
+    }
+    const targetTake = resolveFinishTake("selected-take");
+    return targetTake ? `Selected take: ${targetTake.name || "Untitled take"}` : "Selected take: record or choose one";
+  };
+
   const exportProject = () => {
     const project = createCurrentProjectExport();
-    const selectedThumbnail = selectedTake ? createTakeThumbnailDataUrl(selectedTake) : "";
+    const targetTake = resolveFinishTake();
+    if (renderJob?.output?.videoPath) {
+      project.renderPlan.videoPath = renderJob.output.videoPath;
+      project.publishingPackage.videoPath = renderJob.output.videoPath;
+      project.publishingPackage.renderJob = {
+        id: renderJob.id,
+        status: renderJob.status,
+        output: renderJob.output
+      };
+    }
+    project.publishingPackage.finishTarget = {
+      type: finishTarget,
+      label: describeFinishTarget(),
+      takeId: targetTake?.id || null,
+      timelineClipCount: productionTimeline.length
+    };
+    const selectedThumbnail = targetTake ? createTakeThumbnailDataUrl(targetTake) : "";
     if (selectedThumbnail) {
       project.publishingPackage.thumbnail = {
         ...project.publishingPackage.thumbnail,
         source: "selected-take-preview",
-        takeId: selectedTake.id,
+        takeId: targetTake.id,
         dataUrl: selectedThumbnail,
-        fileName: `pup-it-${selectedTake.id || "take"}-thumbnail.png`
+        fileName: `pup-it-${targetTake.id || "take"}-thumbnail.png`
       };
     }
     downloadJson(project, `pup-it-${roomId}-project.json`);
@@ -2669,12 +2717,13 @@ function App() {
   };
 
   const exportSelectedTakeThumbnail = () => {
-    if (!selectedTake) return;
-    const safeName = (selectedTake.name || selectedTake.id || "take")
+    const targetTake = resolveFinishTake();
+    if (!targetTake) return;
+    const safeName = (targetTake.name || targetTake.id || "take")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    downloadDataUrl(createTakeThumbnailDataUrl(selectedTake), `pup-it-${safeName || "take"}-thumbnail.png`);
+    downloadDataUrl(createTakeThumbnailDataUrl(targetTake), `pup-it-${safeName || "take"}-thumbnail.png`);
     setExportHistory((current) => [
       { id: `thumbnail-${Date.now()}`, type: "thumbnail-png", exportedAt: new Date().toISOString() },
       ...current
@@ -2685,26 +2734,36 @@ function App() {
   const requestBackendRender = async () => {
     if (backendRendering) return;
     const project = createCurrentProjectExport();
-    const submissionTake = selectedTake || takeLibrary.find((take) => take.best) || takeLibrary[0] || null;
+    const submissionTake = resolveFinishTake();
+    if (!submissionTake && !productionTimeline.length) {
+      setStatus("Record a take or add clips to the rough cut before rendering.");
+      return;
+    }
     const renderModel = createRenderModel({
       project,
       selectedTake: submissionTake,
       timeline: productionTimeline,
-      title: doinkSubmission.title || selectedTake?.name || `${showName} Short`,
+      title: doinkSubmission.title || submissionTake?.name || `${showName} Short`,
       requestedBy: doinkSubmission.creatorName || name
     });
+    renderModel.finishTarget = {
+      type: finishTarget,
+      label: describeFinishTarget(),
+      timelineClipCount: productionTimeline.length
+    };
     setBackendRendering(true);
-    setStatus("Sending the short to the backend render queue.");
+    setStatus(`Sending ${describeFinishTarget()} to the backend render queue.`);
     try {
       const response = await fetch(`${SERVER_URL}/api/render-jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           renderer: "browser-server",
-          title: doinkSubmission.title || selectedTake?.name || `${showName} Short`,
+          title: doinkSubmission.title || submissionTake?.name || `${showName} Short`,
           project,
           selectedTake: submissionTake,
           timeline: productionTimeline,
+          finishTarget,
           renderModel,
           requestedBy: doinkSubmission.creatorName || name
         })
@@ -2731,11 +2790,26 @@ function App() {
   const submitToDoinkTv = async () => {
     if (doinkSubmitting) return;
     const project = createCurrentProjectExport();
-    const submissionTake = selectedTake || takeLibrary[0] || null;
+    const submissionTake = resolveFinishTake();
     const projectPackageFileName = `pup-it-${roomId}-project.json`;
-    const previewVideoFileName = submissionTake
+    const previewVideoFileName = renderJob?.output?.videoPath || (submissionTake
       ? `pup-it-${submissionTake.id || "take"}-preview.webm`
-      : null;
+      : null);
+    if (renderJob?.output?.videoPath) {
+      project.renderPlan.videoPath = renderJob.output.videoPath;
+      project.publishingPackage.videoPath = renderJob.output.videoPath;
+      project.publishingPackage.renderJob = {
+        id: renderJob.id,
+        status: renderJob.status,
+        output: renderJob.output
+      };
+    }
+    project.publishingPackage.finishTarget = {
+      type: finishTarget,
+      label: describeFinishTarget(),
+      takeId: submissionTake?.id || null,
+      timelineClipCount: productionTimeline.length
+    };
     const submissionPackage = createDoinkTvSubmissionPackage({
       project,
       submission: {
@@ -2785,11 +2859,12 @@ function App() {
   };
 
   const exportSelectedTakeVideo = async () => {
-    if (!selectedTake || videoExporting) return;
+    const targetTake = resolveFinishTake();
+    if (!targetTake || videoExporting) return;
     setVideoExporting(true);
-    setStatus("Rendering a 720p WEBM deliverable from the selected trim. Keep this tab open for a moment.");
+    setStatus(`Rendering a 720p WEBM deliverable from ${describeFinishTarget()}. Keep this tab open for a moment.`);
     try {
-      const blob = await exportTakePreviewVideo(selectedTake, {
+      const blob = await exportTakePreviewVideo(targetTake, {
         onFrame: (progress) => {
           if (progress === 0 || progress >= 0.98) return;
           setStatus(`Rendering 720p WEBM ${Math.round(progress * 100)}%.`);
@@ -2798,7 +2873,7 @@ function App() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      const safeName = (selectedTake.name || selectedTake.id || "take")
+      const safeName = (targetTake.name || targetTake.id || "take")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
@@ -3650,6 +3725,9 @@ function App() {
             onBackendRender={requestBackendRender}
             backendRendering={backendRendering}
             renderJob={renderJob}
+            finishTarget={finishTarget}
+            finishTargetLabel={describeFinishTarget()}
+            onFinishTargetChange={setFinishTarget}
             videoExporting={videoExporting}
             doinkSubmission={doinkSubmission}
             doinkSubmitting={doinkSubmitting}
@@ -5490,6 +5568,9 @@ function SceneLibraryEditor({
   onBackendRender,
   backendRendering,
   renderJob,
+  finishTarget,
+  finishTargetLabel,
+  onFinishTargetChange,
   videoExporting,
   doinkSubmission,
   doinkSubmitting,
@@ -5518,6 +5599,13 @@ function SceneLibraryEditor({
     : [];
   const reviewReadyStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
   const hasSubmissionSource = Boolean(selectedTake || takes.length || timeline.length);
+  const hasBestTake = takes.some((take) => take.best);
+  const hasTargetTake =
+    finishTarget === "rough-cut"
+      ? Boolean(timeline.length || selectedTake || takes.length)
+      : finishTarget === "best-take"
+        ? Boolean(hasBestTake || selectedTake || takes.length)
+        : Boolean(selectedTake || hasBestTake || takes.length);
   const packageChecklist = projectExport?.publishingPackage?.broadcastChecklist || [];
   const readiness = projectExport?.publishingPackage?.packageReadiness || {};
   const reviewTarget = projectExport?.publishingPackage?.reviewTarget;
@@ -5546,8 +5634,15 @@ function SceneLibraryEditor({
     },
     {
       label: "Trim",
-      done: Boolean(selectedTake?.trim?.startMs || selectedTake?.trim?.endMs),
-      detail: selectedTake?.trim ? "Rough edges set" : "Optional, but useful"
+      done: Boolean(
+        selectedTake &&
+          ((selectedTake.trimStartMs || 0) > 0 ||
+            (selectedTake.trimEndMs && selectedTake.trimEndMs < selectedTake.durationMs))
+      ),
+      detail:
+        selectedTake && ((selectedTake.trimStartMs || 0) > 0 || selectedTake.trimEndMs)
+          ? `${formatDuration(selectedTake.trimStartMs || 0)} to ${formatDuration(selectedTake.trimEndMs || selectedTake.durationMs)}`
+          : "Optional, but useful"
     },
     {
       label: "Backend render",
@@ -5590,8 +5685,28 @@ function SceneLibraryEditor({
             <span className="eyebrow">Finished Short Flow</span>
             <strong>{finalVideoPath ? "Final preview is ready." : "Render one clean review copy."}</strong>
             <small>
-              Best take, trim, render, package, submit. Everything needed for DoinkTV lives here.
+              {finishTargetLabel}. Best take, trim, render, package, submit. Everything needed for DoinkTV lives here.
             </small>
+          </div>
+          <div className="finishTargetPicker" aria-label="Finish target">
+            <button
+              className={finishTarget === "selected-take" ? "active" : ""}
+              onClick={() => onFinishTargetChange("selected-take")}
+            >
+              Selected Take
+            </button>
+            <button
+              className={finishTarget === "best-take" ? "active" : ""}
+              onClick={() => onFinishTargetChange("best-take")}
+            >
+              Best Take
+            </button>
+            <button
+              className={finishTarget === "rough-cut" ? "active" : ""}
+              onClick={() => onFinishTargetChange("rough-cut")}
+            >
+              Rough Cut
+            </button>
           </div>
           {finalVideoUrl ? (
             <video className="finalPreviewVideo" src={finalVideoUrl} controls muted playsInline />
@@ -5627,11 +5742,11 @@ function SceneLibraryEditor({
             <ExternalLink size={16} />
             DoinkTV
           </button>
-          <button onClick={onExportVideo} disabled={!selectedTake || videoExporting}>
+          <button onClick={onExportVideo} disabled={!hasTargetTake || videoExporting}>
             <Video size={16} />
             {videoExporting ? "Browser Render" : "Browser WEBM"}
           </button>
-          <button onClick={onExportThumbnail} disabled={!selectedTake}>
+          <button onClick={onExportThumbnail} disabled={!hasTargetTake}>
             <Camera size={16} />
             Thumbnail
           </button>

@@ -3884,6 +3884,28 @@ input[type="color"] {
   text-align: center;
 }
 
+.finishTargetPicker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+}
+
+.finishTargetPicker button {
+  min-height: 30px;
+  padding: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.finishTargetPicker button.active {
+  background: var(--pond);
+}
+
 .finishStepGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

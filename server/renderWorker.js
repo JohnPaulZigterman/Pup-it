@@ -496,9 +496,10 @@ function renderHtml() {
         const model = request.renderModel || request;
         const take = model.take || {};
         const duration = Math.max(1000, Math.min(model.durationMs || take.durationMs || 5000, 12000));
+        const trimOffset = Math.max(0, model.trimStartMs || take.trimStartMs || 0);
         const fps = 24;
         model.subtitle = (model.reviewTarget?.type || "preview") + " / " + Math.round(duration / 1000) + "s";
-        drawFrame(model, 0);
+        drawFrame(model, trimOffset);
         const thumbnail = canvas.toDataURL("image/png").split(",")[1];
 
         if (!window.MediaRecorder || !canvas.captureStream) {
@@ -521,7 +522,7 @@ function renderHtml() {
         recorder.start();
         const frameMs = 1000 / fps;
         for (let ms = 0; ms <= duration; ms += frameMs) {
-          drawFrame(model, ms);
+          drawFrame(model, ms + trimOffset);
           await new Promise((resolve) => setTimeout(resolve, frameMs));
         }
         recorder.stop();
