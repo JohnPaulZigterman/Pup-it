@@ -94,7 +94,7 @@ const tutorialSteps = [
   {
     mode: "perform",
     title: "Perform Live",
-    body: "Move your character with WASD or arrow keys, use mouse height for mouth movement, and trigger expressions, poses, and macros from the dock."
+    body: "Move your character with WASD or arrow keys, let mic audio drive the mouth by default, and trigger expressions, poses, and macros from the dock."
   },
   {
     mode: "build",
@@ -555,10 +555,20 @@ function createStoryboardPanel({
 
 function App() {
   const socketRef = useRef(null);
-  const audioRef = useRef({ context: null, sequence: 0, recorder: null, stream: null });
+  const audioRef = useRef({
+    analyser: null,
+    context: null,
+    frame: null,
+    lastMouthSentAt: 0,
+    recorder: null,
+    sequence: 0,
+    source: null,
+    stream: null
+  });
   const mouthVideoRef = useRef(null);
   const mouthValueRef = useRef(0);
   const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
+  const mouthControlRef = useRef("audio");
   const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
@@ -727,8 +737,17 @@ function App() {
   }, [joined, mode, selfId, selectedScene]);
 
   useEffect(() => {
-    return () => stopMouthCamera();
+    return () => {
+      stopMouthCamera();
+      audioRef.current.recorder?.stop();
+      audioRef.current.stream?.getTracks().forEach((track) => track.stop());
+      stopAudioMouthMeter({ closeContext: true });
+    };
   }, []);
+
+  useEffect(() => {
+    mouthControlRef.current = self?.state.mouthControl || "audio";
+  }, [self?.state.mouthControl]);
 
   useEffect(() => {
     if (joined && mode === "edit") loadTakeLibrary();
@@ -841,8 +860,8 @@ function App() {
       try {
         await startMouthCamera();
       } catch (_error) {
-        updateSelf({ mouthControl: "mouse", mouthOpen: 0, speaking: false });
-        setStatus("Camera mouth control was blocked. Mouse mouth control is still active.");
+        updateSelf({ mouthControl: "audio", mouthOpen: 0, speaking: false });
+        setStatus("Camera mouth control was blocked. Audio mouth matching is still active.");
       }
       return;
     }
@@ -850,6 +869,9 @@ function App() {
     stopMouthCamera();
     mouthValueRef.current = 0;
     updateSelf({ mouthControl, mouthOpen: 0, speaking: false });
+    if (mouthControl === "audio" && !micLive) {
+      setStatus("Audio mouth matching is selected. Turn on Mic to drive the mouth automatically.");
+    }
   };
 
   const updateCharacterRig = (patch) => {
@@ -1158,13 +1180,73 @@ function App() {
     }, 850);
   };
 
+  const stopAudioMouthMeter = async ({ closeContext = false } = {}) => {
+    if (audioRef.current.frame) cancelAnimationFrame(audioRef.current.frame);
+    audioRef.current.source?.disconnect();
+    if (closeContext && audioRef.current.context?.state !== "closed") {
+      await audioRef.current.context.close().catch(() => {});
+    }
+    audioRef.current = {
+      ...audioRef.current,
+      analyser: null,
+      context: closeContext ? null : audioRef.current.context,
+      frame: null,
+      lastMouthSentAt: 0,
+      source: null
+    };
+  };
+
+  const startAudioMouthMeter = async (stream) => {
+    await stopAudioMouthMeter();
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const context = audioRef.current.context || new AudioContext();
+    if (context.state === "suspended") await context.resume().catch(() => {});
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.72;
+    const source = context.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.fftSize);
+
+    audioRef.current = {
+      ...audioRef.current,
+      analyser,
+      context,
+      source
+    };
+
+    const sample = () => {
+      if (!audioRef.current.analyser || !audioRef.current.stream) return;
+      audioRef.current.analyser.getByteTimeDomainData(data);
+      let total = 0;
+      let peak = 0;
+      for (const value of data) {
+        const centered = Math.abs(value - 128) / 128;
+        total += centered;
+        peak = Math.max(peak, centered);
+      }
+      const average = total / data.length;
+      const mouthOpen = clamp((average * 5.6 + peak * 1.4 - 0.055) * 3.2, 0, 1);
+      const now = performance.now();
+      if (mouthControlRef.current === "audio" && now - audioRef.current.lastMouthSentAt > 55) {
+        audioRef.current.lastMouthSentAt = now;
+        setMouthOpen(mouthOpen);
+      }
+      audioRef.current.frame = requestAnimationFrame(sample);
+    };
+
+    audioRef.current.frame = requestAnimationFrame(sample);
+  };
+
   const toggleMic = async () => {
     if (micLive) {
       audioRef.current.recorder?.stop();
       audioRef.current.stream?.getTracks().forEach((track) => track.stop());
+      await stopAudioMouthMeter();
       audioRef.current = { ...audioRef.current, recorder: null, stream: null };
       setMicLive(false);
-      updateSelf({ speaking: false });
+      updateSelf({ mouthOpen: 0, speaking: false });
       return;
     }
 
@@ -1173,6 +1255,7 @@ function App() {
     audioRef.current.stream = stream;
     audioRef.current.recorder = recorder;
     audioRef.current.sequence = 0;
+    await startAudioMouthMeter(stream);
 
     recorder.ondataavailable = async (event) => {
       if (!event.data.size) return;
@@ -1185,7 +1268,11 @@ function App() {
     };
     recorder.start(250);
     setMicLive(true);
-    updateSelf({ speaking: true });
+    if (mouthControlRef.current === "audio") {
+      setStatus("Mic is driving automatic mouth movement.");
+    } else {
+      updateSelf({ speaking: true });
+    }
   };
 
   const playRemoteAudio = async ({ data, mimeType }) => {
@@ -1911,6 +1998,7 @@ function App() {
             onIdleMotionChange={setIdleMotion}
             onMotionFeelChange={setMotionFeel}
             onMouthControlChange={setMouthControl}
+            micLive={micLive}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
             cameraShot={cameraShot}
@@ -2399,6 +2487,7 @@ function PerformControls({
   onIdleMotionChange,
   onMotionFeelChange,
   onMouthControlChange,
+  micLive,
   mouthCameraActive,
   onMacroTrigger,
   onDirectorAction,
@@ -2546,8 +2635,8 @@ function PerformControls({
         <div>
           <span>WASD / Arrows</span>
           <strong>Move body</strong>
-          <span>Mouse height</span>
-          <strong>Mouth open</strong>
+          <span>Mic audio</span>
+          <strong>Mouth auto-match</strong>
           <span>1-4</span>
           <strong>Quick poses</strong>
           <span>Z / X / C</span>
@@ -2627,6 +2716,13 @@ function PerformControls({
         <h2>Mouth Control</h2>
         <div className="segmented">
           <button
+            className={(self?.state.mouthControl || "audio") === "audio" ? "selected" : ""}
+            onClick={() => onMouthControlChange("audio")}
+          >
+            <Mic size={15} />
+            Audio
+          </button>
+          <button
             className={self?.state.mouthControl === "mouse" ? "selected" : ""}
             onClick={() => onMouthControlChange("mouse")}
           >
@@ -2645,7 +2741,11 @@ function PerformControls({
           <span style={{ width: `${(self?.state.mouthOpen || 0) * 100}%` }} />
         </div>
         <small className="controlHint">
-          {self?.state.mouthControl === "camera"
+          {(self?.state.mouthControl || "audio") === "audio"
+            ? micLive
+              ? "Voice is automatically driving mouth motion."
+              : "Turn on Mic to drive mouth motion from your voice."
+            : self?.state.mouthControl === "camera"
             ? mouthCameraActive
               ? "Camera is driving mouth motion."
               : "Camera access may need browser permission."

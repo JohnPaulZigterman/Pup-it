@@ -21,7 +21,7 @@ export function createPerformerState(overrides = {}) {
     expression: "neutral",
     speaking: false,
     mouthOpen: 0,
-    mouthControl: "mouse",
+    mouthControl: "audio",
     walking: false,
     motionFeel: "smooth",
     motionVx: 0,
