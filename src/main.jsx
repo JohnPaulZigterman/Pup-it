@@ -92,6 +92,12 @@ import {
 } from "./engine/performanceState.js";
 import { Puppet } from "./renderer/Puppet.jsx";
 import {
+  attachFinishMetadata,
+  describeFinishTarget as describeFinishTargetFromState,
+  hasUsableFinishTake,
+  resolveFinishTake as resolveFinishTakeFromState
+} from "./workflows/finishFlow.js";
+import {
   computeBeginnerProgress,
   tutorialSteps,
   workflowSteps
@@ -2651,53 +2657,24 @@ function App() {
     });
 
   const resolveFinishTake = (target = finishTarget) => {
-    const bestTake = takeLibrary.find((take) => take.best) || null;
-    if (target === "best-take") return bestTake || selectedTake || takeLibrary[0] || null;
-    if (target === "rough-cut") {
-      const timelineTakeClip = productionTimeline.find((clip) => clip.sourceType === "take");
-      return (
-        takeLibrary.find((take) => take.id === timelineTakeClip?.sourceId) ||
-        selectedTake ||
-        bestTake ||
-        takeLibrary[0] ||
-        null
-      );
-    }
-    return selectedTake || bestTake || takeLibrary[0] || null;
+    return resolveFinishTakeFromState({ target, selectedTake, takeLibrary, productionTimeline });
   };
 
   const describeFinishTarget = (target = finishTarget) => {
-    if (target === "rough-cut") {
-      return productionTimeline.length
-        ? `Rough cut: ${productionTimeline.length} clip${productionTimeline.length === 1 ? "" : "s"}`
-        : "Rough cut: add clips first";
-    }
-    if (target === "best-take") {
-      const bestTake = takeLibrary.find((take) => take.best);
-      return bestTake ? `Best take: ${bestTake.name || "Untitled take"}` : "Best take: mark a keeper";
-    }
-    const targetTake = resolveFinishTake("selected-take");
-    return targetTake ? `Selected take: ${targetTake.name || "Untitled take"}` : "Selected take: record or choose one";
+    return describeFinishTargetFromState({ target, selectedTake, takeLibrary, productionTimeline });
   };
 
   const exportProject = () => {
     const project = createCurrentProjectExport();
     const targetTake = resolveFinishTake();
-    if (renderJob?.output?.videoPath) {
-      project.renderPlan.videoPath = renderJob.output.videoPath;
-      project.publishingPackage.videoPath = renderJob.output.videoPath;
-      project.publishingPackage.renderJob = {
-        id: renderJob.id,
-        status: renderJob.status,
-        output: renderJob.output
-      };
-    }
-    project.publishingPackage.finishTarget = {
-      type: finishTarget,
-      label: describeFinishTarget(),
-      takeId: targetTake?.id || null,
-      timelineClipCount: productionTimeline.length
-    };
+    attachFinishMetadata({
+      project,
+      renderJob,
+      finishTarget,
+      finishTargetLabel: describeFinishTarget(),
+      targetTake,
+      productionTimeline
+    });
     const selectedThumbnail = targetTake ? createTakeThumbnailDataUrl(targetTake) : "";
     if (selectedThumbnail) {
       project.publishingPackage.thumbnail = {
@@ -2798,20 +2775,23 @@ function App() {
       ? `pup-it-${submissionTake.id || "take"}-preview.webm`
       : null);
     if (renderJob?.output?.videoPath) {
-      project.renderPlan.videoPath = renderJob.output.videoPath;
-      project.publishingPackage.videoPath = renderJob.output.videoPath;
-      project.publishingPackage.renderJob = {
-        id: renderJob.id,
-        status: renderJob.status,
-        output: renderJob.output
-      };
+      attachFinishMetadata({
+        project,
+        renderJob,
+        finishTarget,
+        finishTargetLabel: describeFinishTarget(),
+        targetTake: submissionTake,
+        productionTimeline
+      });
+    } else {
+      attachFinishMetadata({
+        project,
+        finishTarget,
+        finishTargetLabel: describeFinishTarget(),
+        targetTake: submissionTake,
+        productionTimeline
+      });
     }
-    project.publishingPackage.finishTarget = {
-      type: finishTarget,
-      label: describeFinishTarget(),
-      takeId: submissionTake?.id || null,
-      timelineClipCount: productionTimeline.length
-    };
     const submissionPackage = createDoinkTvSubmissionPackage({
       project,
       submission: {
@@ -5601,13 +5581,12 @@ function SceneLibraryEditor({
     : [];
   const reviewReadyStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
   const hasSubmissionSource = Boolean(selectedTake || takes.length || timeline.length);
-  const hasBestTake = takes.some((take) => take.best);
-  const hasTargetTake =
-    finishTarget === "rough-cut"
-      ? Boolean(timeline.length || selectedTake || takes.length)
-      : finishTarget === "best-take"
-        ? Boolean(hasBestTake || selectedTake || takes.length)
-        : Boolean(selectedTake || hasBestTake || takes.length);
+  const hasTargetTake = hasUsableFinishTake({
+    target: finishTarget,
+    selectedTake,
+    takeLibrary: takes,
+    productionTimeline: timeline
+  });
   const packageChecklist = projectExport?.publishingPackage?.broadcastChecklist || [];
   const readiness = projectExport?.publishingPackage?.packageReadiness || {};
   const reviewTarget = projectExport?.publishingPackage?.reviewTarget;
