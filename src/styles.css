@@ -203,7 +203,7 @@ input[type="color"] {
 
 .modeSwitch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(76px, 1fr));
+  grid-template-columns: repeat(3, minmax(76px, 1fr));
   gap: 4px;
   padding: 4px;
   border: 2px solid var(--ink);
@@ -420,6 +420,90 @@ input[type="color"] {
 .characterEditor {
   display: grid;
   gap: 16px;
+}
+
+.sceneEditor {
+  display: grid;
+  gap: 16px;
+}
+
+.takeList {
+  display: grid;
+  gap: 8px;
+}
+
+.takeButton {
+  display: grid;
+  gap: 4px;
+  min-height: 56px;
+  padding: 9px 10px;
+  color: var(--ink);
+  text-align: left;
+  background: #fffcf0;
+}
+
+.takeButton.selected {
+  background: var(--paper);
+  transform: rotate(-0.5deg);
+}
+
+.takeButton span,
+.trackRow span {
+  font-weight: 800;
+}
+
+.takeButton small,
+.trackRow small {
+  color: #666b86;
+}
+
+.emptyState {
+  padding: 12px;
+  border: 2px dashed rgba(43, 45, 66, 0.35);
+  color: #666b86;
+  background: rgba(255, 252, 240, 0.58);
+}
+
+.editorStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.editorStats span,
+.trackRow {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 3px 8px 3px 6px;
+  background: #fffcf0;
+}
+
+.editorStats strong {
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.libraryActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.libraryActions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--ink);
+  background: #fffcf0;
+  font-weight: 750;
+}
+
+.libraryActions button.active {
+  background: var(--pond);
 }
 
 .originalPanel {

@@ -65,3 +65,40 @@ export function createTakeExport(room, exportedAt = new Date().toISOString()) {
     audio: room.audio
   };
 }
+
+export function getTakeDuration(take) {
+  const motionMax = Math.max(0, ...take.tracks.motion.map((event) => event.at || 0));
+  const audioMax = Math.max(
+    0,
+    ...take.tracks.audio.flatMap((track) => track.chunks.map((chunk) => chunk.at || 0))
+  );
+  return Math.max(motionMax, audioMax);
+}
+
+export function summarizeTake(take) {
+  return {
+    id: take.id,
+    name: take.name,
+    schemaVersion: take.schemaVersion,
+    roomId: take.roomId,
+    scene: take.scene,
+    takeStartedAt: take.takeStartedAt,
+    exportedAt: take.exportedAt,
+    durationMs: take.durationMs ?? getTakeDuration(take),
+    performerCount: take.performers.length,
+    motionEventCount: take.tracks.motion.length,
+    audioTrackCount: take.tracks.audio.length
+  };
+}
+
+export function createStoredTake(room, takeNumber = 1) {
+  const take = createTakeExport(room);
+  const durationMs = getTakeDuration(take);
+
+  return {
+    ...take,
+    id: `take-${Date.now()}`,
+    name: `${room.scene} take ${takeNumber}`,
+    durationMs
+  };
+}

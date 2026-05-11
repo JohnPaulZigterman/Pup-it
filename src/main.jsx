@@ -4,11 +4,14 @@ import { io } from "socket.io-client";
 import {
   Camera,
   Circle,
+  Library,
   Mic,
   MicOff,
   MousePointer2,
   Palette,
+  Play,
   Radio,
+  RefreshCw,
   Shuffle,
   Square,
   Theater,
@@ -31,7 +34,7 @@ import {
   sceneCatalog,
   walkCycleCatalog
 } from "../shared/catalogs.js";
-import { defaultCharacterId, defaultRoomId } from "../shared/schema.js";
+import { createPerformerState, defaultCharacterId, defaultRoomId } from "../shared/schema.js";
 import {
   hasInput,
   indexPerformers,
@@ -81,11 +84,39 @@ function makeOriginalRig() {
   };
 }
 
+function formatDuration(durationMs = 0) {
+  const seconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function makePreviewPerformers(take) {
+  return indexPerformers(
+    take.performers.map((performer, index) => ({
+      id: performer.id,
+      name: performer.name,
+      character: performer.character,
+      state: createPerformerState({
+        x: 34 + index * 18,
+        y: 60,
+        pose: performer.pose,
+        idleMotion: performer.idleMotion,
+        mouthControl: performer.mouthControl,
+        rigConfig: performer.rigConfig,
+        stylePreset: performer.stylePreset,
+        characterDesign: performer.characterDesign,
+        blinkSeed: index * 337
+      })
+    }))
+  );
+}
+
 function App() {
   const socketRef = useRef(null);
   const audioRef = useRef({ context: null, sequence: 0, recorder: null, stream: null });
   const mouthVideoRef = useRef(null);
   const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
+  const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
@@ -97,6 +128,10 @@ function App() {
   const [micLive, setMicLive] = useState(false);
   const [mouthCameraActive, setMouthCameraActive] = useState(false);
   const [mode, setMode] = useState("perform");
+  const [takeLibrary, setTakeLibrary] = useState([]);
+  const [selectedTake, setSelectedTake] = useState(null);
+  const [previewPerformers, setPreviewPerformers] = useState(null);
+  const [playbackActive, setPlaybackActive] = useState(false);
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
@@ -124,9 +159,15 @@ function App() {
       setPerformers((current) => updatePerformerState(current, id, state));
     });
     socket.on("scene:set", setScene);
-    socket.on("take:status", ({ recording: isRecording }) => {
+    socket.on("take:status", ({ recording: isRecording, savedTake }) => {
       setRecording(isRecording);
-      setStatus(isRecording ? "Recording movement and audio chunks." : "Take stopped. Export is ready.");
+      if (savedTake) {
+        setTakeLibrary((current) => [
+          savedTake,
+          ...current.filter((take) => take.id !== savedTake.id)
+        ]);
+      }
+      setStatus(isRecording ? "Recording movement and audio chunks." : "Take saved to the scene library.");
     });
     socket.on("macro:trigger", ({ performerId, macro }) => {
       flashMacro(performerId, macro);
@@ -186,6 +227,14 @@ function App() {
 
   useEffect(() => {
     return () => stopMouthCamera();
+  }, []);
+
+  useEffect(() => {
+    if (joined && mode === "edit") loadTakeLibrary();
+  }, [joined, mode, roomId]);
+
+  useEffect(() => {
+    return () => clearPlayback();
   }, []);
 
   const joinRoom = (event) => {
@@ -408,16 +457,92 @@ function App() {
   const exportTake = async () => {
     const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/take`);
     const take = await response.json();
+    downloadTake(take);
+  };
+
+  const downloadTake = (take) => {
     const blob = new Blob([JSON.stringify(take, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `pup-it-${roomId}-take.json`;
+    link.download = `pup-it-${take.roomId || roomId}-${take.id || "take"}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
+  const loadTakeLibrary = async () => {
+    const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes`);
+    if (!response.ok) {
+      setTakeLibrary([]);
+      return;
+    }
+    const library = await response.json();
+    setTakeLibrary(library.takes || []);
+  };
+
+  const selectTake = async (takeId) => {
+    const response = await fetch(
+      `${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes/${encodeURIComponent(takeId)}`
+    );
+    if (!response.ok) return;
+    const take = await response.json();
+    clearPlayback();
+    setSelectedTake(take);
+    setPreviewPerformers(makePreviewPerformers(take));
+    setScene(take.scene);
+    setMode("edit");
+  };
+
+  const clearPlayback = () => {
+    playbackTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    playbackTimersRef.current = [];
+    setPlaybackActive(false);
+  };
+
+  const playSelectedTake = () => {
+    if (!selectedTake) return;
+    clearPlayback();
+    setScene(selectedTake.scene);
+    setPreviewPerformers(makePreviewPerformers(selectedTake));
+    setPlaybackActive(true);
+
+    const events = [...selectedTake.tracks.motion].sort((a, b) => a.at - b.at);
+    const lastAt = events.at(-1)?.at || selectedTake.durationMs || 0;
+
+    playbackTimersRef.current = events.map((event) =>
+      window.setTimeout(() => {
+        if (event.type === "performer:update") {
+          setPreviewPerformers((current) =>
+            updatePerformerState(current || {}, event.performerId, event.state)
+          );
+        }
+        if (event.type === "performer:joined") {
+          setPreviewPerformers((current) => upsertPerformer(current || {}, event.performer));
+        }
+        if (event.type === "performer:left") {
+          setPreviewPerformers((current) => removePerformer(current || {}, event.performerId));
+        }
+        if (event.type === "scene:set") setScene(event.scene);
+        if (event.type === "macro:trigger") {
+          setPreviewPerformers((current) =>
+            updatePerformerState(current || {}, event.performerId, { macro: event.macro })
+          );
+        }
+      }, event.at)
+    );
+
+    playbackTimersRef.current.push(
+      window.setTimeout(() => {
+        setPlaybackActive(false);
+      }, lastAt + 250)
+    );
+  };
+
   const activePerformers = useMemo(() => performerList(performers), [performers]);
+  const stagePerformers = useMemo(
+    () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
+    [activePerformers, mode, previewPerformers]
+  );
 
   if (!joined) {
     return (
@@ -469,7 +594,7 @@ function App() {
         </div>
         <div className="transport">
           <div className="modeSwitch" aria-label="Workflow mode">
-            {["perform", "build"].map((item) => (
+            {["perform", "build", "edit"].map((item) => (
               <button
                 key={item}
                 className={mode === item ? "selected" : ""}
@@ -501,13 +626,13 @@ function App() {
       >
         <div className="horizonGuide" />
         <div className="setFloor" />
-            {activePerformers.map((performer) => (
+        {stagePerformers.map((performer) => (
           <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
         ))}
       </section>
 
       <aside className="controlDock">
-        {mode === "perform" ? (
+        {mode === "perform" && (
           <PerformControls
             scene={scene}
             self={self}
@@ -519,7 +644,8 @@ function App() {
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
           />
-        ) : (
+        )}
+        {mode === "build" && (
           <CharacterEditor
             performer={self}
             onRigChange={updateCharacterRig}
@@ -528,10 +654,21 @@ function App() {
             onRandomize={randomizeCharacterDesign}
           />
         )}
+        {mode === "edit" && (
+          <SceneLibraryEditor
+            takes={takeLibrary}
+            selectedTake={selectedTake}
+            playbackActive={playbackActive}
+            onRefresh={loadTakeLibrary}
+            onSelectTake={selectTake}
+            onPlay={playSelectedTake}
+            onExport={downloadTake}
+          />
+        )}
 
         <div className="dockGroup performerGroup">
           <h2>Performers</h2>
-          {activePerformers.map((performer) => (
+          {stagePerformers.map((performer) => (
             <div className="performerRow" key={performer.id}>
               <span>{performer.name}</span>
               <small>
@@ -667,6 +804,110 @@ function PerformControls({
         </div>
       </div>
     </>
+  );
+}
+
+function SceneLibraryEditor({
+  takes,
+  selectedTake,
+  playbackActive,
+  onRefresh,
+  onSelectTake,
+  onPlay,
+  onExport
+}) {
+  return (
+    <div className="sceneEditor">
+      <div className="dockGroup">
+        <h2>Scene Library</h2>
+        <div className="editorHeader">
+          <Library size={18} />
+          <div>
+            <strong>{selectedTake?.name || "Recorded Scenes"}</strong>
+            <small>{takes.length} saved in this room</small>
+          </div>
+        </div>
+        <button className="wideAction" onClick={onRefresh}>
+          <RefreshCw size={16} />
+          Refresh
+        </button>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Takes</h2>
+        {takes.length ? (
+          <div className="takeList">
+            {takes.map((take) => (
+              <button
+                key={take.id}
+                className={`takeButton ${selectedTake?.id === take.id ? "selected" : ""}`}
+                onClick={() => onSelectTake(take.id)}
+              >
+                <span>{take.name}</span>
+                <small>
+                  {take.scene} / {formatDuration(take.durationMs)}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">No recorded takes yet.</div>
+        )}
+      </div>
+
+      {selectedTake && (
+        <>
+          <div className="dockGroup">
+            <h2>Timeline</h2>
+            <div className="editorStats">
+              <span>
+                <strong>{formatDuration(selectedTake.durationMs)}</strong>
+                Duration
+              </span>
+              <span>
+                <strong>{selectedTake.tracks.motion.length}</strong>
+                Moves
+              </span>
+              <span>
+                <strong>{selectedTake.tracks.audio.length}</strong>
+                Audio Tracks
+              </span>
+              <span>
+                <strong>{selectedTake.performers.length}</strong>
+                Cast
+              </span>
+            </div>
+          </div>
+
+          <div className="dockGroup">
+            <h2>Tracks</h2>
+            {selectedTake.tracks.audio.length ? (
+              selectedTake.tracks.audio.map((track) => (
+                <div className="trackRow" key={track.id}>
+                  <span>{track.performerName}</span>
+                  <small>
+                    {track.character} / {track.chunks.length} clips
+                  </small>
+                </div>
+              ))
+            ) : (
+              <div className="emptyState">No audio tracks.</div>
+            )}
+          </div>
+
+          <div className="libraryActions">
+            <button className={playbackActive ? "active" : ""} onClick={onPlay}>
+              <Play size={16} />
+              {playbackActive ? "Playing" : "Play Scene"}
+            </button>
+            <button onClick={() => onExport(selectedTake)}>
+              <Video size={16} />
+              Export
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

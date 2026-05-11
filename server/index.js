@@ -1,7 +1,12 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import { createTakeExport, recordEvent } from "../shared/recorder.js";
+import {
+  createStoredTake,
+  createTakeExport,
+  recordEvent,
+  summarizeTake
+} from "../shared/recorder.js";
 import {
   createPerformer,
   createRoom,
@@ -106,10 +111,19 @@ io.on("connection", (socket) => {
   socket.on("take:stop", () => {
     if (!activeRoomId) return;
     const room = getRoom(activeRoomId);
+    const wasRecording = room.recording;
+    let savedTake = null;
+
     room.recording = false;
+    if (wasRecording) {
+      savedTake = createStoredTake(room, room.takes.length + 1);
+      room.takes.unshift(savedTake);
+    }
+
     io.to(activeRoomId).emit("take:status", {
       recording: false,
-      takeStartedAt: room.takeStartedAt
+      takeStartedAt: room.takeStartedAt,
+      savedTake: savedTake ? summarizeTake(savedTake) : null
     });
   });
 
@@ -147,6 +161,30 @@ app.get("/api/rooms/:roomId/take", (req, res) => {
   }
 
   res.json(createTakeExport(room));
+});
+
+app.get("/api/rooms/:roomId/takes", (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) {
+    res.status(404).json({ error: "Room not found" });
+    return;
+  }
+
+  res.json({
+    roomId: room.id,
+    takes: room.takes.map(summarizeTake)
+  });
+});
+
+app.get("/api/rooms/:roomId/takes/:takeId", (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  const take = room?.takes.find((item) => item.id === req.params.takeId);
+  if (!take) {
+    res.status(404).json({ error: "Take not found" });
+    return;
+  }
+
+  res.json(take);
 });
 
 app.get("/health", (_req, res) => {

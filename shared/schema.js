@@ -51,7 +51,8 @@ export function createRoom({ id, scene = defaultSceneId }) {
     recording: false,
     takeStartedAt: null,
     events: [],
-    audio: []
+    audio: [],
+    takes: []
   };
 }
 
