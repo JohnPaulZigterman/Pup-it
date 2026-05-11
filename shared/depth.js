@@ -1,3 +1,5 @@
+import { motionFeelCatalog } from "./catalogs.js";
+
 export const defaultDepthModel = {
   horizon: 20,
   foreground: 82,
@@ -77,6 +79,23 @@ function mix(from, to, progress) {
   return from + (to - from) * progress;
 }
 
+export const motionProfiles = {
+  ...Object.fromEntries(motionFeelCatalog.map((profile) => [profile.id, profile]))
+};
+
+export function getMotionProfile(id = "smooth") {
+  return motionProfiles[id] || motionProfiles.smooth;
+}
+
+export function hasResidualMotion(state, threshold = 0.035) {
+  return Math.hypot(state.motionVx || 0, state.motionVy || 0) > threshold;
+}
+
+function easeVelocity(current, target, amount, frameScale) {
+  const adjustedAmount = 1 - Math.pow(1 - amount, frameScale);
+  return current + (target - current) * adjustedAmount;
+}
+
 export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
   const progress = getDepthProgress(y, model);
@@ -89,10 +108,26 @@ export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
 export function movePerformerState(state, input, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
   const progress = getDepthProgress(state.y, model);
+  const profile = getMotionProfile(state.motionFeel);
+  const frameScale = clamp(input.deltaMs ?? 16.67, 8, 48) / 16.67;
   const lateralSpeed = mix(model.lateralFar, model.lateralNear, progress);
   const verticalSpeed = mix(model.verticalFar, model.verticalNear, progress);
-  const dx = input.dx * lateralSpeed;
-  const dy = input.dy * verticalSpeed;
+  const movingDiagonally = input.dx !== 0 && input.dy !== 0;
+  const diagonalTrim = movingDiagonally ? Math.SQRT1_2 : 1;
+  const targetVx = input.dx * diagonalTrim * profile.speed * lateralSpeed;
+  const targetVy = input.dy * diagonalTrim * profile.speed * verticalSpeed;
+  const activelyMoving = input.dx !== 0 || input.dy !== 0;
+  const easing = activelyMoving ? profile.acceleration : profile.deceleration;
+  let motionVx = easeVelocity(state.motionVx || 0, targetVx, easing, frameScale);
+  let motionVy = easeVelocity(state.motionVy || 0, targetVy, easing, frameScale);
+
+  if (!activelyMoving && Math.hypot(motionVx, motionVy) < 0.025) {
+    motionVx = 0;
+    motionVy = 0;
+  }
+
+  const dx = motionVx * frameScale;
+  const dy = motionVy * frameScale;
   const away = input.dy < 0;
   const toward = input.dy > 0;
   const convergenceDirection = away
@@ -100,21 +135,25 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     : toward
       ? state.x - model.vanishingX
       : 0;
-  const convergenceX = convergenceDirection * Math.abs(input.dy) * model.convergence;
+  const convergenceX = convergenceDirection * Math.abs(motionVy) * model.convergence * frameScale;
   const nextX = clamp(state.x + dx + convergenceX, 5, 92);
   const minY = model.horizon + (model.performerHorizonBuffer ?? 0);
   const nextY = clamp(state.y + dy, minY, model.foreground);
-  const nextScale = clamp(state.scale + input.dScale, model.minTrim, model.maxTrim);
-  const groundSpeed = Math.hypot(dx, dy);
+  const nextScale = clamp(state.scale + input.dScale * frameScale, model.minTrim, model.maxTrim);
+  const groundSpeed = Math.hypot(motionVx, motionVy);
+  const travelLean = clamp(motionVx * profile.lean, -profile.maxLean, profile.maxLean);
 
   return {
     ...state,
     x: nextX,
     y: nextY,
     scale: nextScale,
-    facing: input.dx === 0 ? state.facing : input.dx > 0 ? 1 : -1,
-    walking: input.dx !== 0 || input.dy !== 0,
+    facing: Math.abs(motionVx) < 0.08 ? state.facing : motionVx > 0 ? 1 : -1,
+    walking: groundSpeed > 0.03,
+    motionVx,
+    motionVy,
     groundSpeed,
+    travelLean,
     depthProgress: getDepthProgress(nextY, model)
   };
 }

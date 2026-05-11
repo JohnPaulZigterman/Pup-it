@@ -2428,7 +2428,11 @@ input[type="color"] {
   width: 144px;
   height: 196px;
   transform-origin: bottom center;
-  transition: transform 80ms linear;
+  transition:
+    left 70ms linear,
+    top 70ms linear,
+    transform 90ms linear;
+  will-change: left, top, transform;
   --outline: #2b2d42;
   --line-width: 4px;
   --highlight-opacity: 0.22;
@@ -2524,6 +2528,7 @@ input[type="color"] {
     3px 5px 0 rgba(38, 41, 54, calc(var(--shadow-opacity) * 0.18));
   transform: rotate(var(--body-lean)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
   transform-origin: bottom center;
+  transition: transform 90ms ease-out;
 }
 
 .puppetBody::before {

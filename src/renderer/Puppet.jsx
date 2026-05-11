@@ -31,6 +31,8 @@ export function Puppet({ performer, isSelf, depthModel }) {
     Math.min(1, (state.y - (depthModel?.horizon || 20)) / ((depthModel?.foreground || 82) - (depthModel?.horizon || 20)))
   );
   const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
+  const actingLean = pose.bodyLean + (state.travelLean || 0);
+  const motionSquash = state.walking ? 1 + Math.min(0.035, (state.groundSpeed || 0) * 0.018) : 1;
 
   return (
     <div
@@ -76,8 +78,8 @@ export function Puppet({ performer, isSelf, depthModel }) {
         "--cast-shadow-opacity": 0.08 + depth * adapter.shadowOpacity,
         "--arm-length": `${rig.armLength * adapter.limbScale}px`,
         "--leg-length": `${rig.legLength * adapter.limbScale}px`,
-        "--body-lean": `${pose.bodyLean}deg`,
-        "--body-squash": pose.bodySquash,
+        "--body-lean": `${actingLean}deg`,
+        "--body-squash": pose.bodySquash * motionSquash,
         "--arm-left": `${pose.armLeft}deg`,
         "--arm-right": `${pose.armRight}deg`,
         "--leg-left": `${pose.legLeft}deg`,

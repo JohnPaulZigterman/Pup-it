@@ -1,4 +1,4 @@
-import { movePerformerState } from "../../shared/depth.js";
+import { hasResidualMotion, movePerformerState } from "../../shared/depth.js";
 
 export function indexPerformers(performers) {
   return Object.fromEntries(performers.map((performer) => [performer.id, performer]));
@@ -37,7 +37,7 @@ export function updatePerformerState(performersById, id, statePatch) {
   };
 }
 
-export function inputFromPressedKeys(pressed) {
+export function inputFromPressedKeys(pressed, deltaMs = 16.67) {
   let dx = 0;
   let dy = 0;
   let dScale = 0;
@@ -49,11 +49,15 @@ export function inputFromPressedKeys(pressed) {
   if (pressed.has("q")) dScale -= 0.005;
   if (pressed.has("e")) dScale += 0.005;
 
-  return { dx, dy, dScale };
+  return { dx, dy, dScale, deltaMs };
 }
 
 export function hasInput(input) {
   return input.dx !== 0 || input.dy !== 0 || input.dScale !== 0;
+}
+
+export function shouldContinueMotion(state) {
+  return hasResidualMotion(state);
 }
 
 export function movePerformerFromInput(performer, input, depthModel) {

@@ -59,6 +59,7 @@ import {
   idleMotionCatalog,
   limbStyleCatalog,
   macroCatalog,
+  motionFeelCatalog,
   mouthStyleCatalog,
   objectStyleCatalog,
   originalNameParts,
@@ -75,6 +76,7 @@ import {
   movePerformerFromInput,
   performerList,
   removePerformer,
+  shouldContinueMotion,
   updatePerformerState,
   upsertPerformer
 } from "./engine/performanceState.js";
@@ -329,6 +331,7 @@ function makePreviewPerformers(take) {
         y: 60,
         pose: performer.pose,
         idleMotion: performer.idleMotion,
+        motionFeel: performer.motionFeel || "smooth",
         mouthControl: performer.mouthControl,
         rigConfig: performer.rigConfig,
         stylePreset: performer.stylePreset,
@@ -620,18 +623,30 @@ function App() {
 
     const pressed = new Set();
     let frame = null;
+    let lastFrameAt = performance.now();
 
-    const update = () => {
+    const update = (now = performance.now()) => {
+      const deltaMs = Math.min(48, Math.max(8, now - lastFrameAt || 16.67));
+      lastFrameAt = now;
+
       setPerformers((current) => {
         const performer = current[selfId];
         if (!performer) return current;
 
-        const input = inputFromPressedKeys(pressed);
-        if (!hasInput(input)) {
-          if (!performer.state.walking) return current;
+        const input = inputFromPressedKeys(pressed, deltaMs);
+        const moving = hasInput(input);
+        if (!moving && !shouldContinueMotion(performer.state)) {
+          if (!performer.state.walking && !performer.state.groundSpeed) return current;
           const nextPerformer = {
             ...performer,
-            state: { ...performer.state, walking: false }
+            state: {
+              ...performer.state,
+              walking: false,
+              motionVx: 0,
+              motionVy: 0,
+              groundSpeed: 0,
+              travelLean: 0
+            }
           };
           socketRef.current.emit("performer:update", nextPerformer.state);
           return upsertPerformer(current, nextPerformer);
@@ -762,6 +777,7 @@ function App() {
     setStatus("Updated floor mark from the current performer position.");
   };
   const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
+  const setMotionFeel = (motionFeel) => updateSelf({ motionFeel });
   const setMouthOpen = (mouthOpen, { immediate = false } = {}) => {
     const target = clamp(mouthOpen, 0, 1);
     const previous = mouthValueRef.current;
@@ -1762,6 +1778,7 @@ function App() {
             onExpressionChange={setExpression}
             onPoseChange={setPose}
             onIdleMotionChange={setIdleMotion}
+            onMotionFeelChange={setMotionFeel}
             onMouthControlChange={setMouthControl}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
@@ -2245,6 +2262,7 @@ function PerformControls({
   onExpressionChange,
   onPoseChange,
   onIdleMotionChange,
+  onMotionFeelChange,
   onMouthControlChange,
   mouthCameraActive,
   onMacroTrigger,
@@ -2449,6 +2467,25 @@ function PerformControls({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Motion</h2>
+        <div className="segmented">
+          {motionFeelCatalog.map((feel) => (
+            <button
+              key={feel.id}
+              className={(self?.state.motionFeel || "smooth") === feel.id ? "selected" : ""}
+              title={feel.description}
+              onClick={() => onMotionFeelChange(feel.id)}
+            >
+              {feel.name}
+            </button>
+          ))}
+        </div>
+        <small className="controlHint">
+          Smooth is the beginner default. Direct hits marks faster; Loose keeps more handmade drift.
+        </small>
       </div>
 
       <div className="dockGroup">

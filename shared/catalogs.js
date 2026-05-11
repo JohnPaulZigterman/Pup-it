@@ -238,6 +238,39 @@ export const macroCatalog = [
   { id: "panic", name: "Panic", kind: "emotion", durationMs: 850 }
 ];
 
+export const motionFeelCatalog = [
+  {
+    id: "smooth",
+    name: "Smooth",
+    description: "Soft starts and stops for most character acting.",
+    speed: 1,
+    acceleration: 0.36,
+    deceleration: 0.3,
+    lean: 4.2,
+    maxLean: 6
+  },
+  {
+    id: "direct",
+    name: "Direct",
+    description: "Snappier control for precise blocking and marks.",
+    speed: 1.04,
+    acceleration: 0.72,
+    deceleration: 0.62,
+    lean: 2.2,
+    maxLean: 3.5
+  },
+  {
+    id: "loose",
+    name: "Loose",
+    description: "Floatier drift for weird, handmade comedy motion.",
+    speed: 0.94,
+    acceleration: 0.22,
+    deceleration: 0.18,
+    lean: 6.8,
+    maxLean: 8
+  }
+];
+
 export const poseCatalog = [
   {
     id: "neutral",
