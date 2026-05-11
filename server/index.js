@@ -28,6 +28,21 @@ const PORT = Number(process.env.PORT || 4111);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
 const app = express();
+app.use((req, res, next) => {
+  const allowedOrigins = new Set([CLIENT_ORIGIN, "http://127.0.0.1:5173", "http://localhost:5173"]);
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 app.use(express.json({ limit: "5mb" }));
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -234,6 +249,10 @@ app.get("/api/shows", async (_req, res) => {
   try {
     res.json({ shows: await listShows() });
   } catch (error) {
+    if (error?.code === "DATABASE_NOT_CONFIGURED") {
+      res.json({ shows: [], persistence: "local" });
+      return;
+    }
     handleApiError(res, error);
   }
 });
@@ -263,6 +282,10 @@ app.get("/api/shows/:showId", async (req, res) => {
     }
     res.json({ show });
   } catch (error) {
+    if (error?.code === "DATABASE_NOT_CONFIGURED") {
+      res.status(404).json({ error: "Show not found", persistence: "local" });
+      return;
+    }
     handleApiError(res, error);
   }
 });
@@ -271,6 +294,10 @@ app.get("/api/shows/:showId/episodes", async (req, res) => {
   try {
     res.json({ episodes: await listEpisodes(req.params.showId) });
   } catch (error) {
+    if (error?.code === "DATABASE_NOT_CONFIGURED") {
+      res.json({ episodes: [], persistence: "local" });
+      return;
+    }
     handleApiError(res, error);
   }
 });

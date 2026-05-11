@@ -2426,7 +2426,7 @@ function App() {
 
   const queueVideoExport = () => {
     setMode("edit");
-    setStatus("Video export is next on the render roadmap. For now, export the short package with takes, credits, and tracks.");
+    setStatus("Use Preview WEBM for a quick video. The next render milestone is matching the full live stage more exactly.");
   };
 
   const exportSelectedTakeVideo = async () => {
@@ -2867,6 +2867,7 @@ function App() {
         />
 
         <BeginnerRoadmap
+          mode={mode}
           progress={beginnerProgress}
           selectedTake={selectedTake}
           onModeChange={setMode}
@@ -3392,6 +3393,7 @@ function ContextualInspector({
 }
 
 function BeginnerRoadmap({
+  mode,
   progress,
   selectedTake,
   recording,
@@ -3489,7 +3491,7 @@ function BeginnerRoadmap({
           </div>
         ))}
       </div>
-      {selectedTake && (
+      {selectedTake && mode !== "edit" && (
         <div className="roadmapReward">
           <strong>That is a cartoon now.</strong>
           <small>Replay it while the timing is fresh, then save it into the show.</small>
@@ -4385,7 +4387,11 @@ function AssetLibraryPanel({
             </article>
           );
         }) : (
-          <div className="emptyState">No assets match that search yet.</div>
+          <div className="emptyState actionEmpty">
+            <strong>No assets match that search yet.</strong>
+            <span>Try a broader raw-material search, then bend the result into your show.</span>
+            <button onClick={() => onSearchChange("")}>Show All Materials</button>
+          </div>
         )}
       </div>
 
@@ -4403,7 +4409,11 @@ function AssetLibraryPanel({
             ))}
           </div>
         ) : (
-          <div className="emptyState">No external assets attached to this show yet.</div>
+          <div className="emptyState actionEmpty">
+            <strong>No external assets attached yet.</strong>
+            <span>One-click safe materials keep credits and rights notes with the show.</span>
+            <button onClick={() => onSearchChange("cc0 prop")}>Find CC0 Props</button>
+          </div>
         )}
       </div>
 
