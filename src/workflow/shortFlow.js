@@ -22,9 +22,9 @@ export const tutorialSteps = [
 ];
 
 export const workflowSteps = [
-  { id: "home", label: "Setup", mode: "home", description: "Choose a show, template, or next task." },
-  { id: "cast", label: "Rigs", mode: "build", description: "Build performer rigs and make them original." },
-  { id: "sets", label: "Materials", mode: "assets", description: "Gather raw settings, props, textures, and references." },
+  { id: "home", label: "Setting", mode: "home", description: "Choose the show, starting setting, and first task." },
+  { id: "cast", label: "Creator", mode: "build", description: "Choose a rig model and customize it like a character creator." },
+  { id: "sets", label: "Place", mode: "assets", description: "Place settings, props, textures, and raw materials into the scene." },
   { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
   { id: "edit", label: "Finish", mode: "edit", description: "Replay, trim, export, and submit the short." },
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }

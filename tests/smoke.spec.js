@@ -10,20 +10,22 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();
   await expect(page.locator(".puppet.self .nameTag")).toHaveCount(0);
   await expect(page.locator(".floorMark")).toHaveCount(0);
+  await expect(page.locator(".newProjectGuide")).toBeVisible();
 
-  await page.getByRole("button", { name: "Setup" }).first().click();
+  await page.getByRole("button", { name: "Setting" }).first().click();
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pick a tiny format, then make it yours." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Make A Short" })).toBeVisible();
   await expect(page.locator("header").getByRole("button", { name: "Finish" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Rigs" }).first().click();
-  await expect(page.getByRole("heading", { name: "Build Your Rig" })).toBeVisible();
+  await page.getByRole("button", { name: "Creator" }).first().click();
+  await expect(page.getByRole("heading", { name: "Character Creator" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rig Check" })).toBeVisible();
   await expect(page.locator(".buildToolStrip")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assemble Parts" })).toBeVisible();
   await expect(page.locator(".visualPartWorkbench")).toBeVisible();
   await expect(page.locator(".partPaletteCard")).toHaveCount(10);
+  await expect(page.locator(".puppet.self .nameTag, .floorMark, .horizonGuide")).toHaveCount(0);
   await page.locator(".partPaletteCard").filter({ hasText: "Torso" }).click();
   await page.locator(".shapePaintGrid").getByRole("button", { name: "Bean" }).click();
   await expect(page.locator(".partWorkbenchPreview.partShape-bean")).toBeVisible();
@@ -33,7 +35,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.locator(".partTopAccessory, .partLeftAccessory, .partRightAccessory, .partBackAppendage")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Behavior" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Materials" }).first().click();
+  await page.getByRole("button", { name: "Place" }).first().click();
   await page.getByPlaceholder("rigs, mouths, diner setting, parody reference...").fill("furniture");
   await page.locator(".assetActions").getByRole("button", { name: "Use as Material" }).first().click();
 
@@ -70,6 +72,7 @@ test("main workstation avoids horizontal overflow across common viewport sizes",
     await page.getByLabel("Performer").fill("Responsive QA");
     await page.getByRole("button", { name: "Join Stage" }).click();
     await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();
+    await expect(page.locator(".newProjectGuide")).toBeVisible();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);

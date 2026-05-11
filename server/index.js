@@ -83,9 +83,12 @@ function getRoom(roomId) {
 io.on("connection", (socket) => {
   let activeRoomId = null;
 
-  socket.on("room:join", ({ roomId, name, character }) => {
+  socket.on("room:join", ({ roomId, name, character, scene }) => {
     activeRoomId = sanitizeRoomId(roomId);
     const room = getRoom(activeRoomId);
+    if (scene && room.performers.size === 0) {
+      room.scene = scene;
+    }
 
     const performer = createPerformer({
       id: socket.id,

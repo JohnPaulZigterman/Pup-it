@@ -888,6 +888,7 @@ async function fetchPersistedShows() {
   const response = await fetch(`${SERVER_URL}/api/shows`);
   if (!response.ok) throw new Error("Show database unavailable");
   const data = await response.json();
+  if (data.persistence === "local") throw new Error("Show database unavailable");
   return (data.shows || []).map(showSessionFromPersistedShow);
 }
 
@@ -1025,9 +1026,11 @@ function App() {
   const [showName, setShowName] = useState("Untitled Show");
   const [savedShows, setSavedShows] = useState([]);
   const [selectedShowId, setSelectedShowId] = useState("");
+  const [entryLoadedShowId, setEntryLoadedShowId] = useState("");
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
   const [character, setCharacter] = useState(defaultCharacterId);
   const [scene, setScene] = useState(sceneCatalog[0].id);
+  const selectedSceneRef = useRef(sceneCatalog[0].id);
   const [performers, setPerformers] = useState({});
   const [selfId, setSelfId] = useState(null);
   const [recording, setRecording] = useState(false);
@@ -1120,6 +1123,7 @@ function App() {
 
     socket.on("connect", () => setSelfId(socket.id));
     socket.on("room:snapshot", (snapshot) => {
+      selectedSceneRef.current = snapshot.scene;
       setScene(snapshot.scene);
       setRecording(snapshot.recording);
       setPerformers(indexPerformers(snapshot.performers));
@@ -1322,7 +1326,7 @@ function App() {
   const joinRoom = (event) => {
     event.preventDefault();
     socketRef.current.connect();
-    socketRef.current.emit("room:join", { roomId, name, character });
+    socketRef.current.emit("room:join", { roomId, name, character, scene: selectedSceneRef.current });
   };
 
   const updateSelf = (statePatch) => {
@@ -1411,6 +1415,37 @@ function App() {
   };
 
   const updateCharacterStyle = (stylePreset) => updateSelf({ stylePreset });
+  const changeCharacterRig = (nextCharacter) => {
+    setCharacter(nextCharacter);
+    if (!self) return;
+    const baseCharacter = getCatalogItem(characterCatalog, nextCharacter);
+    const nextState = createPerformerState({
+      ...self.state,
+      rigConfig: baseCharacter.rigConfig,
+      stylePreset: baseCharacter.stylePreset,
+      characterDesign: {
+        name: `${baseCharacter.name} Puppet`,
+        color: baseCharacter.color,
+        accent: baseCharacter.accent
+      },
+      characterParts: {},
+      mouthOpen: 0,
+      speaking: false,
+      walking: false,
+      motionVx: 0,
+      motionVy: 0,
+      groundSpeed: 0,
+      macro: null
+    });
+    const nextPerformer = { ...self, character: nextCharacter, state: nextState };
+    setPerformers((current) => upsertPerformer(current, nextPerformer));
+    socketRef.current.emit("performer:configure", {
+      name: nextPerformer.name,
+      character: nextPerformer.character,
+      state: nextPerformer.state
+    });
+    setStatus(`${baseCharacter.name} selected. Customize the rig, then place it in the scene.`);
+  };
   const updateCharacterDesign = (patch) => {
     if (!self) return;
     const baseCharacter = getCatalogItem(characterCatalog, self.character);
@@ -1753,6 +1788,7 @@ function App() {
   };
 
   const changeScene = (nextScene) => {
+    selectedSceneRef.current = nextScene;
     setScene(nextScene);
     socketRef.current.emit("scene:set", nextScene);
   };
@@ -2185,7 +2221,8 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
-  const showStageMarkers = mode !== "perform";
+  const showStageMarkers = mode === "assets" || mode === "edit";
+  const showPuppetLabels = mode === "edit";
   const activeShowToolbox = useMemo(
     () =>
       createShowToolbox({
@@ -2717,6 +2754,34 @@ function App() {
     setStatus(`Loaded show "${session.showName}".`);
   };
 
+  const loadEntryShow = (showId = selectedShowId) => {
+    const session = savedShows.find((show) => show.id === showId);
+    if (!session) return;
+    clearPlayback();
+    setEntryLoadedShowId(session.id);
+    setSelectedShowId(session.id);
+    setShowName(session.showName);
+    setRoomId(session.roomId || roomId);
+    selectedSceneRef.current = session.scene || sceneCatalog[0].id;
+    setScene(session.scene || sceneCatalog[0].id);
+    setCameraShot(session.cameraShot || "wide");
+    setLightingPreset(session.lightingPreset || "scene");
+    setBackgroundTheme(session.backgroundTheme || "painted-depth");
+    setObjectStyle(session.objectStyle || "soft-material");
+    setSceneObjects(session.sceneObjects || []);
+    setSceneSets(session.sceneSets || []);
+    setFloorMarks(session.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, session.scene || sceneCatalog[0].id)));
+    setStoryboardPanels(session.storyboardPanels || []);
+    setProductionTimeline(session.productionTimeline || session.timeline || []);
+    setAssetReferences(session.assetReferences || []);
+    const castMember = session.cast?.find((performer) => performer.name === name) || session.cast?.[0];
+    if (castMember) {
+      setCharacter(castMember.character || character);
+      setName(castMember.name || name);
+    }
+    setStatus(`Ready to continue "${session.showName}". Join when you want to enter the stage.`);
+  };
+
   const exportShowSession = () => {
     const session = createShowSession();
     const blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
@@ -2747,6 +2812,36 @@ function App() {
             </div>
           </div>
           <form onSubmit={joinRoom} className="joinForm">
+            {savedShows.length > 0 && (
+              <div className="entryContinuePanel">
+                <strong>Continue a saved show</strong>
+                <label>
+                  Saved Show
+                  <select value={selectedShowId} onChange={(event) => setSelectedShowId(event.target.value)}>
+                    {savedShows.map((show) => (
+                      <option key={show.id} value={show.id}>
+                        {show.showName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="entryShowActions">
+                  <button type="button" onClick={() => loadEntryShow()}>
+                    <FolderOpen size={16} />
+                    Load Show
+                  </button>
+                  <button type="submit">
+                    <Radio size={16} />
+                    Continue Show
+                  </button>
+                </div>
+                {entryLoadedShowId && (
+                  <small>
+                    Loaded {savedShows.find((show) => show.id === entryLoadedShowId)?.showName || "saved show"} into the start controls.
+                  </small>
+                )}
+              </div>
+            )}
             <label>
               Room
               <input value={roomId} onChange={(event) => setRoomId(event.target.value)} />
@@ -2755,8 +2850,27 @@ function App() {
               Performer
               <input value={name} onChange={(event) => setName(event.target.value)} />
             </label>
+            <div className="entryDivider">
+              <span>{savedShows.length ? "Or start a new stage" : "Start a new stage"}</span>
+            </div>
             <label>
-              Rig Model
+              Starting Setting
+              <select
+                value={scene}
+                onChange={(event) => {
+                  selectedSceneRef.current = event.target.value;
+                  setScene(event.target.value);
+                }}
+              >
+                {sceneCatalog.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Starting Rig
               <select value={character} onChange={(event) => setCharacter(event.target.value)}>
                 {characterCatalog.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -2912,7 +3026,7 @@ function App() {
                   performer={performer}
                   isSelf={performer.id === selfId}
                   depthModel={selectedScene}
-                  showLabels={showStageMarkers}
+                  showLabels={showPuppetLabels}
                 />
               ))}
             </div>
@@ -2924,12 +3038,25 @@ function App() {
         <ShowSessionControls
           showName={showName}
           savedShows={savedShows}
-          selectedShowId={selectedShowId}
-          onShowNameChange={setShowName}
-          onSelectedShowChange={setSelectedShowId}
-          onSaveShow={saveShowSession}
-          onLoadShow={loadShowSession}
-          onExportShow={exportShowSession}
+            selectedShowId={selectedShowId}
+            onShowNameChange={setShowName}
+            onSelectedShowChange={setSelectedShowId}
+            onSaveShow={saveShowSession}
+            onLoadShow={loadShowSession}
+            onExportShow={exportShowSession}
+        />
+
+        <NewProjectGuide
+          mode={mode}
+          scene={scene}
+          character={character}
+          hasCustomRigParts={hasCustomRigParts}
+          sceneObjectCount={sceneObjects.length}
+          onSceneChange={changeScene}
+          onCharacterChange={changeCharacterRig}
+          onCustomizeRig={() => setMode("build")}
+          onPlaceInScene={() => openAssetSearch("", "object")}
+          onPerform={() => setMode("perform")}
         />
 
         <BeginnerRoadmap
@@ -3013,6 +3140,8 @@ function App() {
         {mode === "build" && (
           <CharacterEditor
             performer={self}
+            character={character}
+            onCharacterChange={changeCharacterRig}
             onRigChange={updateCharacterRig}
             onStyleChange={updateCharacterStyle}
             onDesignChange={updateCharacterDesign}
@@ -3687,6 +3816,73 @@ function ShowSessionControls({
       <small className="controlHint">
         Saves the show look, cast customization, storyboard, timeline, and take list in this browser.
       </small>
+    </div>
+  );
+}
+
+function NewProjectGuide({
+  mode,
+  scene,
+  character,
+  hasCustomRigParts,
+  sceneObjectCount,
+  onSceneChange,
+  onCharacterChange,
+  onCustomizeRig,
+  onPlaceInScene,
+  onPerform
+}) {
+  const steps = [
+    { id: "setting", label: "Select setting", done: Boolean(scene), action: null },
+    { id: "rig", label: "Select rig", done: Boolean(character), action: null },
+    { id: "customize", label: "Customize rig", done: hasCustomRigParts, action: onCustomizeRig },
+    { id: "place", label: "Place in scene", done: sceneObjectCount > 0, action: onPlaceInScene },
+    { id: "perform", label: "Perform", done: mode === "perform", action: onPerform }
+  ];
+
+  return (
+    <div className="dockGroup newProjectGuide">
+      <h2>New Project Path</h2>
+      <small className="controlHint">Start like a game character creator: pick the room, pick the rig, make it yours, then walk it onto the set.</small>
+      <div className="projectStepRail">
+        {steps.map((step, index) => (
+          <button
+            type="button"
+            key={step.id}
+            className={`${step.done ? "done" : ""} ${mode === "build" && step.id === "customize" ? "current" : ""}`}
+            onClick={step.action || undefined}
+            disabled={!step.action}
+          >
+            <span>{index + 1}</span>
+            {step.label}
+          </button>
+        ))}
+      </div>
+      <label>
+        Setting
+        <select value={scene} onChange={(event) => onSceneChange(event.target.value)}>
+          {sceneCatalog.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Rig Model
+        <select value={character} onChange={(event) => onCharacterChange(event.target.value)}>
+          {characterCatalog.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="projectGuideActions">
+        <button type="button" onClick={onCustomizeRig}>Character Creator</button>
+        <button type="button" onClick={onPlaceInScene}>Place Props</button>
+        <button type="button" onClick={onPerform}>Perform</button>
+      </div>
     </div>
   );
 }
@@ -5259,6 +5455,8 @@ function StoryboardEditor({
 
 function CharacterEditor({
   performer,
+  character,
+  onCharacterChange,
   onRigChange,
   onStyleChange,
   onDesignChange,
@@ -5309,7 +5507,7 @@ function CharacterEditor({
   return (
     <div className="characterEditor">
       <div className="dockGroup">
-        <h2>Build Your Rig</h2>
+        <h2>Character Creator</h2>
         <div className="editorHeader">
           <Palette size={18} />
           <div>
@@ -5321,6 +5519,16 @@ function CharacterEditor({
             </small>
           </div>
         </div>
+        <label className="characterCreatorSelect">
+          Rig Model
+          <select value={character || performer.character} onChange={(event) => onCharacterChange(event.target.value)}>
+            {characterCatalog.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="buildToolStrip" aria-label="Fast rig tools">
           <button
             type="button"
@@ -5446,7 +5654,7 @@ function CharacterEditor({
                     className={`partMiniPreview partShape-${value.shape || "scribble"}`}
                     style={{ "--part-tint": value.tint || design.color }}
                   >
-                    {value.source ? <img src={value.source} alt="" /> : null}
+          {value.source ? <img src={value.source} alt="" /> : null}
                   </span>
                   <strong>{part.name}</strong>
                   <small>{populated ? value.hidden ? "hidden" : "ready" : "empty"}</small>
@@ -5704,7 +5912,7 @@ function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate,
           className={`partWorkbenchPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}
           style={{ "--part-tint": value.tint || fallbackColor }}
         >
-          {value.source ? <img src={value.source} alt="" /> : <span>{part.label}</span>}
+          {value.source ? <img src={value.source} alt="" /> : null}
         </div>
         <div>
           <strong>{part.name}</strong>
@@ -5813,7 +6021,7 @@ function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapN
         className={`partCardPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}
         style={{ "--part-tint": value.tint || "var(--paper)" }}
       >
-        {value.source ? <img src={value.source} alt="" /> : <span>{value.label || part.label}</span>}
+        {value.source ? <img src={value.source} alt="" /> : null}
       </div>
       <div>
         <strong>{part.name}</strong>

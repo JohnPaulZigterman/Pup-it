@@ -26,6 +26,14 @@
     radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.28) 0 1px, transparent 1.6px),
     radial-gradient(circle at 72% 68%, rgba(38, 41, 54, 0.08) 0 1px, transparent 1.5px),
     repeating-linear-gradient(104deg, transparent 0 9px, rgba(38, 41, 54, 0.035) 9px 10px, transparent 10px 24px);
+  --workstation-grain:
+    radial-gradient(circle at 14% 26%, rgba(255, 255, 255, 0.28) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 72% 34%, rgba(38, 41, 54, 0.1) 0 1px, transparent 1.5px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(38, 41, 54, 0.026) 3px 4px, transparent 4px 13px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 16px);
+  --workspace-accent: var(--nicotine);
+  --workspace-soft: rgba(227, 189, 69, 0.18);
+  --workspace-muted: #5f6278;
   --model-grain:
     radial-gradient(circle at 22% 28%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1.4px),
     radial-gradient(circle at 68% 64%, rgba(24, 26, 36, 0.12) 0 1px, transparent 1.5px),
@@ -79,7 +87,7 @@ button:disabled {
 }
 
 .entryPanel {
-  width: min(440px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
   padding: 28px;
   border: 3px solid var(--ink);
   border-radius: 4px;
@@ -115,8 +123,53 @@ button:disabled {
 
 .joinForm {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   margin-top: 28px;
+}
+
+.entryContinuePanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(111, 166, 140, 0.22), transparent 44%),
+    var(--paper);
+}
+
+.entryContinuePanel strong {
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.entryContinuePanel small {
+  color: #5f6278;
+}
+
+.entryShowActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.entryDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  color: #666b86;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.entryDivider::before,
+.entryDivider::after {
+  content: "";
+  height: 1px;
+  background: var(--rule);
 }
 
 label {
@@ -173,6 +226,31 @@ input[type="color"] {
   overflow: hidden;
 }
 
+.mode-build {
+  --workspace-accent: var(--sky);
+  --workspace-soft: rgba(112, 152, 200, 0.2);
+  --workspace-muted: #3e5d7f;
+}
+
+.mode-perform {
+  --workspace-accent: var(--pond);
+  --workspace-soft: rgba(111, 166, 140, 0.22);
+  --workspace-muted: #426854;
+}
+
+.mode-edit {
+  --workspace-accent: var(--nicotine);
+  --workspace-soft: rgba(227, 189, 69, 0.22);
+  --workspace-muted: #6e5b20;
+}
+
+.mode-assets,
+.mode-storyboard {
+  --workspace-accent: var(--bruise);
+  --workspace-soft: rgba(138, 120, 184, 0.2);
+  --workspace-muted: #5f5380;
+}
+
 .appShell > * {
   min-width: 0;
 }
@@ -186,6 +264,7 @@ input[type="color"] {
   opacity: 0.1;
   background:
     linear-gradient(90deg, rgba(38, 41, 54, 0.08) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--workstation-grain),
     linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 28%);
   mix-blend-mode: soft-light;
 }
@@ -207,7 +286,7 @@ input[type="color"] {
   border-bottom: 3px solid var(--ink);
   background:
     var(--surface-grain),
-    linear-gradient(90deg, rgba(227, 189, 69, 0.18), transparent 34%),
+    linear-gradient(90deg, var(--workspace-soft), transparent 34%),
     var(--panel);
   background-blend-mode: multiply, normal, normal;
 }
@@ -344,7 +423,7 @@ input[type="color"] {
   border-right: 3px solid var(--ink);
   background:
     var(--surface-grain),
-    linear-gradient(180deg, rgba(227, 189, 69, 0.13), transparent 36%),
+    linear-gradient(180deg, var(--workspace-soft), transparent 36%),
     var(--rail);
   background-blend-mode: multiply, normal, normal;
   overflow: auto;
@@ -380,7 +459,11 @@ input[type="color"] {
 }
 
 .workflowRail button.selected {
-  background: var(--nicotine);
+  background: var(--workspace-accent);
+}
+
+.workflowRail button.selected span {
+  background: var(--surface);
 }
 
 .stage {
@@ -409,6 +492,47 @@ input[type="color"] {
   --scene-foreground: 84%;
   --scene-focus-x: 50%;
   --scene-focus-y: 56%;
+}
+
+.mode-build .stage {
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.08) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(112, 152, 200, 0.1)),
+    #d9d1c3;
+}
+
+.mode-perform .stage-live::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 13;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.18), transparent 6%, transparent 94%, rgba(38, 41, 54, 0.18)),
+    radial-gradient(ellipse at 50% 10%, rgba(255, 244, 191, 0.26), transparent 58%);
+  mix-blend-mode: multiply;
+}
+
+.mode-perform .stage-live::after {
+  content: "LIVE STAGE";
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 30;
+  padding: 4px 7px;
+  border: 2px solid rgba(38, 41, 54, 0.66);
+  color: rgba(38, 41, 54, 0.72);
+  background: rgba(245, 241, 232, 0.52);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+}
+
+.mode-edit .stage,
+.mode-storyboard .storyboardStage {
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(180deg, #e7e1d6, #d2cabc);
 }
 
 .stageCamera {
@@ -1587,6 +1711,7 @@ input[type="color"] {
   background:
     var(--surface-grain),
     linear-gradient(90deg, rgba(38, 41, 54, 0.04) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(135deg, var(--workspace-soft), transparent 34%),
     var(--panel);
   background-blend-mode: multiply, normal, normal;
   overflow: auto;
@@ -1595,15 +1720,107 @@ input[type="color"] {
 .dockGroup {
   display: grid;
   gap: 8px;
+  position: relative;
 }
 
 .dockGroup h2 {
   margin: 0;
   font-size: 12px;
-  color: var(--ink);
+  color: var(--workspace-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-shadow: none;
+}
+
+.dockGroup h2::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border: 1px solid var(--ink);
+  background: var(--workspace-accent);
+  vertical-align: 0;
+}
+
+.mode-build .controlDock {
+  background:
+    var(--surface-grain),
+    linear-gradient(90deg, rgba(38, 41, 54, 0.04) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 26%),
+    #d9d1c3;
+}
+
+.mode-build .dockGroup {
+  padding: 9px;
+  border: 2px solid rgba(38, 41, 54, 0.72);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(112, 152, 200, 0.16), transparent 42%),
+    var(--surface);
+}
+
+.mode-build .dockGroup.advancedControl,
+.mode-build .tuningStack .dockGroup {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mode-build .characterEditor > .dockGroup:first-child {
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.08) 1px, transparent 1px) 0 0 / 18px 18px,
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(112, 152, 200, 0.24), rgba(245, 241, 232, 0.6)),
+    var(--surface);
+}
+
+.characterCreatorSelect {
+  padding: 7px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mode-perform .controlDock {
+  background:
+    var(--surface-grain),
+    linear-gradient(180deg, rgba(38, 41, 54, 0.07) 0 1px, transparent 1px) 0 0 / 100% 30px,
+    linear-gradient(135deg, rgba(111, 166, 140, 0.22), transparent 42%),
+    #d6d1c5;
+}
+
+.mode-perform .dockGroup {
+  padding: 10px;
+  border: 2px solid rgba(38, 41, 54, 0.72);
+  background:
+    var(--surface-grain),
+    linear-gradient(90deg, rgba(111, 166, 140, 0.16), transparent 38%),
+    var(--surface);
+}
+
+.mode-perform .dockGroup.advancedControl,
+.mode-perform .controlCheatSheet {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(38, 41, 54, 0.06), transparent 42%),
+    var(--paper);
+}
+
+.mode-edit .controlDock {
+  background:
+    var(--surface-grain),
+    linear-gradient(90deg, rgba(38, 41, 54, 0.055) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(135deg, rgba(227, 189, 69, 0.22), transparent 38%),
+    #d8d0c4;
+}
+
+.mode-edit .dockGroup {
+  padding: 10px;
+  border: 2px solid rgba(38, 41, 54, 0.78);
+  background:
+    var(--surface-grain),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 36%),
+    var(--surface);
 }
 
 .contextInspector {
@@ -1612,6 +1829,65 @@ input[type="color"] {
     linear-gradient(135deg, rgba(111, 166, 140, 0.18), transparent 42%),
     var(--surface);
   background-blend-mode: multiply, normal, normal;
+}
+
+.newProjectGuide {
+  border-color: var(--workspace-accent);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, var(--workspace-soft), transparent 44%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.projectStepRail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.projectStepRail button {
+  display: grid;
+  gap: 3px;
+  min-height: 50px;
+  place-items: center;
+  padding: 5px 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.projectStepRail button span {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--surface);
+  font-weight: 950;
+}
+
+.projectStepRail button.done {
+  background: var(--pond);
+}
+
+.projectStepRail button.current {
+  background: var(--workspace-accent);
+}
+
+.projectGuideActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.projectGuideActions button {
+  min-height: 34px;
+  padding: 0 7px;
+  background: var(--surface);
+  font-size: 10px;
 }
 
 .perspectivePanel {
@@ -2322,6 +2598,28 @@ input[type="color"] {
   box-shadow: inset 0 0 0 2px rgba(43, 45, 66, 0.08);
 }
 
+.mode-build .partPaletteBoard {
+  padding: 7px;
+  border: 2px solid rgba(38, 41, 54, 0.62);
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.06) 1px, transparent 1px) 0 0 / 18px 18px,
+    rgba(255, 255, 255, 0.2);
+}
+
+.mode-build .partPaletteCard {
+  border-width: 2px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 60%),
+    var(--surface);
+}
+
+.mode-build .partPaletteCard.selected {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(112, 152, 200, 0.34), rgba(227, 189, 69, 0.28)),
+    var(--surface);
+}
+
 .partPaletteCard.hidden {
   opacity: 0.5;
 }
@@ -2372,6 +2670,18 @@ input[type="color"] {
     var(--paper);
 }
 
+.mode-build .partWorkbench {
+  border-width: 3px;
+  background:
+    var(--surface-grain),
+    linear-gradient(90deg, rgba(38, 41, 54, 0.08) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 46%),
+    var(--paper);
+  box-shadow:
+    5px 5px 0 rgba(38, 41, 54, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.26);
+}
+
 .partWorkbenchHeader {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
@@ -2407,6 +2717,10 @@ input[type="color"] {
   background: var(--nicotine);
 }
 
+.mode-build .shapePaintGrid button.selected {
+  background: var(--sky);
+}
+
 .shapeChip {
   width: 20px;
   height: 18px;
@@ -2430,6 +2744,14 @@ input[type="color"] {
 .partColorSwatches button.selected {
   border-color: var(--ink);
   box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink);
+}
+
+.mode-build .partColorSwatches {
+  padding: 7px;
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22), transparent 48%),
+    rgba(255, 255, 255, 0.22);
 }
 
 .partWorkbenchActions {
@@ -3499,7 +3821,9 @@ input[type="color"] {
   gap: 5px;
   padding: 6px;
   border: 2px solid var(--ink);
-  background: var(--rail);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.28), transparent 36%),
+    var(--rail);
   box-shadow: inset 2px 2px 0 rgba(38, 41, 54, 0.06);
 }
 
@@ -3509,11 +3833,31 @@ input[type="color"] {
   min-height: 48px;
   place-items: center;
   padding: 5px 3px;
-  background: var(--surface);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 56%),
+    var(--surface);
   color: var(--ink);
   font-size: 9px;
   font-weight: 900;
   line-height: 1;
+}
+
+.mode-build .buildToolStrip {
+  position: sticky;
+  top: -1px;
+  z-index: 5;
+  border-width: 3px;
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.08) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(135deg, rgba(112, 152, 200, 0.22), transparent 42%),
+    var(--rail);
+}
+
+.mode-build .buildToolStrip button:hover,
+.mode-build .shapePaintGrid button:hover,
+.mode-build .partPaletteCard:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(38, 41, 54, 0.24);
 }
 
 .buildToolStrip svg {
@@ -3654,6 +3998,77 @@ input[type="color"] {
     linear-gradient(135deg, rgba(141, 183, 255, 0.18), transparent 44%),
     var(--surface);
   background-blend-mode: multiply, normal, normal;
+}
+
+.mode-perform .cueDeckPanel {
+  border-width: 3px;
+  background:
+    var(--surface-grain),
+    linear-gradient(90deg, rgba(111, 166, 140, 0.28), transparent 44%),
+    var(--surface);
+}
+
+.mode-perform .cueDeckPanel button,
+.mode-perform .directorCameraPanel button,
+.mode-perform .performancePresetList button,
+.mode-perform .macroGrid button {
+  min-height: 38px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 58%),
+    var(--paper);
+}
+
+.mode-perform .cueDeckPanel button:hover,
+.mode-perform .directorCameraPanel button:hover,
+.mode-perform .performancePresetList button:hover {
+  background: var(--pond);
+}
+
+.mode-perform .performanceLoopPanel {
+  border-color: var(--meat);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(215, 109, 88, 0.18), transparent 44%),
+    var(--surface);
+}
+
+.mode-edit .finishReadinessPanel,
+.mode-edit .exportPlanPanel,
+.mode-edit .doinkSubmissionPanel {
+  border-width: 3px;
+  box-shadow: 4px 4px 0 rgba(38, 41, 54, 0.16);
+}
+
+.mode-edit .finishActionBar {
+  position: sticky;
+  top: -1px;
+  z-index: 4;
+  border-width: 3px;
+  background:
+    linear-gradient(90deg, rgba(227, 189, 69, 0.18), transparent 42%),
+    var(--rail);
+}
+
+.mode-edit .finishActionBar button {
+  min-height: 42px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 55%),
+    var(--surface);
+}
+
+.mode-edit .pipelineChecklist span,
+.mode-edit .submissionChecklist span {
+  border-width: 2px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 40%),
+    var(--rail);
+}
+
+.mode-edit .pipelineChecklist span.done,
+.mode-edit .submissionChecklist span.done {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22), transparent 44%),
+    var(--pond);
 }
 
 .secondaryAction {
