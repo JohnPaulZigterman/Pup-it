@@ -14,13 +14,13 @@ import {
   Video
 } from "lucide-react";
 import { hasUsableFinishTake } from "../workflows/finishFlow.js";
+import {
+  buildDoinkReviewChecklist,
+  describeAudioStatus,
+  formatDuration,
+  summarizeFinishConfidence
+} from "../workflows/finishReadiness.js";
 import { ProductionTimeline } from "./ProductionTimeline.jsx";
-
-function formatDuration(durationMs = 0) {
-  const seconds = Math.max(0, Math.round(durationMs / 1000));
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
-}
 
 export function SceneLibraryEditor({
   takes,
@@ -96,31 +96,35 @@ export function SceneLibraryEditor({
     selectedTake?.durationMs ||
     timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
   const renderClipCount = renderHealth?.clipCount || renderModel?.timelineSegments?.length || (finishTarget === "rough-cut" ? timeline.length : selectedTake ? 1 : 0);
-  const audioTrackCount = audioMux?.trackCount ?? selectedTake?.tracks?.audio?.length ?? 0;
-  const audioStatus =
-    audioMux?.status === "muxed"
-      ? `${audioTrackCount} character track${audioTrackCount === 1 ? "" : "s"} mixed, separate tracks saved`
-      : audioMux?.status === "skipped_no_audio"
-        ? "No recorded character audio yet"
-        : audioMux?.status === "skipped_ffmpeg_missing"
-          ? "Separate tracks saved; FFmpeg not configured"
-          : audioMux?.status === "failed"
-            ? "Audio tracks saved, final mux needs attention"
-            : audioTrackCount
-              ? `${audioTrackCount} character audio track${audioTrackCount === 1 ? "" : "s"} ready`
-              : "No audio tracks recorded";
+  const { audioTrackCount, audioReady, label: audioStatus } = describeAudioStatus({ audioMux, selectedTake });
   const submissionTitle = doinkSubmission.title.trim() || selectedTake?.name || `${projectExport?.showName || "Untitled Show"} Short`;
   const submissionDurationMs = selectedTake?.durationMs || timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
-  const doinkReviewChecklist = [
-    { id: "title", label: "Title", done: Boolean(submissionTitle.trim()), detail: submissionTitle },
-    { id: "creator", label: "Creator", done: Boolean(doinkSubmission.creatorName.trim()), detail: doinkSubmission.creatorName || "Add credit name" },
-    { id: "target", label: "Target", done: hasSubmissionSource, detail: finishTargetLabel },
-    { id: "video", label: "Video", done: Boolean(finalVideoPath), detail: finalVideoPath || "Render final WEBM" },
-    { id: "package", label: "Package", done: readiness.readyForSubmission, detail: `${readyCount}/${packageChecklist.length || 1} package checks` },
-    { id: "rights", label: "Rights", done: Boolean(doinkSubmission.rightsNotes.trim()), detail: doinkSubmission.rightsNotes ? "Included" : "Add note" }
-  ];
+  const doinkReviewChecklist = buildDoinkReviewChecklist({
+    submissionTitle,
+    creatorName: doinkSubmission.creatorName,
+    hasSubmissionSource,
+    finishTargetLabel,
+    finalVideoPath,
+    readiness,
+    readyCount,
+    packageChecklistLength: packageChecklist.length,
+    rightsNotes: doinkSubmission.rightsNotes
+  });
   const doinkReadyCount = doinkReviewChecklist.filter((item) => item.done).length;
   const doinkMissing = doinkReviewChecklist.filter((item) => !item.done);
+  const finishConfidence = summarizeFinishConfidence({
+    checklist: doinkReviewChecklist,
+    hasRender: renderSucceeded,
+    hasSource: hasSubmissionSource,
+    episodeStatus
+  });
+  const deliveryItems = [
+    { id: "review-video", label: "Review video", value: finalVideoPath || "Render Final creates this", ready: Boolean(finalVideoPath) },
+    { id: "source-package", label: "Source package", value: readiness.readyForSubmission ? "Package manifest ready" : "Package updates on export", ready: readiness.readyForSubmission },
+    { id: "thumbnail", label: "Thumbnail", value: renderHealth?.hasThumbnail || renderSucceeded ? "Included with render" : "Generated from stage", ready: renderHealth?.hasThumbnail || renderSucceeded },
+    { id: "audio", label: "Audio tracks", value: audioStatus, ready: audioReady },
+    { id: "rights", label: "Rights note", value: doinkSubmission.rightsNotes.trim() ? "Included" : "Needs creator note", ready: Boolean(doinkSubmission.rightsNotes.trim()) }
+  ];
   const finishSpineSteps = [
     { id: "review", label: "Review", done: Boolean(selectedTake || timeline.length), actionLabel: selectedTake ? "Replay" : "Pick Take", action: selectedTake ? onPlay : onRefresh },
     { id: "keep", label: "Keep", done: Boolean(selectedTake?.best || timeline.length), actionLabel: selectedTake?.best || timeline.length ? "Kept" : "Keep Take", action: onKeepTake },
@@ -252,6 +256,22 @@ export function SceneLibraryEditor({
               </div>
             ))}
           </div>
+          <div className={`finishConfidencePanel ${finishConfidence.reviewReady ? "ready" : finishConfidence.readyEnough ? "close" : ""}`}>
+            <div>
+              <span className="eyebrow">Ready Enough Score</span>
+              <strong>{finishConfidence.score}%</strong>
+              <small>
+                {finishConfidence.reviewReady
+                  ? "Ready for a clean review handoff."
+                  : finishConfidence.readyEnough
+                    ? "Good enough to keep moving; render when you want a proper review copy."
+                    : "A few basics are missing before this feels like a finished short."}
+              </small>
+            </div>
+            <div className="finishConfidenceMeter">
+              <span style={{ width: `${finishConfidence.score}%` }} />
+            </div>
+          </div>
         </div>
         <div className="renderReliabilityPanel">
           <div>
@@ -312,6 +332,20 @@ export function SceneLibraryEditor({
           ) : (
             <small className="controlHint">This is enough for a clean DoinkTV review pass.</small>
           )}
+        </div>
+        <div className="deliveryPreviewPanel">
+          <div>
+            <span className="eyebrow">Delivery Preview</span>
+            <strong>{finishConfidence.reviewReady ? "Broadcast review package is coherent." : "Here is what admins will receive."}</strong>
+          </div>
+          <div className="deliveryPreviewList">
+            {deliveryItems.map((item) => (
+              <span className={item.ready ? "done" : ""} key={item.id}>
+                <strong>{item.label}</strong>
+                <small>{item.value}</small>
+              </span>
+            ))}
+          </div>
         </div>
         {(selectedTake || timeline.length || renderSucceeded) ? (
           <div className="anotherBitPanel">

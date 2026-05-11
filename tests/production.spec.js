@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createShowToolbox } from "../shared/production.js";
+import { buildDoinkReviewChecklist, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
   const project = {
@@ -61,4 +62,23 @@ test("Show Kit branches keep beginner actions, pro unlocks, and reusable homes t
   expect(toolbox.quickReuse.primaryCast).toBe("The Shape");
   expect(toolbox.quickReuse.primarySet).toBe("Kitchen");
   expect(toolbox.quickReuse.bestTake).toBe("Argument Take");
+});
+
+test("finish confidence separates ready enough from review ready", () => {
+  const checklist = buildDoinkReviewChecklist({
+    submissionTitle: "One Good Bit",
+    creatorName: "QA",
+    hasSubmissionSource: true,
+    finishTargetLabel: "Best take",
+    finalVideoPath: "",
+    readiness: { readyForSubmission: true },
+    readyCount: 5,
+    packageChecklistLength: 5,
+    rightsNotes: "Original material."
+  });
+  const confidence = summarizeFinishConfidence({ checklist, hasRender: false, hasSource: true });
+
+  expect(confidence.readyEnough).toBe(true);
+  expect(confidence.reviewReady).toBe(false);
+  expect(confidence.missing.map((item) => item.id)).toEqual(["video"]);
 });

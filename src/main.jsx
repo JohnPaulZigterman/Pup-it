@@ -5148,6 +5148,11 @@ function PerformControls({
           <strong>{activeMotionFeel.name}</strong>
           <span>{intentLabel}</span>
         </div>
+        <div className="feelHintStrip" aria-label="Performance feel tips">
+          <span>Shift scoots</span>
+          <span>Alt creeps</span>
+          <span>Space resets mouth</span>
+        </div>
         <div className="feelMeter">
           <span>Motion</span>
           <div><i style={{ width: `${motionEnergy}%` }} /></div>
@@ -5165,6 +5170,17 @@ function PerformControls({
         <h2>Feel Boosters</h2>
         <small className="controlHint">One-click performance polish: make the puppet feel better before you think about animation curves.</small>
         <div className="quickRemixGrid">
+          <button
+            type="button"
+            onClick={() => {
+              onMotionFeelChange("smooth");
+              onIdleMotionChange("alive");
+              onPoseChange("listen");
+            }}
+          >
+            <Sparkles size={15} />
+            TV Ready
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -6616,6 +6632,12 @@ function BuildCanvasPartToolbar({ selectedPart, value = {}, fallbackColor, onCha
           <strong>{selectedPart?.name || "Part"}</strong>
           <small>{hasPart ? "editing on canvas" : "empty stick guide"}</small>
         </div>
+      </div>
+      <div className="canvasPartState">
+        <span>{hasPart ? "Made" : "Needs art"}</span>
+        <span>{value.hidden ? "Hidden" : "Visible"}</span>
+        <span>{Math.round((value.scale || 1) * 100)}%</span>
+        <span>{value.rotate || 0}deg</span>
       </div>
       <div className="canvasPartActions">
         <button type="button" onClick={() => onChange({ mode: "shape", shape: selectedPart?.id === "torso" ? "bean" : "circle", source: "" })}>

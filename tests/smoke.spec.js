@@ -26,6 +26,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.locator(".showKitBranches").getByText("Cast Branch")).toBeVisible();
   await expect(page.getByLabel("Canvas part editor")).toBeVisible();
   await page.getByLabel("Canvas part editor").getByRole("button", { name: "Shape" }).click();
+  await expect(page.getByLabel("Canvas part editor").getByText("Made")).toBeVisible();
   await expect(page.locator(".puppet.self .partHead")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rig Check" })).toBeVisible();
   await expect(page.locator(".buildToolStrip")).toBeVisible();
@@ -60,6 +61,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Performance Presets" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Motion" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live Pad" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "TV Ready" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Audio" })).toHaveClass(/selected/);
   await page.getByRole("button", { name: "5 Big Reaction Face, punch-in, and weird expression." }).click();
   await expect(page.getByRole("button", { name: "Surprise" })).toHaveClass(/selected/);
@@ -74,6 +76,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByText("Render Check")).toBeVisible();
   await expect(page.getByText("DoinkTV Handoff")).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();
+  await expect(page.getByText("Ready Enough Score")).toBeVisible();
+  await expect(page.getByText("Delivery Preview")).toBeVisible();
   await expect(page.getByText("Backend render preview will appear here.")).toBeVisible();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "DoinkTV" })).toBeDisabled();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "Render Final" })).toBeDisabled();
