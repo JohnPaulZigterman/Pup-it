@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createDoinkTvSubmissionPackage } from "../shared/production.js";
+import { createDoinkTvSubmissionPackage, createShowToolbox } from "../shared/production.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
   const project = {
@@ -35,3 +35,30 @@ test("DoinkTV package includes admin review manifest and missing-item guidance",
   expect(submission.reviewChecklist.every((item) => item.done)).toBe(true);
 });
 
+test("Show Kit branches keep beginner actions, pro unlocks, and reusable homes together", () => {
+  const toolbox = createShowToolbox({
+    showName: "Tiny Arguments",
+    cast: [
+      {
+        id: "performer-1",
+        name: "The Shape",
+        character: "single-shape",
+        state: { characterParts: { head: { mode: "shape" }, mouth: { mode: "shape" } } }
+      }
+    ],
+    sceneObjects: [{ id: "prop-1", name: "Bad Chair", shape: "square", texturePreset: "photocopy" }],
+    sceneSets: [{ id: "set-1", name: "Kitchen", sceneObjects: [{ id: "prop-1" }] }],
+    takes: [{ id: "take-1", name: "Argument Take", durationMs: 9000, best: true, audioTrackCount: 1 }],
+    timeline: [{ id: "clip-1", title: "Argument Cut", duration: 9000 }],
+    style: { family: "Public Access", theme: "Copy Shop", texturePreset: "photocopy" },
+    episodeStatus: "draft"
+  });
+
+  expect(toolbox.schemaVersion).toBe("pup-it.show-toolbox.v2");
+  expect(toolbox.branches.map((branch) => branch.id)).toEqual(["cast", "world", "performance", "finish"]);
+  expect(toolbox.branches.every((branch) => branch.beginnerVersion && branch.proUnlock && branch.showKitHome)).toBe(true);
+  expect(toolbox.branches.find((branch) => branch.id === "finish").ready).toBe(true);
+  expect(toolbox.quickReuse.primaryCast).toBe("The Shape");
+  expect(toolbox.quickReuse.primarySet).toBe("Kitchen");
+  expect(toolbox.quickReuse.bestTake).toBe("Argument Take");
+});

@@ -4772,6 +4772,8 @@ function ShowBiblePanel({
 }) {
   const readiness = toolbox?.readiness || { completeCount: 0, totalCount: 6, percent: 0, steps: [], nextStep: null };
   const nextStep = readiness.nextStep;
+  const branches = toolbox?.branches || [];
+  const quickReuse = toolbox?.quickReuse || {};
   return (
     <div className="dockGroup showBiblePanel">
       <h2>Show Kit</h2>
@@ -4846,11 +4848,33 @@ function ShowBiblePanel({
         <span>Pro: {toolbox?.productRule?.experienced || "Deeper controls stay nearby."}</span>
         <span>Home: {toolbox?.productRule?.home || "Reusable results live here."}</span>
       </div>
+      {branches.length ? (
+        <div className="showKitBranches">
+          <div className="showKitBranchHeader">
+            <strong>Tech Tree</strong>
+            <span>{quickReuse.nextRecommendedAction || "Make the next reusable piece."}</span>
+          </div>
+          {branches.map((branch) => (
+            <div className={`showKitBranch ${branch.ready ? "ready" : ""}`} key={branch.id}>
+              <div>
+                <strong>{branch.label}</strong>
+                <small>{branch.count} saved in {branch.showKitHome}</small>
+              </div>
+              <span>{branch.beginnerVersion}</span>
+              <span>{branch.proUnlock}</span>
+              <button type="button" onClick={() => onModeChange(branch.mode)}>
+                {branch.ready ? "Open" : "Start"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="reusableShelf">
         <strong>Reusable Kit</strong>
-        <span>{toolbox?.cast?.slice(0, 2).map((item) => item.name).join(", ") || "Build cast"}</span>
-        <span>{toolbox?.props?.slice(0, 2).map((item) => item.name).join(", ") || "Add props"}</span>
-        <span>{toolbox?.sets?.slice(0, 2).map((item) => item.name).join(", ") || "Save a set"}</span>
+        <span>{quickReuse.primaryCast || toolbox?.cast?.slice(0, 2).map((item) => item.name).join(", ") || "Build cast"}</span>
+        <span>{quickReuse.primaryProp || toolbox?.props?.slice(0, 2).map((item) => item.name).join(", ") || "Add props"}</span>
+        <span>{quickReuse.primarySet || toolbox?.sets?.slice(0, 2).map((item) => item.name).join(", ") || "Save a set"}</span>
+        <span>{quickReuse.bestTake || "Mark a best take"}</span>
       </div>
       <div className="showKitSteps">
         {readiness.steps.map((step) => (

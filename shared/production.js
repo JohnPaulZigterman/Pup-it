@@ -314,15 +314,59 @@ export function createShowToolbox({
     best: Boolean(take.best)
   }));
   const submittedStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
+  const hasBestTake = takeItems.some((take) => take.best);
   const readinessSteps = [
     { id: "show", label: "Name the show", done: Boolean((showName || "").trim()), beginnerAction: "Name it", proUnlock: "Series metadata" },
     { id: "cast", label: "Build a rig", done: castItems.some((item) => item.partCount > 0) || castItems.length > 0, beginnerAction: "Pick a rig", proUnlock: "Advanced rig parts" },
     { id: "world", label: "Build the space", done: setItems.length > 0 || propItems.length > 0, beginnerAction: "Place one prop", proUnlock: "Reusable sets" },
     { id: "perform", label: "Record a take", done: takeItems.length > 0, beginnerAction: "Record", proUnlock: "Separate lanes" },
-    { id: "cut", label: "Choose a cut", done: cutItems.length > 0 || takeItems.some((take) => take.best), beginnerAction: "Pick best", proUnlock: "Rough cut timeline" },
+    { id: "cut", label: "Choose a cut", done: cutItems.length > 0 || hasBestTake, beginnerAction: "Pick best", proUnlock: "Rough cut timeline" },
     { id: "publish", label: "Ready for review", done: submittedStatuses.includes(episodeStatus), beginnerAction: "Submit", proUnlock: "DoinkTV package" }
   ];
   const missingSteps = readinessSteps.filter((step) => !step.done);
+  const branchCatalog = [
+    {
+      id: "cast",
+      label: "Cast Branch",
+      mode: "build",
+      ready: castItems.length > 0,
+      count: castItems.length,
+      beginnerVersion: "Pick a rig and make one obvious change.",
+      proUnlock: "Swap parts, style parts, validate rigs, and save reusable characters.",
+      showKitHome: "Cast"
+    },
+    {
+      id: "world",
+      label: "World Branch",
+      mode: "assets",
+      ready: setItems.length > 0 || propItems.length > 0,
+      count: setItems.length + propItems.length,
+      beginnerVersion: "Drop in one set piece or prop.",
+      proUnlock: "Build reusable sets, prop libraries, textures, credits, and floor marks.",
+      showKitHome: "Sets and props"
+    },
+    {
+      id: "performance",
+      label: "Performance Branch",
+      mode: "perform",
+      ready: takeItems.length > 0,
+      count: takeItems.length,
+      beginnerVersion: "Record one live take.",
+      proUnlock: "Use cue pads, motion presets, camera punches, macros, and audio lanes.",
+      showKitHome: "Takes"
+    },
+    {
+      id: "finish",
+      label: "Finish Branch",
+      mode: "edit",
+      ready: cutItems.length > 0 || hasBestTake || submittedStatuses.includes(episodeStatus),
+      count: cutItems.length + (hasBestTake ? 1 : 0),
+      beginnerVersion: "Mark the best take and render a review copy.",
+      proUnlock: "Trim, assemble cuts, package metadata, and submit to DoinkTV.",
+      showKitHome: "Cuts and exports"
+    }
+  ];
+  const nextBranch = branchCatalog.find((branch) => !branch.ready) || branchCatalog[branchCatalog.length - 1];
 
   return {
     schemaVersion: "pup-it.show-toolbox.v2",
@@ -339,6 +383,16 @@ export function createShowToolbox({
       beginner: "One obvious next button.",
       experienced: "Pro controls stay nearby, not in the way.",
       home: "Reusable results live in this Show Kit."
+    },
+    branches: branchCatalog,
+    quickReuse: {
+      primaryCast: castItems[0]?.name || null,
+      primarySet: setItems[0]?.name || null,
+      primaryProp: propItems[0]?.name || null,
+      bestTake: takeItems.find((take) => take.best)?.name || null,
+      houseLook: [style.family, style.theme].filter(Boolean).join(" / ") || "Flexible / Show Native",
+      nextRecommendedMode: nextBranch.mode,
+      nextRecommendedAction: nextBranch.beginnerVersion
     },
     cast: castItems,
     styleGuide: {

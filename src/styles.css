@@ -2094,6 +2094,20 @@ input[type="color"] {
   display: none;
 }
 
+.experience-beginner .showBiblePanel {
+  display: grid;
+}
+
+.experience-beginner .showBiblePanel .showKitPersistence,
+.experience-beginner .showBiblePanel .bibleGrid,
+.experience-beginner .showBiblePanel .showObjectMap,
+.experience-beginner .showBiblePanel .toolboxSummary,
+.experience-beginner .showBiblePanel .showKitRule,
+.experience-beginner .showBiblePanel .showKitSteps,
+.experience-beginner .showBiblePanel > .controlHint {
+  display: none;
+}
+
 .beginnerRoadmap {
   border-color: var(--pond);
   background:
@@ -2734,6 +2748,88 @@ input[type="color"] {
 .showKitSteps span.done {
   background: #8fd8b5;
   color: var(--ink);
+}
+
+.showKitBranches {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(141, 183, 255, 0.15), rgba(255, 255, 255, 0.28));
+  background-blend-mode: multiply, normal;
+}
+
+.showKitBranchHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.showKitBranchHeader strong,
+.showKitBranchHeader span {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.showKitBranchHeader span {
+  max-width: 58%;
+  color: #4b4e68;
+  text-align: right;
+  line-height: 1.25;
+}
+
+.showKitBranch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px;
+  gap: 5px 8px;
+  align-items: center;
+  padding: 7px;
+  border: 1px dashed rgba(43, 45, 66, 0.55);
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.showKitBranch.ready {
+  border-style: solid;
+  background:
+    linear-gradient(90deg, rgba(143, 216, 181, 0.36), transparent 70%),
+    rgba(255, 255, 255, 0.24);
+}
+
+.showKitBranch div,
+.showKitBranch > span {
+  min-width: 0;
+}
+
+.showKitBranch strong {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.showKitBranch small,
+.showKitBranch > span {
+  color: #4b4e68;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.showKitBranch > span {
+  grid-column: 1 / -1;
+}
+
+.showKitBranch button {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 10px;
 }
 
 .reusableShelf {
