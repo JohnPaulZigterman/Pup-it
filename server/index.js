@@ -1,15 +1,22 @@
 import express from "express";
 import http from "http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
 import { checkDatabase, isDatabaseConfigured } from "./db.js";
+import { renderWithHeadlessChromium } from "./renderWorker.js";
 import {
+  createRenderJob,
   getShow,
+  getRenderJob,
   listEpisodes,
   listShows,
   updateEpisodeStatus,
+  updateRenderJob,
   upsertEpisode,
   upsertShow
 } from "./repositories/projectRepository.js";
+import { createDoinkTvSubmissionPackage } from "../shared/production.js";
 import {
   createStoredTake,
   createTakeExport,
@@ -26,6 +33,8 @@ import {
 
 const PORT = Number(process.env.PORT || 4111);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const renderStaticRoot = path.resolve(__dirname, "../renders");
 
 const app = express();
 app.use((req, res, next) => {
@@ -44,6 +53,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: "5mb" }));
+app.use("/renders", express.static(renderStaticRoot));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -54,6 +64,53 @@ const io = new Server(server, {
 });
 
 const rooms = new Map();
+const memoryRenderJobs = new Map();
+const memoryDoinkSubmissions = new Map();
+
+function makeId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+}
+
+async function persistRenderJob(job) {
+  try {
+    return await createRenderJob(job);
+  } catch (error) {
+    if (error?.code !== "DATABASE_NOT_CONFIGURED") throw error;
+    const memoryJob = {
+      id: makeId("render"),
+      episodeId: job.episodeId || null,
+      status: job.status || "queued",
+      renderer: job.renderer || "browser-server",
+      request: job.request || {},
+      output: job.output || {},
+      error: job.error || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      persistence: "memory"
+    };
+    memoryRenderJobs.set(memoryJob.id, memoryJob);
+    return memoryJob;
+  }
+}
+
+async function persistRenderJobUpdate(job, patch) {
+  try {
+    const updated = await updateRenderJob(job.id, patch);
+    if (updated) return updated;
+  } catch (error) {
+    if (error?.code !== "DATABASE_NOT_CONFIGURED") throw error;
+  }
+  const memoryJob = {
+    ...job,
+    ...patch,
+    output: patch.output || job.output || {},
+    error: patch.error || "",
+    updatedAt: new Date().toISOString(),
+    persistence: "memory"
+  };
+  memoryRenderJobs.set(memoryJob.id, memoryJob);
+  return memoryJob;
+}
 
 function handleApiError(res, error) {
   if (error?.code === "DATABASE_NOT_CONFIGURED") {
@@ -337,6 +394,101 @@ app.patch("/api/episodes/:episodeId/status", async (req, res) => {
   } catch (error) {
     handleApiError(res, error);
   }
+});
+
+app.post("/api/render-jobs", async (req, res) => {
+  try {
+    const request = req.body || {};
+    const queuedJob = await persistRenderJob({
+      episodeId: request.episodeId || null,
+      status: "queued",
+      renderer: request.renderer || "browser-server",
+      request,
+      output: {}
+    });
+    const runningJob = await persistRenderJobUpdate(queuedJob, { status: "running" });
+    let completedJob;
+    try {
+      const output = await renderWithHeadlessChromium(request, runningJob.id);
+      completedJob = await persistRenderJobUpdate(runningJob, {
+        status: "succeeded",
+        output
+      });
+    } catch (renderError) {
+      completedJob = await persistRenderJobUpdate(runningJob, {
+        status: "failed",
+        output: {},
+        error: renderError.message || "Headless render failed."
+      });
+    }
+
+    res.status(202).json({
+      renderJob: completedJob,
+      next: {
+        pollUrl: `/api/render-jobs/${completedJob.id}`,
+        submitUrl: "/api/doinktv/submissions"
+      }
+    });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get("/api/render-jobs/:jobId", async (req, res) => {
+  try {
+    let renderJob = null;
+    try {
+      renderJob = await getRenderJob(req.params.jobId);
+    } catch (error) {
+      if (error?.code !== "DATABASE_NOT_CONFIGURED") throw error;
+    }
+    renderJob = renderJob || memoryRenderJobs.get(req.params.jobId);
+    if (!renderJob) {
+      res.status(404).json({ error: "Render job not found" });
+      return;
+    }
+    res.json({ renderJob });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.post("/api/doinktv/submissions", (req, res) => {
+  const body = req.body || {};
+  const project = body.project || body.package?.project || null;
+  const submission = body.submission || body.package || body;
+  const submissionPackage = project
+    ? createDoinkTvSubmissionPackage({
+        project,
+        submission,
+        selectedTake: body.selectedTake || null,
+        previewVideoFileName: body.previewVideoFileName || body.renderJob?.output?.videoPath || null,
+        projectPackageFileName: body.projectPackageFileName || null
+      })
+    : {
+        ...submission,
+        schemaVersion: submission.schemaVersion || "pup-it.doinktv-submission.v1",
+        targetChannel: "DoinkTV",
+        hostSite: "chillnet.me",
+        status: "submitted_for_review",
+        submittedAt: submission.submittedAt || new Date().toISOString()
+      };
+  const submissionRecord = {
+    id: makeId("doinktv"),
+    status: "submitted_for_review",
+    receivedAt: new Date().toISOString(),
+    renderJobId: body.renderJob?.id || body.renderJobId || null,
+    package: submissionPackage
+  };
+  memoryDoinkSubmissions.set(submissionRecord.id, submissionRecord);
+  res.status(202).json({
+    submission: submissionRecord,
+    review: {
+      status: "submitted_for_review",
+      adminQueue: "DoinkTV",
+      message: "Submission accepted by the Pup-It integration endpoint."
+    }
+  });
 });
 
 app.get("/health", async (_req, res) => {

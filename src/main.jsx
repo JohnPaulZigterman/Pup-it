@@ -1083,6 +1083,8 @@ function App() {
   const [previewPerformers, setPreviewPerformers] = useState(null);
   const [playbackActive, setPlaybackActive] = useState(false);
   const [videoExporting, setVideoExporting] = useState(false);
+  const [backendRendering, setBackendRendering] = useState(false);
+  const [renderJob, setRenderJob] = useState(null);
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const [productionTimeline, setProductionTimeline] = useState([]);
@@ -2526,6 +2528,34 @@ function App() {
     setProductionTimeline((current) => current.filter((clip) => clip.id !== clipId));
   };
 
+  const updateTimelineClip = (clipId, patch) => {
+    setProductionTimeline((current) =>
+      current.map((clip) => (clip.id === clipId ? { ...clip, ...patch } : clip))
+    );
+  };
+
+  const moveTimelineClip = (clipId, direction) => {
+    setProductionTimeline((current) => {
+      const index = current.findIndex((clip) => clip.id === clipId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      const [clip] = next.splice(index, 1);
+      next.splice(nextIndex, 0, clip);
+      return next.map((item, itemIndex) => ({ ...item, index: itemIndex + 1 }));
+    });
+  };
+
+  const trimTimelineClip = (clipId, deltaMs) => {
+    setProductionTimeline((current) =>
+      current.map((clip) =>
+        clip.id === clipId
+          ? { ...clip, duration: Math.max(1000, (clip.duration || 5000) + deltaMs) }
+          : clip
+      )
+    );
+  };
+
   const quickTrimSelectedTake = (edge) => {
     if (!selectedTake) return;
     const trimMs = 500;
@@ -2651,6 +2681,40 @@ function App() {
     setStatus("Thumbnail PNG exported for the selected take.");
   };
 
+  const requestBackendRender = async () => {
+    if (backendRendering) return;
+    const project = createCurrentProjectExport();
+    const submissionTake = selectedTake || takeLibrary.find((take) => take.best) || takeLibrary[0] || null;
+    setBackendRendering(true);
+    setStatus("Sending the short to the backend render queue.");
+    try {
+      const response = await fetch(`${SERVER_URL}/api/render-jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          renderer: "browser-server",
+          title: doinkSubmission.title || selectedTake?.name || `${showName} Short`,
+          project,
+          selectedTake: submissionTake,
+          timeline: productionTimeline,
+          requestedBy: doinkSubmission.creatorName || name
+        })
+      });
+      if (!response.ok) throw new Error("Backend render endpoint rejected the job.");
+      const data = await response.json();
+      setRenderJob(data.renderJob);
+      setExportHistory((current) => [
+        { id: data.renderJob.id, type: "backend-render", exportedAt: new Date().toISOString() },
+        ...current
+      ]);
+      setStatus(`Backend render ${data.renderJob.status}. ${data.renderJob.output?.videoPath || "Artifact path pending."}`);
+    } catch (error) {
+      setStatus(error.message || "Backend render request failed.");
+    } finally {
+      setBackendRendering(false);
+    }
+  };
+
   const updateDoinkSubmission = (patch) => {
     setDoinkSubmission((current) => ({ ...current, ...patch }));
   };
@@ -2676,17 +2740,23 @@ function App() {
 
     setDoinkSubmitting(true);
     try {
-      if (DOINKTV_SUBMISSION_URL) {
-        const response = await fetch(DOINKTV_SUBMISSION_URL, {
+      const submissionUrl = DOINKTV_SUBMISSION_URL || `${SERVER_URL}/api/doinktv/submissions`;
+      if (submissionUrl) {
+        const response = await fetch(submissionUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(submissionPackage)
+          body: JSON.stringify({
+            project,
+            submission: submissionPackage,
+            selectedTake: submissionTake,
+            renderJob,
+            previewVideoFileName: renderJob?.output?.videoPath || previewVideoFileName,
+            projectPackageFileName
+          })
         });
         if (!response.ok) throw new Error("DoinkTV submission endpoint rejected the package.");
-        setStatus("Submitted to DoinkTV for admin review.");
-      } else {
-        downloadJson(submissionPackage, `pup-it-${roomId}-doinktv-submission.json`);
-        setStatus("Created a DoinkTV submission package. Add VITE_DOINKTV_SUBMISSION_URL later for direct admin intake.");
+        const data = await response.json().catch(() => ({}));
+        setStatus(data.review?.message || "Submitted to DoinkTV for admin review.");
       }
       setEpisodeStatus("submitted");
       setExportHistory((current) => [
@@ -3568,6 +3638,9 @@ function App() {
             onExportProject={exportProject}
             onExportVideo={exportSelectedTakeVideo}
             onExportThumbnail={exportSelectedTakeThumbnail}
+            onBackendRender={requestBackendRender}
+            backendRendering={backendRendering}
+            renderJob={renderJob}
             videoExporting={videoExporting}
             doinkSubmission={doinkSubmission}
             doinkSubmitting={doinkSubmitting}
@@ -3579,6 +3652,9 @@ function App() {
             episodeStatus={episodeStatus}
             onEpisodeStatusChange={setEpisodeStatus}
             onRemoveTimelineClip={removeTimelineClip}
+            onMoveTimelineClip={moveTimelineClip}
+            onTrimTimelineClip={trimTimelineClip}
+            onUpdateTimelineClip={updateTimelineClip}
             onModeChange={setMode}
           />
         )}
@@ -5402,6 +5478,9 @@ function SceneLibraryEditor({
   onExportProject,
   onExportVideo,
   onExportThumbnail,
+  onBackendRender,
+  backendRendering,
+  renderJob,
   videoExporting,
   doinkSubmission,
   doinkSubmitting,
@@ -5413,6 +5492,9 @@ function SceneLibraryEditor({
   episodeStatus,
   onEpisodeStatusChange,
   onRemoveTimelineClip,
+  onMoveTimelineClip,
+  onTrimTimelineClip,
+  onUpdateTimelineClip,
   onModeChange
 }) {
   const takeLaneSummary = selectedTake
@@ -5454,6 +5536,10 @@ function SceneLibraryEditor({
           <button onClick={onExportThumbnail} disabled={!selectedTake}>
             <Camera size={16} />
             Thumbnail
+          </button>
+          <button onClick={onBackendRender} disabled={backendRendering || !hasSubmissionSource}>
+            <RefreshCw size={16} />
+            {backendRendering ? "Rendering" : "Backend Render"}
           </button>
           <button onClick={onExportProject}>
             <Save size={16} />
@@ -5612,6 +5698,12 @@ function SceneLibraryEditor({
           {projectExport?.renderPlan?.preferredPreviewVideoName || "Export a WEBM"} /{" "}
           {projectExport?.renderPlan?.preferredThumbnailName || "export a thumbnail"}
         </small>
+        {renderJob && (
+          <div className="renderJobCard">
+            <strong>Backend render: {renderJob.status}</strong>
+            <small>{renderJob.output?.videoPath || "Waiting for artifact path."}</small>
+          </div>
+        )}
       </div>
 
       <div className="dockGroup doinkSubmissionPanel">
@@ -5740,12 +5832,15 @@ function SceneLibraryEditor({
       <ProductionTimeline
         clips={timeline}
         onRemoveClip={onRemoveTimelineClip}
+        onMoveClip={onMoveTimelineClip}
+        onTrimClip={onTrimTimelineClip}
+        onUpdateClip={onUpdateTimelineClip}
       />
     </div>
   );
 }
 
-function ProductionTimeline({ clips, onRemoveClip }) {
+function ProductionTimeline({ clips, onRemoveClip, onMoveClip, onTrimClip, onUpdateClip }) {
   return (
     <div className="dockGroup productionTimelinePanel">
       <h2>Episode Assembly</h2>
@@ -5758,14 +5853,32 @@ function ProductionTimeline({ clips, onRemoveClip }) {
             <div className="timelineClip" key={clip.id}>
               <span>{index + 1}</span>
               <div>
-                <strong>{clip.title}</strong>
+                <input
+                  value={clip.title}
+                  aria-label={`Rename ${clip.title}`}
+                  onChange={(event) => onUpdateClip(clip.id, { title: event.target.value })}
+                />
                 <small>
                   {clip.sourceType} / {clip.shot} / {formatClipDuration(clip.duration)}
                 </small>
               </div>
-              <button aria-label={`Remove ${clip.title}`} onClick={() => onRemoveClip(clip.id)}>
-                <Trash2 size={14} />
-              </button>
+              <div className="timelineClipActions">
+                <button aria-label={`Move ${clip.title} earlier`} onClick={() => onMoveClip(clip.id, -1)} disabled={index === 0}>
+                  <ChevronLeft size={14} />
+                </button>
+                <button aria-label={`Shorten ${clip.title}`} onClick={() => onTrimClip(clip.id, -500)}>
+                  -0.5s
+                </button>
+                <button aria-label={`Lengthen ${clip.title}`} onClick={() => onTrimClip(clip.id, 500)}>
+                  +0.5s
+                </button>
+                <button aria-label={`Move ${clip.title} later`} onClick={() => onMoveClip(clip.id, 1)} disabled={index === clips.length - 1}>
+                  <ChevronRight size={14} />
+                </button>
+                <button aria-label={`Remove ${clip.title}`} onClick={() => onRemoveClip(clip.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

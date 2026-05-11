@@ -4,6 +4,8 @@ const reviewStatuses = new Set([
   "draft",
   "rough_cut",
   "ready_for_review",
+  "submitted",
+  "needs_changes",
   "approved",
   "scheduled",
   "published"
@@ -48,6 +50,20 @@ function episodeFromRow(row) {
     takes: row.takes || [],
     finalCuts: row.final_cuts || [],
     publishingPackages: row.publishing_packages || [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function renderJobFromRow(row) {
+  return {
+    id: row.id,
+    episodeId: row.episode_id,
+    status: row.status,
+    renderer: row.renderer,
+    request: row.request || {},
+    output: row.output || {},
+    error: row.error || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -200,4 +216,62 @@ export async function updateEpisodeStatus(episodeId, status) {
     [episodeId, status]
   );
   return result.rows[0] ? episodeFromRow(result.rows[0]) : null;
+}
+
+export async function createRenderJob(payload) {
+  const result = await query(
+    `insert into render_jobs (
+       episode_id,
+       status,
+       renderer,
+       request,
+       output,
+       error
+     )
+     values ($1, $2, $3, $4, $5, $6)
+     returning *`,
+    [
+      payload.episodeId || null,
+      payload.status || "queued",
+      payload.renderer || "browser-server",
+      payload.request || {},
+      payload.output || {},
+      payload.error || null
+    ]
+  );
+  return renderJobFromRow(result.rows[0]);
+}
+
+export async function updateRenderJob(jobId, patch) {
+  const result = await query(
+    `update render_jobs
+     set status = coalesce($2, status),
+         renderer = coalesce($3, renderer),
+         request = coalesce($4, request),
+         output = coalesce($5, output),
+         error = $6,
+         updated_at = now()
+     where id = $1
+     returning *`,
+    [
+      jobId,
+      patch.status || null,
+      patch.renderer || null,
+      patch.request || null,
+      patch.output || null,
+      patch.error ?? null
+    ]
+  );
+  return result.rows[0] ? renderJobFromRow(result.rows[0]) : null;
+}
+
+export async function getRenderJob(jobId) {
+  const result = await query(
+    `select *
+     from render_jobs
+     where id::text = $1
+     limit 1`,
+    [jobId]
+  );
+  return result.rows[0] ? renderJobFromRow(result.rows[0]) : null;
 }
