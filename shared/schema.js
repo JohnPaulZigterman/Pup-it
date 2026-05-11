@@ -2,7 +2,7 @@ export const schemaVersion = "pup-it.take.v1";
 
 export const defaultRoomId = "demo";
 export const defaultSceneId = "studio";
-export const defaultCharacterId = "bean";
+export const defaultCharacterId = "bear";
 
 export function sanitizeRoomId(roomId) {
   return (roomId || defaultRoomId).trim().slice(0, 40) || defaultRoomId;

@@ -3,20 +3,28 @@ import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import {
   Camera,
+  ChevronLeft,
+  ChevronRight,
+  Clapperboard,
   Circle,
+  Copy,
+  HelpCircle,
   Library,
   Mic,
   MicOff,
   MousePointer2,
   Palette,
   Play,
+  Plus,
   Radio,
   RefreshCw,
   Shuffle,
   Square,
   Theater,
+  Trash2,
   Video,
-  Wand2
+  Wand2,
+  X
 } from "lucide-react";
 import {
   characterCatalog,
@@ -49,6 +57,29 @@ import { Puppet } from "./renderer/Puppet.jsx";
 import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
+
+const tutorialSteps = [
+  {
+    mode: "perform",
+    title: "Perform Live",
+    body: "Move your character with WASD or arrow keys, use mouse height for mouth movement, and trigger expressions, poses, and macros from the dock."
+  },
+  {
+    mode: "build",
+    title: "Shape A Character",
+    body: "Build mode changes the current performer without breaking their identity: species, colors, rig parts, animation style, walk cycle, and mouth style stay reusable."
+  },
+  {
+    mode: "storyboard",
+    title: "Plan The Scene",
+    body: "Storyboard mode captures the current stage as comic-strip panels, then lets you label beats, shot sizes, and timing before recording."
+  },
+  {
+    mode: "edit",
+    title: "Review Takes",
+    body: "Edit mode keeps recorded performances inside the app so you can browse scenes, play them back, and export takes with separate character audio tracks."
+  }
+];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -111,10 +142,30 @@ function makePreviewPerformers(take) {
   );
 }
 
+function clonePerformers(performers) {
+  return performers.map((performer) => ({
+    ...performer,
+    state: { ...performer.state }
+  }));
+}
+
+function createStoryboardPanel({ scene, performers, index }) {
+  return {
+    id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    title: `Panel ${index}`,
+    shot: "Wide",
+    duration: "0:05",
+    caption: "",
+    scene,
+    performers: clonePerformers(performers)
+  };
+}
+
 function App() {
   const socketRef = useRef(null);
   const audioRef = useRef({ context: null, sequence: 0, recorder: null, stream: null });
   const mouthVideoRef = useRef(null);
+  const mouthValueRef = useRef(0);
   const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
   const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
@@ -132,6 +183,10 @@ function App() {
   const [selectedTake, setSelectedTake] = useState(null);
   const [previewPerformers, setPreviewPerformers] = useState(null);
   const [playbackActive, setPlaybackActive] = useState(false);
+  const [storyboardPanels, setStoryboardPanels] = useState([]);
+  const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
@@ -178,7 +233,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!joined || !selfId) return undefined;
+    if (!joined || !selfId || !["perform", "build"].includes(mode)) return undefined;
 
     const pressed = new Set();
     let frame = null;
@@ -199,7 +254,7 @@ function App() {
           return upsertPerformer(current, nextPerformer);
         }
 
-        const nextPerformer = movePerformerFromInput(performer, input);
+        const nextPerformer = movePerformerFromInput(performer, input, selectedScene);
         const nextState = nextPerformer.state;
         socketRef.current.emit("performer:update", nextState);
         return upsertPerformer(current, nextPerformer);
@@ -223,7 +278,7 @@ function App() {
       window.removeEventListener("keyup", keyup);
       cancelAnimationFrame(frame);
     };
-  }, [joined, selfId]);
+  }, [joined, mode, selfId, selectedScene]);
 
   useEffect(() => {
     return () => stopMouthCamera();
@@ -237,6 +292,23 @@ function App() {
     return () => clearPlayback();
   }, []);
 
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("pup-it-tutorial-open");
+      if (saved === "true") setTutorialOpen(true);
+    } catch (_error) {
+      setTutorialOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("pup-it-tutorial-open", String(tutorialOpen));
+    } catch (_error) {
+      // Tutorial persistence is optional; the UI should keep working without storage.
+    }
+  }, [tutorialOpen]);
+
   const joinRoom = (event) => {
     event.preventDefault();
     socketRef.current.connect();
@@ -247,6 +319,7 @@ function App() {
     if (!selfId) return;
     setPerformers((current) => {
       const performer = current[selfId];
+      if (!performer) return current;
       const nextState = { ...performer.state, ...statePatch };
       socketRef.current.emit("performer:update", nextState);
       return upsertPerformer(current, { ...performer, state: nextState });
@@ -259,8 +332,12 @@ function App() {
     updateSelf({ pose: pose.id, expression: pose.expression });
   };
   const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
-  const setMouthOpen = (mouthOpen) => {
-    const open = clamp(mouthOpen, 0, 1);
+  const setMouthOpen = (mouthOpen, { immediate = false } = {}) => {
+    const target = clamp(mouthOpen, 0, 1);
+    const previous = mouthValueRef.current;
+    const open = immediate ? target : previous * 0.58 + target * 0.42;
+    if (!immediate && Math.abs(open - previous) < 0.015) return;
+    mouthValueRef.current = open;
     updateSelf({ mouthOpen: open, speaking: open > 0.08 });
   };
   const setMouthControl = async (mouthControl) => {
@@ -276,6 +353,7 @@ function App() {
     }
 
     stopMouthCamera();
+    mouthValueRef.current = 0;
     updateSelf({ mouthControl, mouthOpen: 0, speaking: false });
   };
 
@@ -439,6 +517,7 @@ function App() {
   };
 
   const handleStagePointerMove = (event) => {
+    if (mode !== "perform" && mode !== "build") return;
     if (!self || self.state.mouthControl !== "mouse") return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const y = clamp((event.clientY - bounds.top) / bounds.height, 0, 1);
@@ -446,8 +525,9 @@ function App() {
   };
 
   const handleStagePointerLeave = () => {
+    if (mode !== "perform" && mode !== "build") return;
     if (!self || self.state.mouthControl !== "mouse") return;
-    setMouthOpen(0);
+    setMouthOpen(0, { immediate: true });
   };
 
   const toggleTake = () => {
@@ -507,7 +587,7 @@ function App() {
     setPlaybackActive(true);
 
     const events = [...selectedTake.tracks.motion].sort((a, b) => a.at - b.at);
-    const lastAt = events.at(-1)?.at || selectedTake.durationMs || 0;
+    const lastAt = events.length ? events[events.length - 1].at : selectedTake.durationMs || 0;
 
     playbackTimersRef.current = events.map((event) =>
       window.setTimeout(() => {
@@ -543,6 +623,65 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
+  const selectedStoryboardPanel = useMemo(
+    () => storyboardPanels.find((panel) => panel.id === selectedStoryboardId) || null,
+    [selectedStoryboardId, storyboardPanels]
+  );
+
+  const addStoryboardPanel = () => {
+    const panel = createStoryboardPanel({
+      scene,
+      performers: activePerformers,
+      index: storyboardPanels.length + 1
+    });
+    setStoryboardPanels((current) => [...current, panel]);
+    setSelectedStoryboardId(panel.id);
+    setMode("storyboard");
+  };
+
+  const updateStoryboardPanel = () => {
+    if (!selectedStoryboardId) return;
+    setStoryboardPanels((current) =>
+      current.map((panel) =>
+        panel.id === selectedStoryboardId
+          ? { ...panel, scene, performers: clonePerformers(activePerformers) }
+          : panel
+      )
+    );
+  };
+
+  const duplicateStoryboardPanel = () => {
+    if (!selectedStoryboardPanel) return;
+    const panel = {
+      ...selectedStoryboardPanel,
+      id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+      title: `${selectedStoryboardPanel.title} copy`,
+      performers: clonePerformers(selectedStoryboardPanel.performers)
+    };
+    setStoryboardPanels((current) => [...current, panel]);
+    setSelectedStoryboardId(panel.id);
+  };
+
+  const deleteStoryboardPanel = () => {
+    if (!selectedStoryboardId) return;
+    const next = storyboardPanels.filter((panel) => panel.id !== selectedStoryboardId);
+    setStoryboardPanels(next);
+    setSelectedStoryboardId(next.length ? next[next.length - 1].id : null);
+  };
+
+  const updateStoryboardPanelMeta = (patch) => {
+    if (!selectedStoryboardId) return;
+    setStoryboardPanels((current) =>
+      current.map((panel) => (panel.id === selectedStoryboardId ? { ...panel, ...patch } : panel))
+    );
+  };
+
+  const showTutorialStep = (index) => {
+    const nextIndex = (index + tutorialSteps.length) % tutorialSteps.length;
+    setTutorialStep(nextIndex);
+    setMode(tutorialSteps[nextIndex].mode);
+    setTutorialOpen(true);
+  };
 
   if (!joined) {
     return (
@@ -594,7 +733,7 @@ function App() {
         </div>
         <div className="transport">
           <div className="modeSwitch" aria-label="Workflow mode">
-            {["perform", "build", "edit"].map((item) => (
+            {["perform", "build", "edit", "storyboard"].map((item) => (
               <button
                 key={item}
                 className={mode === item ? "selected" : ""}
@@ -616,19 +755,34 @@ function App() {
             {micLive ? <Mic size={17} /> : <MicOff size={17} />}
             Mic
           </button>
+          <button className={tutorialOpen ? "active" : ""} onClick={() => setTutorialOpen((open) => !open)}>
+            <HelpCircle size={17} />
+            Tutorial
+          </button>
         </div>
       </header>
 
       <section
-        className={`stage ${selectedScene.className}`}
+        className={mode === "storyboard" ? "storyboardStage" : `stage ${selectedScene.className}`}
         onPointerMove={handleStagePointerMove}
         onPointerLeave={handleStagePointerLeave}
       >
-        <div className="horizonGuide" />
-        <div className="setFloor" />
-        {stagePerformers.map((performer) => (
-          <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
-        ))}
+        {mode === "storyboard" ? (
+          <StoryboardCanvas
+            panels={storyboardPanels}
+            selectedPanelId={selectedStoryboardId}
+            onSelectPanel={setSelectedStoryboardId}
+          />
+        ) : (
+          <>
+            <div className="stageLighting" />
+            <div className="horizonGuide" />
+            <div className="setFloor" />
+            {stagePerformers.map((performer) => (
+              <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
+            ))}
+          </>
+        )}
       </section>
 
       <aside className="controlDock">
@@ -665,6 +819,18 @@ function App() {
             onExport={downloadTake}
           />
         )}
+        {mode === "storyboard" && (
+          <StoryboardEditor
+            panels={storyboardPanels}
+            selectedPanel={selectedStoryboardPanel}
+            onAddPanel={addStoryboardPanel}
+            onUpdatePanel={updateStoryboardPanel}
+            onDuplicatePanel={duplicateStoryboardPanel}
+            onDeletePanel={deleteStoryboardPanel}
+            onSelectPanel={setSelectedStoryboardId}
+            onPanelMetaChange={updateStoryboardPanelMeta}
+          />
+        )}
 
         <div className="dockGroup performerGroup">
           <h2>Performers</h2>
@@ -685,7 +851,60 @@ function App() {
         muted
         playsInline
       />
+      {tutorialOpen && (
+        <TutorialOverlay
+          step={tutorialStep}
+          mode={mode}
+          onClose={() => setTutorialOpen(false)}
+          onStepChange={showTutorialStep}
+        />
+      )}
     </main>
+  );
+}
+
+function TutorialOverlay({ step, mode, onClose, onStepChange }) {
+  const current = tutorialSteps[step];
+
+  return (
+    <section className="tutorialOverlay" aria-label="Tutorial">
+      <div className="tutorialCard">
+        <div className="tutorialHeader">
+          <HelpCircle size={18} />
+          <div>
+            <strong>{current.title}</strong>
+            <small>
+              {step + 1} / {tutorialSteps.length} / {mode}
+            </small>
+          </div>
+          <button aria-label="Close tutorial" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+        <p>{current.body}</p>
+        <div className="tutorialModes">
+          {tutorialSteps.map((item, index) => (
+            <button
+              key={item.mode}
+              className={index === step ? "selected" : ""}
+              onClick={() => onStepChange(index)}
+            >
+              {item.mode}
+            </button>
+          ))}
+        </div>
+        <div className="tutorialActions">
+          <button onClick={() => onStepChange(step - 1)}>
+            <ChevronLeft size={16} />
+            Back
+          </button>
+          <button onClick={() => onStepChange(step + 1)}>
+            Next
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -911,12 +1130,175 @@ function SceneLibraryEditor({
   );
 }
 
+function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {
+  if (!panels.length) {
+    return (
+      <div className="storyboardEmpty">
+        <Clapperboard size={42} />
+        <strong>Storyboard</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="storyboardStrip">
+      {panels.map((panel, index) => (
+        <button
+          key={panel.id}
+          className={`storyboardPanel ${selectedPanelId === panel.id ? "selected" : ""}`}
+          onClick={() => onSelectPanel(panel.id)}
+        >
+          <div className="panelLabel">
+            <span>{index + 1}</span>
+            <strong>{panel.title}</strong>
+            <small>{panel.shot}</small>
+          </div>
+          <PanelFrame panel={panel} />
+          <p>{panel.caption || "..."}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PanelFrame({ panel }) {
+  const panelScene = getCatalogItem(sceneCatalog, panel.scene);
+
+  return (
+    <div className={`panelFrame ${panelScene.className}`}>
+      <div className="panelStageInner">
+        <div className="stageLighting" />
+        <div className="horizonGuide" />
+        <div className="setFloor" />
+        {panel.performers.map((performer) => (
+          <Puppet key={performer.id} performer={performer} isSelf={false} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StoryboardEditor({
+  panels,
+  selectedPanel,
+  onAddPanel,
+  onUpdatePanel,
+  onDuplicatePanel,
+  onDeletePanel,
+  onSelectPanel,
+  onPanelMetaChange
+}) {
+  return (
+    <div className="storyboardEditor">
+      <div className="dockGroup">
+        <h2>Storyboard</h2>
+        <div className="editorHeader">
+          <Clapperboard size={18} />
+          <div>
+            <strong>{selectedPanel?.title || "Comic Strip Layout"}</strong>
+            <small>{panels.length} panels</small>
+          </div>
+        </div>
+        <div className="libraryActions">
+          <button onClick={onAddPanel}>
+            <Plus size={16} />
+            Add Panel
+          </button>
+          <button onClick={onUpdatePanel} disabled={!selectedPanel}>
+            <RefreshCw size={16} />
+            Capture
+          </button>
+        </div>
+      </div>
+
+      {selectedPanel && (
+        <>
+          <div className="dockGroup">
+            <h2>Panel</h2>
+            <label>
+              Title
+              <input
+                value={selectedPanel.title}
+                onChange={(event) => onPanelMetaChange({ title: event.target.value })}
+              />
+            </label>
+            <label>
+              Shot
+              <select
+                value={selectedPanel.shot}
+                onChange={(event) => onPanelMetaChange({ shot: event.target.value })}
+              >
+                <option>Wide</option>
+                <option>Medium</option>
+                <option>Close</option>
+                <option>Reaction</option>
+                <option>Insert</option>
+              </select>
+            </label>
+            <label>
+              Duration
+              <input
+                value={selectedPanel.duration}
+                onChange={(event) => onPanelMetaChange({ duration: event.target.value })}
+              />
+            </label>
+            <label>
+              Caption
+              <textarea
+                rows={4}
+                value={selectedPanel.caption}
+                onChange={(event) => onPanelMetaChange({ caption: event.target.value })}
+              />
+            </label>
+          </div>
+
+          <div className="libraryActions">
+            <button onClick={onDuplicatePanel}>
+              <Copy size={16} />
+              Duplicate
+            </button>
+            <button className="danger" onClick={onDeletePanel}>
+              <Trash2 size={16} />
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+
+      <div className="dockGroup">
+        <h2>Panel List</h2>
+        {panels.length ? (
+          <div className="takeList">
+            {panels.map((panel, index) => (
+              <button
+                key={panel.id}
+                className={`takeButton ${selectedPanel?.id === panel.id ? "selected" : ""}`}
+                onClick={() => onSelectPanel(panel.id)}
+              >
+                <span>
+                  {index + 1}. {panel.title}
+                </span>
+                <small>
+                  {panel.shot} / {panel.duration}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">No panels yet.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange, onRandomize }) {
   if (!performer) return null;
 
   const baseCharacter = getCatalogItem(characterCatalog, performer.character);
   const rig = { ...baseCharacter.rigConfig, ...performer.state.rigConfig };
   const stylePreset = performer.state.stylePreset || baseCharacter.stylePreset;
+  const selectedStyle = getCatalogItem(animationStyleCatalog, stylePreset);
   const design = {
     name: performer.state.characterDesign?.name || `${baseCharacter.name} Original`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
@@ -964,14 +1346,24 @@ function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange
 
       <div className="dockGroup">
         <h2>Animation Style</h2>
-        <div className="segmented">
+        <div className="styleSummary">
+          <strong>{selectedStyle.family}</strong>
+          <small>{selectedStyle.theme}</small>
+        </div>
+        <div className="styleGrid">
           {animationStyleCatalog.map((style) => (
             <button
               key={style.id}
-              className={stylePreset === style.id ? "selected" : ""}
+              className={`styleButton ${stylePreset === style.id ? "selected" : ""}`}
               onClick={() => onStyleChange(style.id)}
             >
-              {style.name}
+              <span>{style.name}</span>
+              <small>{style.family}</small>
+              <span className="styleSwatches" aria-hidden="true">
+                {style.palette.map((color) => (
+                  <i key={color} style={{ background: color }} />
+                ))}
+              </span>
             </button>
           ))}
         </div>

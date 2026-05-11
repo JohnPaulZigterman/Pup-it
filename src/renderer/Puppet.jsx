@@ -21,16 +21,22 @@ export function Puppet({ performer, isSelf }) {
   const isWalking = state.walking && rig.walkCycle !== "none";
   const canIdle = state.idleMotion !== "held" && !isWalking && !state.macro;
   const canBlink = state.idleMotion !== "held";
-  const mouthOpen = Math.max(state.mouthOpen || 0, state.speaking ? 0.62 : 0);
+  const rawMouthOpen = state.mouthOpen || 0;
+  const mouthOpen = Math.max(rawMouthOpen, state.speaking ? 0.16 : 0);
+  const mouthLevel =
+    mouthOpen > 0.72 ? "wide" : mouthOpen > 0.38 ? "medium" : mouthOpen > 0.1 ? "small" : "closed";
+  const depth = Math.max(0, Math.min(1, (state.y - 20) / 62));
 
   return (
     <div
       className={[
         "puppet",
         `body-${rig.body}`,
+        `archetype-${character.archetype || character.id}`,
         `limbs-${rig.limbs}`,
         `style-${stylePreset}`,
         `idle-${state.idleMotion}`,
+        `mouth-${mouthLevel}`,
         canIdle ? "idle-breathing" : "",
         canBlink ? "auto-blink" : "",
         isWalking ? `walking walk-${rig.walkCycle}` : "",
@@ -44,12 +50,21 @@ export function Puppet({ performer, isSelf }) {
         transform: `translate(-50%, -100%) scale(${scale})`,
         "--puppet": design.color || character.color,
         "--accent": design.accent || character.accent,
+        "--outline": adapter.outline,
         "--facing": state.facing < 0 ? -1 : 1,
         "--line-width": `${adapter.lineWidth}px`,
         "--body-scale-x": adapter.bodyScaleX,
         "--body-scale-y": adapter.bodyScaleY,
         "--body-corner": adapter.corner,
         "--eye-scale": adapter.eyeScale,
+        "--highlight-opacity": adapter.highlightOpacity,
+        "--shadow-opacity": adapter.shadowOpacity,
+        "--texture-opacity": adapter.textureOpacity,
+        "--depth": depth,
+        "--cast-shadow-x": `${-18 + depth * 10}px`,
+        "--cast-shadow-y": `${16 + depth * 18}px`,
+        "--cast-shadow-scale": 0.52 + depth * 0.56,
+        "--cast-shadow-opacity": 0.08 + depth * adapter.shadowOpacity,
         "--arm-length": `${rig.armLength * adapter.limbScale}px`,
         "--leg-length": `${rig.legLength * adapter.limbScale}px`,
         "--body-lean": `${pose.bodyLean}deg`,
@@ -63,6 +78,7 @@ export function Puppet({ performer, isSelf }) {
       }}
     >
       <div className="nameTag">{performer.name}</div>
+      <div className="castShadow" aria-hidden="true" />
       <div className="puppetRig">
         {rig.arms ? (
           <>
@@ -77,7 +93,14 @@ export function Puppet({ performer, isSelf }) {
           </>
         ) : null}
         <div className="puppetBody">
-          <div className={`mouth mouth-${rig.mouthStyle} ${mouthOpen > 0.06 ? "mouth-active" : ""}`}>
+          <div className="animalFeature ears" aria-hidden="true" />
+          <div className="animalFeature snout" aria-hidden="true" />
+          <div className="animalFeature beak" aria-hidden="true" />
+          <div className="animalFeature wings" aria-hidden="true" />
+          <div className="animalFeature tail" aria-hidden="true" />
+          <div
+            className={`mouth mouthStyle-${rig.mouthStyle} ${mouthOpen > 0.06 ? "mouth-active" : ""}`}
+          >
             {expression.face[2]}
           </div>
           <span className="eye eyeOpen left">{expression.face[0]}</span>

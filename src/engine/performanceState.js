@@ -56,9 +56,9 @@ export function hasInput(input) {
   return input.dx !== 0 || input.dy !== 0 || input.dScale !== 0;
 }
 
-export function movePerformerFromInput(performer, input) {
+export function movePerformerFromInput(performer, input, depthModel) {
   return {
     ...performer,
-    state: movePerformerState(performer.state, input)
+    state: movePerformerState(performer.state, input, depthModel)
   };
 }

@@ -1,6 +1,7 @@
 export const defaultDepthModel = {
   horizon: 20,
   foreground: 82,
+  performerHorizonBuffer: 8,
   minScale: 0.42,
   maxScale: 1.46,
   minTrim: 0.82,
@@ -23,7 +24,8 @@ export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
 
 export function movePerformerState(state, input, depthModel = defaultDepthModel) {
   const nextX = clamp(state.x + input.dx, 5, 92);
-  const nextY = clamp(state.y + input.dy, depthModel.horizon, depthModel.foreground);
+  const minY = depthModel.horizon + (depthModel.performerHorizonBuffer ?? 0);
+  const nextY = clamp(state.y + input.dy, minY, depthModel.foreground);
   const nextScale = clamp(state.scale + input.dScale, depthModel.minTrim, depthModel.maxTrim);
 
   return {
