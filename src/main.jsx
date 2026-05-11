@@ -866,6 +866,8 @@ function App() {
   const [assetSearch, setAssetSearch] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [startedShortFormat, setStartedShortFormat] = useState("");
+  const [exportHistory, setExportHistory] = useState([]);
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
@@ -887,13 +889,14 @@ function App() {
   );
   const beginnerProgress = {
     hasShow: Boolean(showName.trim()),
+    hasStartedShort: Boolean(startedShortFormat),
     hasRig: hasCustomRigParts,
     hasSet: sceneObjects.length > 0 || sceneSets.length > 0,
     hasRehearsed: mode === "perform" || takeLibrary.length > 0 || selectedTake,
     hasTake: takeLibrary.length > 0 || selectedTake,
     hasCut: productionTimeline.length > 0,
     readyToExport: productionTimeline.length > 0 || selectedTake,
-    exported: status.toLowerCase().includes("export")
+    exported: exportHistory.length > 0
   };
   const activeStylePreset = self?.state.stylePreset || selfCharacter.stylePreset;
   const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
@@ -1316,6 +1319,8 @@ function App() {
     setObjectStyle(template.objectStyle);
     setAssetTarget("object");
     setAssetSearch(format.assetSearch);
+    setStartedShortFormat(format.id);
+    setExportHistory([]);
     if (showName.trim() === "Untitled Show") {
       setShowName(`${format.name} Show`);
     }
@@ -1850,6 +1855,11 @@ function App() {
     downloadTake(take);
   };
 
+  const openReviewMode = () => {
+    loadTakeLibrary();
+    setMode("edit");
+  };
+
   const downloadTake = (take) => {
     const blob = new Blob([JSON.stringify(take, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1858,6 +1868,10 @@ function App() {
     link.download = `pup-it-${take.roomId || roomId}-${take.id || "take"}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    setExportHistory((current) => [
+      { id: `take-${Date.now()}`, type: "take-json", exportedAt: new Date().toISOString() },
+      ...current
+    ]);
   };
 
   const loadTakeLibrary = async () => {
@@ -2146,6 +2160,16 @@ function App() {
     link.download = `pup-it-${roomId}-project.json`;
     link.click();
     URL.revokeObjectURL(url);
+    setExportHistory((current) => [
+      { id: `short-${Date.now()}`, type: "short-package", exportedAt: new Date().toISOString() },
+      ...current
+    ]);
+    setStatus("Exported short package. Video export is queued as the next render feature.");
+  };
+
+  const queueVideoExport = () => {
+    setMode("edit");
+    setStatus("Video export is next on the render roadmap. For now, export the short package with takes, credits, and tracks.");
   };
 
   const applyShowTemplate = (templateId) => {
@@ -2226,9 +2250,10 @@ function App() {
     { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
     { id: "kitchen", label: "Find kitchen scene pieces", keywords: "kitchen diner room background furniture", action: () => openAssetSearch("kitchen", "setting") },
     { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
-    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review", action: () => { loadTakeLibrary(); setMode("edit"); } },
+    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review", action: openReviewMode },
     { id: "board", label: "Open storyboard mode", keywords: "storyboard panel comic strip planning", action: () => setMode("storyboard") },
-    { id: "export", label: "Export full project package", keywords: "export publish package video project", action: exportProject },
+    { id: "export", label: "Export short package", keywords: "export publish package video project", action: exportProject },
+    { id: "video-export", label: "Prepare video export", keywords: "render video mp4 export movie", action: queueVideoExport },
     { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
     { id: "texture-polish", label: "Add mixed-media texture", keywords: "texture paper pattern style weird", action: () => applyPolishPass("texture") },
     { id: "punch-polish", label: "Punch in for a reaction", keywords: "camera close reaction punch button", action: () => applyPolishPass("camera") }
@@ -2419,9 +2444,13 @@ function App() {
             {recording ? <Square size={17} /> : <Circle size={17} />}
             {recording ? "Stop" : "Record"}
           </button>
-          <button onClick={exportTake}>
+          <button onClick={openReviewMode}>
             <Video size={17} />
-            Export Take
+            Review
+          </button>
+          <button onClick={exportProject}>
+            <Save size={17} />
+            Export Short
           </button>
           <button className={micLive ? "active" : ""} onClick={toggleMic}>
             {micLive ? <Mic size={17} /> : <MicOff size={17} />}
@@ -2677,12 +2706,13 @@ function App() {
             onQuickTrim={quickTrimSelectedTake}
             onSaveTakeAsScene={saveSelectedTakeAsScene}
             onExport={downloadTake}
+            onExportProject={exportProject}
+            onQueueVideoExport={queueVideoExport}
             onAddTakeToTimeline={addTakeToTimeline}
             timeline={productionTimeline}
             episodeStatus={episodeStatus}
             onEpisodeStatusChange={setEpisodeStatus}
             onRemoveTimelineClip={removeTimelineClip}
-            onExportProject={exportProject}
             onModeChange={setMode}
           />
         )}
@@ -2876,7 +2906,7 @@ function ShowDashboard({
         <button onClick={canFinish ? onExport : () => onModeChange("edit")}>
           <Video size={17} />
           <span>Finish</span>
-          <strong>{canFinish ? "Export Package" : "Review the Cut"}</strong>
+          <strong>{canFinish ? "Export Short" : "Review the Cut"}</strong>
         </button>
       </section>
 
@@ -2896,9 +2926,9 @@ function ShowDashboard({
         </div>
       </section>
 
-      <section className="philosophyPanel" aria-label="Development path">
+      <section className="philosophyPanel" aria-label="How to make a short">
         <div>
-          <span className="eyebrow">Product Path</span>
+          <span className="eyebrow">How To Make A Short</span>
           <h2>Build a weird little world, perform inside it, finish the cartoon.</h2>
         </div>
         <div className="pathCardGrid">
@@ -3064,7 +3094,7 @@ function BeginnerRoadmap({
       label: "Start a short",
       body: "Pick a rough launch pad so the blank page disappears.",
       complete: "Short started. Now make it unmistakably yours.",
-      done: progress.hasRig || progress.hasSet,
+      done: progress.hasStartedShort,
       action: onStartQuickShort,
       actionLabel: "Make a Short"
     },
@@ -4195,12 +4225,13 @@ function SceneLibraryEditor({
   onQuickTrim,
   onSaveTakeAsScene,
   onExport,
+  onExportProject,
+  onQueueVideoExport,
   onAddTakeToTimeline,
   timeline,
   episodeStatus,
   onEpisodeStatusChange,
   onRemoveTimelineClip,
-  onExportProject,
   onModeChange
 }) {
   return (
@@ -4313,35 +4344,31 @@ function SceneLibraryEditor({
                 </div>
               ))
             ) : (
-              <div className="emptyState">No audio tracks.</div>
+              <div className="emptyState actionEmpty">
+                <strong>No audio tracks yet.</strong>
+                <span>Turn on the mic, record another take, and each performer will export as a separate track.</span>
+                <button onClick={() => onModeChange("perform")}>Record With Mic</button>
+              </div>
             )}
           </div>
 
-          <div className="libraryActions">
-            <button className={playbackActive ? "active" : ""} onClick={onPlay}>
-              <Play size={16} />
-              {playbackActive ? "Replaying" : "Replay"}
-            </button>
-            <button onClick={() => onQuickTrim("start")}>
-              <ChevronLeft size={16} />
-              Trim In
-            </button>
-            <button onClick={() => onQuickTrim("end")}>
-              <ChevronRight size={16} />
-              Trim Out
-            </button>
-            <button onClick={onSaveTakeAsScene}>
-              <Clapperboard size={16} />
-              Save as Scene
-            </button>
-            <button onClick={() => onAddTakeToTimeline(selectedTake)}>
-              <Plus size={16} />
-              Add to Cut
-            </button>
-            <button onClick={() => onExport(selectedTake)}>
-              <Video size={16} />
-              Export
-            </button>
+          <div className="dockGroup exportPlanPanel">
+            <h2>Export Short</h2>
+            <small className="controlHint">Use the package now; video rendering is the next render-system milestone.</small>
+            <div className="libraryActions">
+              <button onClick={onExportProject}>
+                <Save size={16} />
+                Short Package
+              </button>
+              <button onClick={() => onExport(selectedTake)}>
+                <Video size={16} />
+                Raw Take JSON
+              </button>
+              <button onClick={onQueueVideoExport}>
+                <Clapperboard size={16} />
+                Video Next
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -4405,11 +4432,15 @@ function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">Add a take or storyboard panel to create the rough cut.</div>
+        <div className="emptyState actionEmpty">
+          <strong>No rough cut yet.</strong>
+          <span>Add the selected take above, or storyboard a shot and add that panel.</span>
+          <button onClick={onExportProject}>Export Current Package</button>
+        </div>
       )}
       <button className="wideAction" onClick={onExportProject}>
         <Video size={16} />
-        Export Episode Package
+        Export Short Package
       </button>
     </div>
   );
@@ -4426,6 +4457,7 @@ function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {
       <div className="storyboardEmpty">
         <Clapperboard size={42} />
         <strong>Storyboard</strong>
+        <span>Use the Storyboard dock to add your first panel.</span>
       </div>
     );
   }
@@ -4653,7 +4685,11 @@ function StoryboardEditor({
             ))}
           </div>
         ) : (
-          <div className="emptyState">No panels yet.</div>
+          <div className="emptyState actionEmpty">
+            <strong>No panels yet.</strong>
+            <span>Capture the current stage as a comic-strip beat, then perform from it.</span>
+            <button onClick={onAddPanel}>Add First Panel</button>
+          </div>
         )}
       </div>
     </div>
@@ -4697,7 +4733,7 @@ function CharacterEditor({
   return (
     <div className="characterEditor">
       <div className="dockGroup">
-        <h2>Build The Space</h2>
+        <h2>Build Your Rig</h2>
         <div className="editorHeader">
           <Palette size={18} />
           <div>
