@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { hasUsableFinishTake } from "../workflows/finishFlow.js";
 import {
+  buildRenderPreflight,
   buildDoinkReviewChecklist,
   describeAudioStatus,
   formatDuration,
@@ -114,6 +115,18 @@ export function SceneLibraryEditor({
     { id: "style", label: "Style", ready: Boolean(renderModel?.backgroundTheme || renderHealth?.styleSnapshot?.backgroundTheme) },
     { id: "objects", label: "Objects", ready: Boolean(renderModel?.sceneObjects?.length || selectedTake?.sceneObjects?.length || timeline.length) }
   ];
+  const renderPreflight = buildRenderPreflight({
+    hasSubmissionSource,
+    finishTargetLabel,
+    renderDurationMs,
+    renderClipCount,
+    renderDepthChecks,
+    audioReady,
+    audioTrackCount,
+    backendRendering,
+    renderSucceeded,
+    finalVideoPath
+  });
   const submissionTitle = doinkSubmission.title.trim() || selectedTake?.name || `${projectExport?.showName || "Untitled Show"} Short`;
   const submissionDurationMs = selectedTake?.durationMs || timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
   const doinkReviewChecklist = buildDoinkReviewChecklist({
@@ -302,6 +315,34 @@ export function SceneLibraryEditor({
             <span className="eyebrow">Render Check</span>
             <strong>{backendRendering ? "Rendering review copy..." : renderSucceeded ? "Review render ready." : "Ready to render a review copy."}</strong>
             <small>{finishTargetLabel} / {formatDuration(renderDurationMs)} / {renderClipCount || 1} clip{(renderClipCount || 1) === 1 ? "" : "s"}</small>
+          </div>
+          <div className={`renderPreflightPanel preflight-${renderPreflight.status}`} aria-label="Render preflight">
+            <div>
+              <span className="eyebrow">Preflight</span>
+              <strong>
+                {renderPreflight.status === "rendered"
+                  ? "Rendered and ready to review."
+                  : renderPreflight.status === "rendering"
+                    ? "Render is running."
+                    : renderPreflight.readyToRender
+                      ? "Safe to render."
+                      : "Needs one setup step before render."}
+              </strong>
+              <small>
+                {renderPreflight.blockers.length
+                  ? `Missing: ${renderPreflight.blockers.map((item) => item.label).join(", ")}.`
+                  : "The source, timing, visual context, and audio plan are coherent."}
+              </small>
+            </div>
+            <strong className="preflightScore">{renderPreflight.score}%</strong>
+          </div>
+          <div className="renderPreflightChecks">
+            {renderPreflight.checks.map((item) => (
+              <span className={item.done ? "done" : ""} key={item.id} title={item.detail}>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </span>
+            ))}
           </div>
           <div className="renderPipelineSteps" aria-label="Render pipeline">
             {renderPipelineSteps.map((step, index) => (

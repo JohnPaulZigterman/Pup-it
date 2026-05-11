@@ -5006,6 +5006,92 @@ input[type="color"] {
   background: rgba(215, 109, 88, 0.28);
 }
 
+.renderPreflightPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(255, 242, 168, 0.28), rgba(255, 255, 255, 0.2)),
+    var(--surface);
+}
+
+.renderPreflightPanel strong,
+.renderPreflightPanel small {
+  display: block;
+}
+
+.renderPreflightPanel small {
+  color: #666b86;
+  line-height: 1.35;
+}
+
+.renderPreflightPanel.preflight-ready,
+.renderPreflightPanel.preflight-rendered {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(143, 216, 181, 0.42), rgba(255, 242, 168, 0.26)),
+    var(--surface);
+}
+
+.renderPreflightPanel.preflight-needs-attention {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(246, 166, 178, 0.28), rgba(255, 242, 168, 0.24)),
+    var(--surface);
+}
+
+.preflightScore {
+  display: grid;
+  width: 58px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--nicotine);
+  font-size: 16px;
+}
+
+.renderPreflightChecks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.renderPreflightChecks span {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+  color: #4b4e68;
+}
+
+.renderPreflightChecks span.done {
+  background: var(--pond);
+  color: var(--ink);
+}
+
+.renderPreflightChecks strong,
+.renderPreflightChecks small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.renderPreflightChecks strong {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.renderPreflightChecks small {
+  font-size: 9px;
+}
+
 .renderPipelineSteps {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createProjectExport, createShowToolbox } from "../shared/production.js";
 import { createRenderModel } from "../shared/renderModel.js";
-import { buildDoinkReviewChecklist, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
+import { buildDoinkReviewChecklist, buildRenderPreflight, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
 import { getTutorialTrack, getWorkspaceIdentity, makeShortMilestones, tutorialTracks } from "../src/workflow/shortFlow.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
@@ -144,4 +144,28 @@ test("render model preserves scene depth and direct-manipulated part offsets", (
 
   expect(renderModel.sceneDepth).toMatchObject({ horizon: 56, foreground: 84, focusX: 50 });
   expect(renderModel.take.performers[0].state.characterParts.head).toMatchObject({ x: 18, y: -10, scale: 1.2 });
+});
+
+test("render preflight separates render blockers from optional review file", () => {
+  const preflight = buildRenderPreflight({
+    hasSubmissionSource: true,
+    finishTargetLabel: "Selected take",
+    renderDurationMs: 5000,
+    renderClipCount: 1,
+    renderDepthChecks: [
+      { ready: true },
+      { ready: true },
+      { ready: true },
+      { ready: true },
+      { ready: false }
+    ],
+    audioReady: false,
+    audioTrackCount: 0,
+    renderSucceeded: false
+  });
+
+  expect(preflight.readyToRender).toBe(true);
+  expect(preflight.status).toBe("ready");
+  expect(preflight.blockers).toEqual([]);
+  expect(preflight.checks.find((item) => item.id === "deliverable").done).toBe(false);
 });

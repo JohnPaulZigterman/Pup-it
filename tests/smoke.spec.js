@@ -89,6 +89,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
   await expect(page.getByLabel("Finish mode path")).toBeVisible();
   await expect(page.getByText("Render Check")).toBeVisible();
+  await expect(page.getByLabel("Render preflight")).toBeVisible();
+  await expect(page.getByText("Preflight")).toBeVisible();
   await expect(page.getByLabel("Render pipeline")).toBeVisible();
   await expect(page.getByLabel("Render depth fidelity")).toBeVisible();
   await expect(page.getByText("Render Depth v1")).toBeVisible();
