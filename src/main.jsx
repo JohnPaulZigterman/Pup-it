@@ -89,6 +89,23 @@ import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
 const SHOW_STORAGE_KEY = "pup-it-shows-v1";
+const partSwapTargets = {
+  leftArm: "rightArm",
+  rightArm: "leftArm",
+  leftLeg: "rightLeg",
+  rightLeg: "leftLeg",
+  leftAccessory: "rightAccessory",
+  rightAccessory: "leftAccessory"
+};
+const extraPartSlots = ["topAccessory", "leftAccessory", "rightAccessory", "backAppendage"];
+const texturePresetOptions = [
+  { id: "paper-grain", name: "Paper Grain" },
+  { id: "photocopy", name: "Photocopy" },
+  { id: "static-pattern", name: "Static" },
+  { id: "wallpaper", name: "Wallpaper" },
+  { id: "woodgrain", name: "Woodgrain" },
+  { id: "stucco", name: "Stucco" }
+];
 
 const tutorialSteps = [
   {
@@ -120,6 +137,60 @@ const workflowSteps = [
   { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
   { id: "edit", label: "Edit", mode: "edit", description: "Review takes and assemble the episode." },
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
+];
+
+const styleMutationControls = [
+  {
+    id: "roughen",
+    name: "Roughen",
+    description: "Loosen the rig into a rough handmade look.",
+    stylePreset: "adult-surreal",
+    backgroundTheme: "late-night-copy",
+    objectStyle: "textured-cutout",
+    behaviorPreset: "jitter",
+    motionFeel: "loose"
+  },
+  {
+    id: "photocopy",
+    name: "Photocopy",
+    description: "Push copy-shop grit and late-night texture.",
+    stylePreset: "adult-surreal",
+    backgroundTheme: "late-night-copy",
+    objectStyle: "paper-cut"
+  },
+  {
+    id: "thin-lines",
+    name: "Thin Lines",
+    description: "Clean up heavy borders without making it sterile.",
+    stylePreset: "minimal-comic",
+    backgroundTheme: "broadcast-flat",
+    objectStyle: "thin-ink"
+  },
+  {
+    id: "collage",
+    name: "Collage",
+    description: "Move toward assembled cutouts and texture pieces.",
+    stylePreset: "puppet-collage",
+    backgroundTheme: "pattern-held",
+    objectStyle: "textured-cutout"
+  },
+  {
+    id: "pattern",
+    name: "Pattern",
+    description: "Let wallpaper and held texture carry the shot.",
+    stylePreset: "wallpaper-cutout",
+    backgroundTheme: "vintage-wallpaper",
+    objectStyle: "paper-cut"
+  },
+  {
+    id: "shadow-weird",
+    name: "Shadow Weird",
+    description: "Punch up shape, shadow, and reaction staging.",
+    stylePreset: "abstract-block",
+    backgroundTheme: "abstract-gallery",
+    objectStyle: "soft-material",
+    lightingPreset: "dramatic"
+  }
 ];
 
 const showStarterTemplates = [
@@ -318,6 +389,13 @@ function formatDuration(durationMs = 0) {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function inferAssetTexture(asset) {
+  if (asset.tags?.includes("wood") || asset.name?.toLowerCase().includes("wood")) return "woodgrain";
+  if (asset.tags?.includes("wallpaper") || asset.name?.toLowerCase().includes("wallpaper")) return "wallpaper";
+  if (asset.recommended?.objectStyle === "textured-cutout") return "paper-grain";
+  return "paper-grain";
+}
+
 function createSceneObjectFromAsset(asset, index = 0) {
   const isSetting = asset.targets?.includes("setting") || asset.format === "background";
   return {
@@ -333,11 +411,12 @@ function createSceneObjectFromAsset(asset, index = 0) {
     scale: isSetting ? 1.2 : 0.72,
     layer: isSetting ? 0 : 2,
     tint: asset.recommended?.objectStyle === "textured-cutout" ? "#fff2a8" : "#f5f1e8",
-    shape: asset.previewStyle || "object"
+    shape: asset.previewStyle || "object",
+    texturePreset: inferAssetTexture(asset)
   };
 }
 
-function createSceneObjectFromImage({ name, imageUrl, license, attribution }, index = 0) {
+function createSceneObjectFromImage({ name, imageUrl, license, attribution, texturePreset }, index = 0) {
   return {
     id: `scene-object-image-${Date.now()}-${Math.round(Math.random() * 10000)}`,
     assetId: "custom-image",
@@ -353,12 +432,13 @@ function createSceneObjectFromImage({ name, imageUrl, license, attribution }, in
     layer: 2,
     tint: "#f5f1e8",
     shape: "image",
+    texturePreset: texturePreset || "paper-grain",
     flipped: false,
     locked: false
   };
 }
 
-function createSceneObjectFromShape({ name, shape, tint }, index = 0) {
+function createSceneObjectFromShape({ name, shape, tint, texturePreset }, index = 0) {
   return {
     id: `scene-object-shape-${Date.now()}-${Math.round(Math.random() * 10000)}`,
     assetId: "assembled-shape",
@@ -373,6 +453,7 @@ function createSceneObjectFromShape({ name, shape, tint }, index = 0) {
     layer: 2,
     tint: tint || "#f5f1e8",
     shape: shape || "object",
+    texturePreset: texturePreset || "paper-grain",
     flipped: false,
     locked: false
   };
@@ -590,6 +671,7 @@ function App() {
   const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
   const mouthControlRef = useRef("audio");
   const mouthSensitivityRef = useRef(1);
+  const mouthSmoothingRef = useRef(0.58);
   const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
@@ -605,6 +687,7 @@ function App() {
   const [micLive, setMicLive] = useState(false);
   const [mouthCameraActive, setMouthCameraActive] = useState(false);
   const [mouthSensitivity, setMouthSensitivity] = useState(1);
+  const [mouthSmoothing, setMouthSmoothing] = useState(0.58);
   const [mode, setMode] = useState("home");
   const [experienceMode, setExperienceMode] = useState("beginner");
   const [commandQuery, setCommandQuery] = useState("");
@@ -777,6 +860,10 @@ function App() {
   }, [mouthSensitivity]);
 
   useEffect(() => {
+    mouthSmoothingRef.current = mouthSmoothing;
+  }, [mouthSmoothing]);
+
+  useEffect(() => {
     if (joined && mode === "edit") loadTakeLibrary();
   }, [joined, mode, roomId]);
 
@@ -876,7 +963,8 @@ function App() {
   const setMouthOpen = (mouthOpen, { immediate = false } = {}) => {
     const target = clamp(mouthOpen, 0, 1);
     const previous = mouthValueRef.current;
-    const open = immediate ? target : previous * 0.58 + target * 0.42;
+    const smoothing = clamp(mouthSmoothingRef.current, 0.15, 0.9);
+    const open = immediate ? target : previous * smoothing + target * (1 - smoothing);
     if (!immediate && Math.abs(open - previous) < 0.015) return;
     mouthValueRef.current = open;
     updateSelf({ mouthOpen: open, speaking: open > 0.08 });
@@ -940,6 +1028,43 @@ function App() {
       }
     });
   };
+  const duplicateCharacterPart = (partId) => {
+    if (!self) return;
+    const currentParts = self.state.characterParts || {};
+    const sourcePart = currentParts[partId];
+    if (!sourcePart) return;
+    const targetPartId =
+      extraPartSlots.find((slot) => !currentParts[slot]) ||
+      extraPartSlots.find((slot) => currentParts[slot]?.hidden) ||
+      "backAppendage";
+    updateSelf({
+      characterParts: {
+        ...currentParts,
+        [targetPartId]: {
+          ...sourcePart,
+          label: getCatalogItem(characterPartCatalog, targetPartId).label,
+          hidden: false,
+          scale: Math.max(0.7, Math.min(1.35, (sourcePart.scale || 1) * 0.92)),
+          rotate: (sourcePart.rotate || 0) + 12
+        }
+      }
+    });
+    setStatus(`Cloned ${getCatalogItem(characterPartCatalog, partId).name} into an editable extra slot.`);
+  };
+  const swapCharacterParts = (partId) => {
+    if (!self) return;
+    const targetPartId = partSwapTargets[partId];
+    if (!targetPartId) return;
+    const currentParts = self.state.characterParts || {};
+    updateSelf({
+      characterParts: {
+        ...currentParts,
+        [partId]: currentParts[targetPartId] || {},
+        [targetPartId]: currentParts[partId] || {}
+      }
+    });
+    setStatus(`Swapped ${getCatalogItem(characterPartCatalog, partId).name} with ${getCatalogItem(characterPartCatalog, targetPartId).name}.`);
+  };
   const clearCharacterPart = (partId) => {
     if (!self) return;
     const currentParts = self.state.characterParts || {};
@@ -991,6 +1116,17 @@ function App() {
       }
     });
     setStatus(`${recipe.name} mutation applied. Keep what works, change what bothers you.`);
+  };
+  const applyStyleMutation = (mutationId) => {
+    const mutation = styleMutationControls.find((item) => item.id === mutationId);
+    if (!mutation) return;
+    if (mutation.stylePreset) updateCharacterStyle(mutation.stylePreset);
+    if (mutation.backgroundTheme) setBackgroundTheme(mutation.backgroundTheme);
+    if (mutation.objectStyle) setObjectStyle(mutation.objectStyle);
+    if (mutation.lightingPreset) setLightingPreset(mutation.lightingPreset);
+    if (mutation.behaviorPreset) updateSelf({ behaviorPreset: mutation.behaviorPreset });
+    if (mutation.motionFeel) updateSelf({ motionFeel: mutation.motionFeel });
+    setStatus(`${mutation.name} style mutation applied. Remix it until it feels like your show.`);
   };
 
   const addSceneObjectFromAsset = (asset) => {
@@ -1603,6 +1739,41 @@ function App() {
     setProductionTimeline((current) => current.filter((clip) => clip.id !== clipId));
   };
 
+  const quickTrimSelectedTake = (edge) => {
+    if (!selectedTake) return;
+    const trimMs = 500;
+    const currentStart = selectedTake.trimStartMs || 0;
+    const currentEnd = selectedTake.trimEndMs ?? selectedTake.durationMs;
+    const nextTake =
+      edge === "start"
+        ? { ...selectedTake, trimStartMs: Math.min(currentStart + trimMs, Math.max(0, currentEnd - 1000)) }
+        : { ...selectedTake, trimEndMs: Math.max(currentStart + 1000, currentEnd - trimMs), durationMs: Math.max(1000, currentEnd - trimMs - currentStart) };
+    setSelectedTake(nextTake);
+    setStatus(`Trimmed ${edge} by half a second for review.`);
+  };
+
+  const saveSelectedTakeAsScene = () => {
+    if (!selectedTake) return;
+    const panel = createStoryboardPanel({
+      scene: selectedTake.scene || scene,
+      performers: performerList(makePreviewPerformers(selectedTake)),
+      index: storyboardPanels.length + 1,
+      backgroundTheme,
+      objectStyle,
+      texturePreset: stageTexturePreset,
+      sceneObjects,
+      floorMarks
+    });
+    panel.title = `${selectedTake.name || "Take"} scene`;
+    panel.caption = "Saved from a recorded performance.";
+    panel.duration = formatDuration(selectedTake.durationMs);
+    panel.shot = cameraShot;
+    panel.lightingPreset = lightingPreset;
+    setStoryboardPanels((current) => [...current, panel]);
+    setSelectedStoryboardId(panel.id);
+    setStatus(`Saved "${panel.title}" as a scene board.`);
+  };
+
   const performStoryboardPanel = (panelId) => {
     const panel = storyboardPanels.find((item) => item.id === panelId);
     if (!panel) return;
@@ -2033,6 +2204,7 @@ function App() {
           sceneSetCount={sceneSets.length}
           propCount={sceneObjects.length}
           referenceCount={assetReferences.length}
+          macroCount={macroCatalog.length}
           boardCount={storyboardPanels.length}
           timelineCount={productionTimeline.length}
           activeStyle={activeAnimationStyle}
@@ -2055,6 +2227,8 @@ function App() {
             onMouthControlChange={setMouthControl}
             mouthSensitivity={mouthSensitivity}
             onMouthSensitivityChange={setMouthSensitivity}
+            mouthSmoothing={mouthSmoothing}
+            onMouthSmoothingChange={setMouthSmoothing}
             micLive={micLive}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
@@ -2083,8 +2257,11 @@ function App() {
             onDesignChange={updateCharacterDesign}
             onRandomize={randomizeCharacterDesign}
             onMutate={applyCharacterMutation}
+            onStyleMutate={applyStyleMutation}
             onBehaviorChange={(behaviorPreset) => updateSelf({ behaviorPreset })}
             onPartChange={updateCharacterPart}
+            onPartDuplicate={duplicateCharacterPart}
+            onPartSwap={swapCharacterParts}
             onPartClear={clearCharacterPart}
           />
         )}
@@ -2122,6 +2299,8 @@ function App() {
             onRefresh={loadTakeLibrary}
             onSelectTake={selectTake}
             onPlay={playSelectedTake}
+            onQuickTrim={quickTrimSelectedTake}
+            onSaveTakeAsScene={saveSelectedTakeAsScene}
             onExport={downloadTake}
             onAddTakeToTimeline={addTakeToTimeline}
             timeline={productionTimeline}
@@ -2436,7 +2615,7 @@ function SceneObject({ object, selected, onSelect }) {
   const Component = onSelect ? "button" : "div";
   return (
     <Component
-      className={`sceneObject sceneObject-${object.shape} ${selected ? "selected" : ""} ${object.locked ? "locked" : ""}`}
+      className={`sceneObject sceneObject-${object.shape} objectTexture-${object.texturePreset || "paper-grain"} ${selected ? "selected" : ""} ${object.locked ? "locked" : ""}`}
       style={{
         left: `${object.x}%`,
         top: `${object.y}%`,
@@ -2530,6 +2709,7 @@ function ShowBiblePanel({
   sceneSetCount,
   propCount,
   referenceCount,
+  macroCount,
   boardCount,
   timelineCount,
   activeStyle,
@@ -2559,7 +2739,11 @@ function ShowBiblePanel({
         </span>
         <span>
           <strong>{referenceCount}</strong>
-          Assets
+          Credits
+        </span>
+        <span>
+          <strong>{macroCount}</strong>
+          Macros
         </span>
         <span>
           <strong>{boardCount}</strong>
@@ -2606,6 +2790,8 @@ function PerformControls({
   onMouthControlChange,
   mouthSensitivity,
   onMouthSensitivityChange,
+  mouthSmoothing,
+  onMouthSmoothingChange,
   micLive,
   mouthCameraActive,
   onMacroTrigger,
@@ -2755,8 +2941,9 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
-        <h2>Director</h2>
+      <div className="dockGroup cueDeckPanel">
+        <h2>Cue Deck</h2>
+        <small className="controlHint">Fast live buttons for camera punches, lighting shifts, scene beats, and performer reactions.</small>
         <div className="macroGrid">
           {directorActionCatalog.map((action) => (
             <button key={action.id} onClick={() => onDirectorAction(action.id)}>
@@ -2913,6 +3100,20 @@ function PerformControls({
             onChange={(event) => onMouthSensitivityChange(Number(event.target.value))}
           />
         </div>
+        <div className="advancedControl compactRange">
+          <span className="rangeLabel">
+            Audio Smoothing
+            <small>{Math.round(mouthSmoothing * 100)}%</small>
+          </span>
+          <input
+            type="range"
+            min="0.15"
+            max="0.9"
+            step="0.05"
+            value={mouthSmoothing}
+            onChange={(event) => onMouthSmoothingChange(Number(event.target.value))}
+          />
+        </div>
         <small className="controlHint">
           {(self?.state.mouthControl || "audio") === "audio"
             ? micLive
@@ -2971,6 +3172,7 @@ function AssetLibraryPanel({
   const [propName, setPropName] = useState("Weird Prop");
   const [propShape, setPropShape] = useState("bean");
   const [propTint, setPropTint] = useState("#fff2a8");
+  const [propTexture, setPropTexture] = useState("paper-grain");
   const searchQuery = search.trim().toLowerCase();
   const filteredAssets = assets.filter((asset) => {
     const matchesFormat = filter === "all" || asset.format === filter;
@@ -3077,7 +3279,8 @@ function AssetLibraryPanel({
               name: imageName.trim() || "Imported Image",
               imageUrl,
               license: imageLicense,
-              attribution: imageLicense
+              attribution: imageLicense,
+              texturePreset: propTexture
             });
             setImageName("");
             setImageUrl("");
@@ -3106,6 +3309,16 @@ function AssetLibraryPanel({
             ))}
           </select>
         </label>
+        <label>
+          Texture
+          <select value={propTexture} onChange={(event) => setPropTexture(event.target.value)}>
+            {texturePresetOptions.map((texture) => (
+              <option key={texture.id} value={texture.id}>
+                {texture.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <ColorPicker
           label="Prop Color"
           value={propTint}
@@ -3113,10 +3326,17 @@ function AssetLibraryPanel({
         />
         <button
           className="wideAction"
-          onClick={() => onPlaceShape({ name: propName, shape: propShape, tint: propTint })}
+          onClick={() => onPlaceShape({ name: propName, shape: propShape, tint: propTint, texturePreset: propTexture })}
         >
           <Plus size={16} />
           Build Prop
+        </button>
+        <button
+          className="wideAction secondaryAction"
+          onClick={() => onPlaceShape({ name: propName || "Doodle Prop", shape: "scribble", tint: propTint, texturePreset: "photocopy" })}
+        >
+          <Palette size={16} />
+          Doodle Prop
         </button>
       </div>
 
@@ -3227,6 +3447,19 @@ function AssetLibraryPanel({
                   />
                 </label>
                 <label>
+                  Texture
+                  <select
+                    value={object.texturePreset || "paper-grain"}
+                    onChange={(event) => onUpdateSceneObject(object.id, { texturePreset: event.target.value })}
+                  >
+                    {texturePresetOptions.map((texture) => (
+                      <option key={texture.id} value={texture.id}>
+                        {texture.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   X
                   <input
                     type="range"
@@ -3323,6 +3556,8 @@ function SceneLibraryEditor({
   onRefresh,
   onSelectTake,
   onPlay,
+  onQuickTrim,
+  onSaveTakeAsScene,
   onExport,
   onAddTakeToTimeline,
   timeline,
@@ -3416,7 +3651,19 @@ function SceneLibraryEditor({
           <div className="libraryActions">
             <button className={playbackActive ? "active" : ""} onClick={onPlay}>
               <Play size={16} />
-              {playbackActive ? "Playing" : "Play Scene"}
+              {playbackActive ? "Replaying" : "Replay"}
+            </button>
+            <button onClick={() => onQuickTrim("start")}>
+              <ChevronLeft size={16} />
+              Trim In
+            </button>
+            <button onClick={() => onQuickTrim("end")}>
+              <ChevronRight size={16} />
+              Trim Out
+            </button>
+            <button onClick={onSaveTakeAsScene}>
+              <Clapperboard size={16} />
+              Save as Scene
             </button>
             <button onClick={() => onAddTakeToTimeline(selectedTake)}>
               <Plus size={16} />
@@ -3751,8 +3998,11 @@ function CharacterEditor({
   onDesignChange,
   onRandomize,
   onMutate,
+  onStyleMutate,
   onBehaviorChange,
   onPartChange,
+  onPartDuplicate,
+  onPartSwap,
   onPartClear
 }) {
   if (!performer) return null;
@@ -3799,6 +4049,9 @@ function CharacterEditor({
               part={part}
               value={characterParts[part.id]}
               onChange={(patch) => onPartChange(part.id, { label: part.label, ...patch })}
+              onDuplicate={() => onPartDuplicate(part.id)}
+              onSwap={partSwapTargets[part.id] ? () => onPartSwap(part.id) : null}
+              swapName={partSwapTargets[part.id] ? getCatalogItem(characterPartCatalog, partSwapTargets[part.id]).name : ""}
               onClear={() => onPartClear(part.id)}
             />
           ))}
@@ -3883,6 +4136,19 @@ function CharacterEditor({
         </div>
       </div>
 
+      <div className="dockGroup styleMutationPanel">
+        <h2>Style Mutations</h2>
+        <small className="controlHint">One-click pushes for roughness, texture, line weight, collage, patterns, and shadow weirdness.</small>
+        <div className="mutationGrid">
+          {styleMutationControls.map((mutation) => (
+            <button key={mutation.id} onClick={() => onStyleMutate(mutation.id)}>
+              <strong>{mutation.name}</strong>
+              <span>{mutation.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="advancedControl tuningStack">
         <div className="dockGroup">
           <h2>Expert Rig Tuning</h2>
@@ -3952,7 +4218,7 @@ function CharacterEditor({
   );
 }
 
-function PartBuilderRow({ part, value = {}, onChange, onClear }) {
+function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapName, onClear }) {
   const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
   const importPartImage = (file) => {
     if (!file) return;
@@ -4023,6 +4289,21 @@ function PartBuilderRow({ part, value = {}, onChange, onClear }) {
           }
         >
           Doodle
+        </button>
+        <button
+          type="button"
+          disabled={mode === "empty"}
+          onClick={onDuplicate}
+        >
+          Clone
+        </button>
+        <button
+          type="button"
+          disabled={!onSwap}
+          title={swapName ? `Swap with ${swapName}` : "No matching slot"}
+          onClick={onSwap || undefined}
+        >
+          Swap
         </button>
         <button
           type="button"

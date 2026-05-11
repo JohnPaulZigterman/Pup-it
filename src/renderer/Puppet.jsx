@@ -140,8 +140,12 @@ export function Puppet({ performer, isSelf, depthModel }) {
           </>
         ) : null}
         <div className="puppetBody">
+          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" />
           <PuppetPart part={parts.torso} className="partTorso" label="torso" />
           <PuppetPart part={parts.head} className="partHead" label="head" />
+          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" />
+          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" />
+          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" />
           <div className="animalFeature ears" aria-hidden="true" />
           <div className="animalFeature snout" aria-hidden="true" />
           <div className="animalFeature beak" aria-hidden="true" />

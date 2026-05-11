@@ -121,6 +121,40 @@ export function createProjectExport({
   takes,
   exportedAt = new Date().toISOString()
 }) {
+  const credits = [
+    ...assetReferences.map((asset) => ({
+      name: asset.name,
+      sourceUrl: asset.sourceUrl,
+      license: asset.license,
+      attribution: asset.attribution || asset.license || "Check source before publishing."
+    })),
+    ...sceneObjects
+      .filter((object) => object.license || object.attribution)
+      .map((object) => ({
+        name: object.name,
+        sourceUrl: object.sourceUrl,
+        license: object.license || "Show Built",
+        attribution: object.attribution || "Created inside Pup-It."
+      }))
+  ];
+  const captions = storyboardPanels.map((panel, index) => ({
+    index: index + 1,
+    title: panel.title,
+    text: panel.caption || panel.notes || "",
+    duration: panel.duration || "0:05"
+  }));
+  const thumbnail = storyboardPanels[0]
+    ? {
+        source: "storyboard-panel",
+        panelId: storyboardPanels[0].id,
+        title: storyboardPanels[0].title
+      }
+    : {
+        source: "stage",
+        scene,
+        cameraShot
+      };
+
   return {
     schemaVersion: "pup-it.project.v1",
     roomId,
@@ -136,6 +170,19 @@ export function createProjectExport({
     sceneSets,
     floorMarks,
     assetReferences,
+    renderPlan: {
+      videoPath: null,
+      nextRenderer: "browser-preview-now, WebCodecs or FFmpeg worker next",
+      deterministicRender: true,
+      separateAudioTracks: true
+    },
+    publishingPackage: {
+      videoPath: null,
+      thumbnail,
+      captions,
+      credits,
+      licenseMetadata: credits
+    },
     exportedAt,
     storyboardPanels,
     timeline,

@@ -444,7 +444,11 @@ export const characterPartCatalog = [
   { id: "leftArm", name: "Left Arm", label: "L ARM" },
   { id: "rightArm", name: "Right Arm", label: "R ARM" },
   { id: "leftLeg", name: "Left Leg", label: "L LEG" },
-  { id: "rightLeg", name: "Right Leg", label: "R LEG" }
+  { id: "rightLeg", name: "Right Leg", label: "R LEG" },
+  { id: "topAccessory", name: "Top Accessory", label: "HAT" },
+  { id: "leftAccessory", name: "Left Accessory", label: "PROP" },
+  { id: "rightAccessory", name: "Right Accessory", label: "PROP" },
+  { id: "backAppendage", name: "Weird Appendage", label: "??" }
 ];
 
 export const partShapeCatalog = [
@@ -746,6 +750,12 @@ export const objectStyleCatalog = [
     name: "Soft Material",
     description: "Subtle bevels and contact shadows without looking photoreal.",
     className: "object-soft-material"
+  },
+  {
+    id: "textured-cutout",
+    name: "Textured Cutout",
+    description: "Rough paper edges, grain, and a handmade object read.",
+    className: "object-textured-cutout"
   }
 ];
 
