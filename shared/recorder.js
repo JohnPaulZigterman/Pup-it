@@ -52,10 +52,12 @@ export function createTakeExport(room, exportedAt = new Date().toISOString()) {
       pose: performer.state.pose,
       idleMotion: performer.state.idleMotion,
       motionFeel: performer.state.motionFeel,
+      behaviorPreset: performer.state.behaviorPreset,
       mouthControl: performer.state.mouthControl,
       rigConfig: performer.state.rigConfig,
       stylePreset: performer.state.stylePreset,
-      characterDesign: performer.state.characterDesign
+      characterDesign: performer.state.characterDesign,
+      characterParts: performer.state.characterParts
     })),
     tracks: {
       motion: room.events,

@@ -1,12 +1,12 @@
 export const characterCatalog = [
   {
     id: "bear",
-    name: "Bear",
-    archetype: "bear",
-    rig: "full-body",
+    name: "Biped Rig",
+    archetype: "rig-biped",
+    rig: "rig-model",
     stylePreset: "toon-real",
-    color: "#9a6a4f",
-    accent: "#f2c878",
+    color: "#f5f1e8",
+    accent: "#8db7ff",
     rigConfig: {
       body: "round",
       limbs: "rubber-hose",
@@ -20,12 +20,12 @@ export const characterCatalog = [
   },
   {
     id: "mouse",
-    name: "Mouse",
-    archetype: "mouse",
-    rig: "full-body",
+    name: "Small Biped Rig",
+    archetype: "rig-small",
+    rig: "rig-model",
     stylePreset: "soft-ink",
-    color: "#b7aec5",
-    accent: "#f0b9ca",
+    color: "#f5f1e8",
+    accent: "#c7a8ff",
     rigConfig: {
       body: "tall",
       limbs: "noodle",
@@ -39,11 +39,11 @@ export const characterCatalog = [
   },
   {
     id: "owl",
-    name: "Owl",
-    archetype: "owl",
-    rig: "full-body",
+    name: "Winged Rig",
+    archetype: "rig-winged",
+    rig: "rig-model",
     stylePreset: "stucco-toon",
-    color: "#8aa9d6",
+    color: "#f5f1e8",
     accent: "#f3d98b",
     rigConfig: {
       body: "round",
@@ -58,12 +58,12 @@ export const characterCatalog = [
   },
   {
     id: "snake",
-    name: "Snake",
-    archetype: "snake",
-    rig: "full-body",
+    name: "Spline Rig",
+    archetype: "rig-spline",
+    rig: "rig-model",
     stylePreset: "borderless-painterly",
-    color: "#88caa2",
-    accent: "#39504c",
+    color: "#f5f1e8",
+    accent: "#88caa2",
     rigConfig: {
       body: "tall",
       limbs: "stick",
@@ -77,11 +77,11 @@ export const characterCatalog = [
   },
   {
     id: "fuzzball",
-    name: "Fuzzball",
-    archetype: "fuzzball",
-    rig: "abstract",
+    name: "Single Shape Mouth Rig",
+    archetype: "rig-single",
+    rig: "rig-model",
     stylePreset: "adult-surreal",
-    color: "#2d2b36",
+    color: "#f5f1e8",
     accent: "#f6d94f",
     rigConfig: {
       body: "round",
@@ -91,14 +91,14 @@ export const characterCatalog = [
       armLength: 18,
       legLength: 16,
       walkCycle: "floaty",
-      mouthStyle: "minimal"
+      mouthStyle: "flap"
     }
   },
   {
     id: "moonblock",
-    name: "Moonblock",
-    archetype: "moonblock",
-    rig: "abstract",
+    name: "Block Rig",
+    archetype: "rig-block",
+    rig: "rig-model",
     stylePreset: "abstract-block",
     color: "#63b7d8",
     accent: "#f4e36f",
@@ -115,9 +115,9 @@ export const characterCatalog = [
   },
   {
     id: "shard",
-    name: "Shard",
-    archetype: "shard",
-    rig: "abstract",
+    name: "Angular Rig",
+    archetype: "rig-angular",
+    rig: "rig-model",
     stylePreset: "adult-surreal",
     color: "#d76d58",
     accent: "#fff2a8",
@@ -134,9 +134,9 @@ export const characterCatalog = [
   },
   {
     id: "blobstack",
-    name: "Blob Stack",
-    archetype: "blobstack",
-    rig: "abstract",
+    name: "Stack Rig",
+    archetype: "rig-stack",
+    rig: "rig-model",
     stylePreset: "borderless-painterly",
     color: "#8fd8b5",
     accent: "#c7a8ff",
@@ -153,9 +153,9 @@ export const characterCatalog = [
   },
   {
     id: "staticling",
-    name: "Staticling",
-    archetype: "staticling",
-    rig: "abstract",
+    name: "Panel Rig",
+    archetype: "rig-panel",
+    rig: "rig-model",
     stylePreset: "paper-cutout",
     color: "#f5f1e8",
     accent: "#8db7ff",
@@ -178,33 +178,42 @@ export const sceneCatalog = [
     name: "Kitchen Moon",
     className: "sceneStudio",
     perspective: "front-stage",
-    perspectiveNote: "Front-facing set with theatrical depth. Lateral movement compresses near the horizon.",
-    horizon: 20,
-    foreground: 82,
-    performerHorizonBuffer: 8,
-    vanishingX: 50
+    perspectiveNote: "Large indoor stage. Movement tracks the room focus line instead of the back wall art.",
+    horizonSource: "focus-point",
+    focusLabel: "Room focus",
+    horizon: 56,
+    foreground: 84,
+    performerHorizonBuffer: 2,
+    vanishingX: 50,
+    focusY: 56
   },
   {
     id: "street",
     name: "Soft Alley",
     className: "sceneStreet",
     perspective: "street-depth",
-    perspectiveNote: "Street-depth blocking. Moving away subtly pulls characters toward the vanishing point.",
-    horizon: 20,
-    foreground: 82,
-    performerHorizonBuffer: 8,
-    vanishingX: 55
+    perspectiveNote: "Outdoor scene. Movement tracks the visible horizon where the alley meets the sky.",
+    horizonSource: "visible-horizon",
+    focusLabel: "Visible horizon",
+    horizon: 48,
+    foreground: 84,
+    performerHorizonBuffer: 2,
+    vanishingX: 55,
+    focusY: 48
   },
   {
     id: "space",
     name: "Dream Static",
     className: "sceneSpace",
     perspective: "surreal-float",
-    perspectiveNote: "Floaty surreal space with gentler scale changes and looser floor logic.",
-    horizon: 20,
-    foreground: 82,
-    performerHorizonBuffer: 8,
-    vanishingX: 50
+    perspectiveNote: "Surreal scene. Movement uses a soft focus band so characters drift without flying away.",
+    horizonSource: "soft-focus",
+    focusLabel: "Soft focus band",
+    horizon: 57,
+    foreground: 84,
+    performerHorizonBuffer: 1,
+    vanishingX: 50,
+    focusY: 57
   }
 ];
 
@@ -344,6 +353,109 @@ export const idleMotionCatalog = [
   { id: "alive", name: "Alive" },
   { id: "subtle", name: "Subtle" },
   { id: "held", name: "Held" }
+];
+
+export const behaviorPresetCatalog = [
+  {
+    id: "none",
+    name: "None",
+    description: "No extra behavior. Good for precise acting."
+  },
+  {
+    id: "wobble",
+    name: "Wobble",
+    description: "A gentle handmade body wobble."
+  },
+  {
+    id: "jitter",
+    name: "Jitter",
+    description: "Nervous two-frame shake for rough comedy energy."
+  },
+  {
+    id: "float",
+    name: "Float",
+    description: "Slow drifting puppet behavior for strange or dreamy characters."
+  },
+  {
+    id: "sticker",
+    name: "Sticker",
+    description: "Held cutout feel with chunky offset presence."
+  }
+];
+
+export const mutationRecipeCatalog = [
+  {
+    id: "odd-body",
+    name: "Odd Body",
+    description: "Push the silhouette first, then keep whatever feels funny.",
+    stylePresets: ["abstract-block", "adult-surreal", "paper-diorama", "borderless-collage"],
+    bodies: ["blob", "triangle", "square", "round"],
+    limbs: ["stick", "hinged", "noodle"],
+    walkCycles: ["stiff", "floaty", "rubber"],
+    mouthStyles: ["minimal", "shape"],
+    behaviorPreset: "wobble",
+    motionFeel: "loose",
+    colors: ["#de4d3f", "#245c9c", "#f1c84b", "#312b38", "#ffe66d"]
+  },
+  {
+    id: "rough-copy",
+    name: "Rough Copy",
+    description: "Adds photocopy grit, offbeat color, and twitchy movement.",
+    stylePresets: ["adult-surreal", "paper-cutout", "wallpaper-cutout"],
+    bodies: ["round", "tall", "blob"],
+    limbs: ["stick", "rubber-hose"],
+    walkCycles: ["stiff", "rubber"],
+    mouthStyles: ["flap", "minimal"],
+    behaviorPreset: "jitter",
+    motionFeel: "direct",
+    colors: ["#2d2b36", "#e96f4c", "#fff2a8", "#8db7ff", "#f5f1e8"]
+  },
+  {
+    id: "soft-weird",
+    name: "Soft Weird",
+    description: "Keeps the character inviting but unmistakably homemade.",
+    stylePresets: ["soft-ink", "borderless-painterly", "stucco-toon", "toon-real"],
+    bodies: ["round", "blob", "tall"],
+    limbs: ["noodle", "rubber-hose"],
+    walkCycles: ["floaty", "rubber"],
+    mouthStyles: ["shape", "flap"],
+    behaviorPreset: "float",
+    motionFeel: "smooth",
+    colors: ["#8fd8b5", "#c7a8ff", "#f26f5c", "#f8e6a0", "#436b63"]
+  },
+  {
+    id: "paper-guy",
+    name: "Paper Guy",
+    description: "Turns the puppet into a readable cutout with stage charm.",
+    stylePresets: ["paper-diorama", "flat-paper", "paper-cutout", "puppet-collage"],
+    bodies: ["square", "round", "triangle"],
+    limbs: ["hinged", "stick"],
+    walkCycles: ["stiff", "rubber"],
+    mouthStyles: ["flap", "shape"],
+    behaviorPreset: "sticker",
+    motionFeel: "direct",
+    colors: ["#f2d16b", "#78b6e8", "#f16f5c", "#6fb98f", "#845c44"]
+  }
+];
+
+export const characterPartCatalog = [
+  { id: "head", name: "Head", label: "HD" },
+  { id: "torso", name: "Torso", label: "BODY" },
+  { id: "leftArm", name: "Left Arm", label: "L ARM" },
+  { id: "rightArm", name: "Right Arm", label: "R ARM" },
+  { id: "leftLeg", name: "Left Leg", label: "L LEG" },
+  { id: "rightLeg", name: "Right Leg", label: "R LEG" }
+];
+
+export const partShapeCatalog = [
+  { id: "circle", name: "Circle" },
+  { id: "oval", name: "Oval" },
+  { id: "bean", name: "Bean" },
+  { id: "block", name: "Block" },
+  { id: "triangle", name: "Triangle" },
+  { id: "noodle", name: "Noodle" },
+  { id: "scribble", name: "Scribble" },
+  { id: "star", name: "Star" }
 ];
 
 export const expressionCatalog = [

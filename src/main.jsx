@@ -49,10 +49,12 @@ import {
   lightingPresetCatalog
 } from "../shared/production.js";
 import {
-  characterCatalog,
   animationStyleCatalog,
   backgroundThemeCatalog,
+  behaviorPresetCatalog,
   bodyShapeCatalog,
+  characterPartCatalog,
+  characterCatalog,
   characterColorSwatches,
   expressionCatalog,
   getCatalogItem,
@@ -61,8 +63,10 @@ import {
   macroCatalog,
   motionFeelCatalog,
   mouthStyleCatalog,
+  mutationRecipeCatalog,
   objectStyleCatalog,
   originalNameParts,
+  partShapeCatalog,
   perspectiveCatalog,
   poseCatalog,
   sceneCatalog,
@@ -94,8 +98,8 @@ const tutorialSteps = [
   },
   {
     mode: "build",
-    title: "Shape A Character",
-    body: "Build mode changes the current performer without breaking their identity: species, colors, rig parts, animation style, walk cycle, and mouth style stay reusable."
+    title: "Build The Space",
+    body: "Choose a rig model, then assemble the puppet from shapes, doodle placeholders, imported images, styles, parts, and behaviors."
   },
   {
     mode: "storyboard",
@@ -194,7 +198,7 @@ const shotTemplateCatalog = [
     marks: [
       { id: "hero", label: "H", name: "Hero Reaction", x: 52, y: 66 },
       { id: "off", label: "O", name: "Offscreen Setup", x: 30, y: 64 },
-      { id: "back", label: "B", name: "Back Wall", x: 50, y: 38 }
+      { id: "back", label: "B", name: "Back Wall", x: 50, y: 60 }
     ]
   },
   {
@@ -209,7 +213,7 @@ const shotTemplateCatalog = [
     marks: [
       { id: "host", label: "HOST", name: "Host", x: 35, y: 68 },
       { id: "guest", label: "GUEST", name: "Guest", x: 61, y: 61 },
-      { id: "walkby", label: "W", name: "Walk-by", x: 78, y: 48 },
+      { id: "walkby", label: "W", name: "Walk-by", x: 78, y: 54 },
       { id: "near", label: "N", name: "Near Lens", x: 48, y: 77 }
     ]
   },
@@ -248,6 +252,11 @@ function pickRandom(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+function pickCatalogId(items) {
+  const item = pickRandom(items);
+  return item.id || item;
+}
+
 function makeOriginalDesign() {
   const name = `${pickRandom(originalNameParts.first)} ${pickRandom(originalNameParts.second)}`;
   const color = pickRandom(characterColorSwatches);
@@ -271,6 +280,35 @@ function makeOriginalRig() {
     legLength: Math.floor(18 + Math.random() * 34),
     walkCycle: pickRandom(walkCycleCatalog).id,
     mouthStyle: pickRandom(mouthStyleCatalog).id
+  };
+}
+
+function makeMutationDesign(recipe, fallbackName) {
+  const color = pickRandom(recipe.colors || characterColorSwatches);
+  let accent = pickRandom(recipe.colors || characterColorSwatches);
+  if (accent === color) accent = "#fff2a8";
+
+  return {
+    name: fallbackName,
+    color,
+    accent
+  };
+}
+
+function makeMutationRig(recipe, baseRig = {}) {
+  const arms = recipe.limbs?.some((limb) => limb !== "stick") ? Math.random() > 0.18 : Math.random() > 0.44;
+  const legs = recipe.walkCycles?.includes("floaty") ? Math.random() > 0.48 : Math.random() > 0.24;
+
+  return {
+    ...baseRig,
+    body: pickCatalogId(recipe.bodies || bodyShapeCatalog),
+    limbs: pickCatalogId(recipe.limbs || limbStyleCatalog),
+    arms,
+    legs,
+    armLength: Math.floor(20 + Math.random() * 44),
+    legLength: Math.floor(16 + Math.random() * 42),
+    walkCycle: pickCatalogId(recipe.walkCycles || walkCycleCatalog),
+    mouthStyle: pickCatalogId(recipe.mouthStyles || mouthStyleCatalog)
   };
 }
 
@@ -328,14 +366,16 @@ function makePreviewPerformers(take) {
       character: performer.character,
       state: createPerformerState({
         x: 34 + index * 18,
-        y: 60,
+        y: 68,
         pose: performer.pose,
         idleMotion: performer.idleMotion,
         motionFeel: performer.motionFeel || "smooth",
+        behaviorPreset: performer.behaviorPreset || "none",
         mouthControl: performer.mouthControl,
         rigConfig: performer.rigConfig,
         stylePreset: performer.stylePreset,
         characterDesign: performer.characterDesign,
+        characterParts: performer.characterParts,
         blinkSeed: index * 337
       })
     }))
@@ -762,7 +802,16 @@ function App() {
   const moveSelfToMark = (markId) => {
     const mark = floorMarks.find((item) => item.id === markId);
     if (!mark) return;
-    updateSelf({ x: mark.x, y: mark.y, walking: false });
+    const walkableTop = selectedScene.horizon + (selectedScene.performerHorizonBuffer || 0);
+    updateSelf({
+      x: clamp(mark.x, 5, 92),
+      y: clamp(mark.y, walkableTop, selectedScene.foreground),
+      walking: false,
+      motionVx: 0,
+      motionVy: 0,
+      groundSpeed: 0,
+      travelLean: 0
+    });
     setStatus(`Snapped performer to ${mark.name}.`);
   };
   const setCurrentPositionAsMark = (markId) => {
@@ -828,12 +877,71 @@ function App() {
       }
     });
   };
+  const updateCharacterPart = (partId, patch) => {
+    if (!self) return;
+    const currentParts = self.state.characterParts || {};
+    const currentPart = currentParts[partId] || {};
+    updateSelf({
+      characterParts: {
+        ...currentParts,
+        [partId]: {
+          ...currentPart,
+          ...patch
+        }
+      }
+    });
+  };
+  const clearCharacterPart = (partId) => {
+    if (!self) return;
+    const currentParts = self.state.characterParts || {};
+    const nextParts = { ...currentParts };
+    delete nextParts[partId];
+    updateSelf({ characterParts: nextParts });
+  };
   const randomizeCharacterDesign = () => {
     updateSelf({
       characterDesign: makeOriginalDesign(),
       rigConfig: makeOriginalRig(),
-      stylePreset: pickRandom(animationStyleCatalog).id
+      stylePreset: pickRandom(animationStyleCatalog).id,
+      behaviorPreset: pickRandom(behaviorPresetCatalog).id,
+      motionFeel: pickRandom(motionFeelCatalog).id,
+      characterParts: Object.fromEntries(
+        characterPartCatalog.map((part) => [
+          part.id,
+          {
+            mode: "shape",
+            shape: pickRandom(partShapeCatalog).id,
+            label: part.label
+          }
+        ])
+      )
     });
+  };
+  const applyCharacterMutation = (recipeId) => {
+    if (!self) return;
+    const recipe = getCatalogItem(mutationRecipeCatalog, recipeId);
+    const baseCharacter = getCatalogItem(characterCatalog, self.character);
+    const currentRig = {
+      ...baseCharacter.rigConfig,
+      ...self.state.rigConfig
+    };
+    const fallbackName =
+      self.state.characterDesign?.name ||
+      `${pickRandom(originalNameParts.first)} ${pickRandom(originalNameParts.second)}`;
+
+    updateSelf({
+      characterDesign: makeMutationDesign(recipe, fallbackName),
+      rigConfig: makeMutationRig(recipe, currentRig),
+      stylePreset: pickCatalogId(recipe.stylePresets),
+      behaviorPreset: recipe.behaviorPreset || "none",
+      motionFeel: recipe.motionFeel || self.state.motionFeel || "smooth",
+      characterParts: {
+        ...(self.state.characterParts || {}),
+        head: self.state.characterParts?.head || { mode: "shape", shape: pickCatalogId(partShapeCatalog), label: "HD" },
+        torso: self.state.characterParts?.torso || { mode: "shape", shape: pickCatalogId(partShapeCatalog), label: "BODY" }
+      }
+    });
+    setStatus(`${recipe.name} mutation applied. Keep what works, change what bothers you.`);
   };
 
   const addSceneObjectFromAsset = (asset) => {
@@ -1429,7 +1537,17 @@ function App() {
     setObjectStyle(template.objectStyle);
     setFloorMarks(template.marks.map((mark) => ({ ...mark })));
     if (template.marks[0] && self) {
-      updateSelf({ x: template.marks[0].x, y: template.marks[0].y, walking: false });
+      const templateScene = getCatalogItem(sceneCatalog, template.scene);
+      const walkableTop = templateScene.horizon + (templateScene.performerHorizonBuffer || 0);
+      updateSelf({
+        x: clamp(template.marks[0].x, 5, 92),
+        y: clamp(template.marks[0].y, walkableTop, templateScene.foreground),
+        walking: false,
+        motionVx: 0,
+        motionVy: 0,
+        groundSpeed: 0,
+        travelLean: 0
+      });
     }
     setMode("perform");
     setStatus(`${template.name} shot template loaded with ${template.marks.length} floor marks.`);
@@ -1464,6 +1582,8 @@ function App() {
   const commandItems = [
     { id: "home", label: "Open show dashboard", keywords: "setup home project show", action: () => setMode("home") },
     { id: "cast", label: "Edit current character", keywords: "cast character rig build customize", action: () => setMode("build") },
+    { id: "playground", label: "Open character playground", keywords: "playground weird mutate original character toybox", action: () => setMode("build") },
+    { id: "mutate", label: "Make current character weirder", keywords: "mutate random weird rough original", action: () => { setMode("build"); applyCharacterMutation("odd-body"); } },
     { id: "sets", label: "Search settings and props", keywords: "assets objects settings props backgrounds", action: () => openAssetSearch("", "setting") },
     { id: "shots", label: "Open shot templates", keywords: "shot template blocking marks two shot reaction", action: () => setMode("perform") },
     { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
@@ -1610,7 +1730,7 @@ function App() {
               <input value={name} onChange={(event) => setName(event.target.value)} />
             </label>
             <label>
-              Character
+              Rig Model
               <select value={character} onChange={(event) => setCharacter(event.target.value)}>
                 {characterCatalog.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -1703,6 +1823,16 @@ function App() {
             ? "storyboardStage"
             : `stage perspective-${selectedScene.perspective || "front-stage"} ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
         }
+        style={
+          mode === "home" || mode === "storyboard"
+            ? undefined
+            : {
+                "--scene-horizon": `${selectedScene.horizon}%`,
+                "--scene-foreground": `${selectedScene.foreground}%`,
+                "--scene-focus-x": `${selectedScene.vanishingX || 50}%`,
+                "--scene-focus-y": `${selectedScene.focusY || selectedScene.horizon}%`
+              }
+        }
         onPointerMove={handleStagePointerMove}
         onPointerLeave={handleStagePointerLeave}
       >
@@ -1730,7 +1860,8 @@ function App() {
             <div className="stageTexture" />
             <div className="stageCamera">
               <div className="stageLighting" />
-              <div className="horizonGuide" />
+              <div className="horizonGuide" data-label={selectedScene.focusLabel || "Focus"} />
+              <div className="focusPoint" aria-hidden="true" />
               <div className="setFloor" />
               {floorMarks.map((mark) => (
                 <FloorMark key={mark.id} mark={mark} onActivate={moveSelfToMark} />
@@ -1806,6 +1937,10 @@ function App() {
             onStyleChange={updateCharacterStyle}
             onDesignChange={updateCharacterDesign}
             onRandomize={randomizeCharacterDesign}
+            onMutate={applyCharacterMutation}
+            onBehaviorChange={(behaviorPreset) => updateSelf({ behaviorPreset })}
+            onPartChange={updateCharacterPart}
+            onPartClear={clearCharacterPart}
           />
         )}
         {mode === "assets" && (
@@ -2008,7 +2143,7 @@ function ShowDashboard({
         <div>
           <span className="eyebrow">Production Home</span>
           <h1>{showName}</h1>
-          <p>Start with a reusable show format, rehearse a take, then move straight into review and export.</p>
+          <p>Make a weird thing, perform it live, then turn it into a reusable show.</p>
         </div>
         <div className="recordFlow">
           <span>Rehearse</span>
@@ -2055,7 +2190,7 @@ function ShowDashboard({
           <div className="dashboardActions">
             <button onClick={() => onModeChange("build")}>
               <Sparkles size={16} />
-              Design Cast
+              Playground
             </button>
             <button onClick={() => onAssetSearch("furniture", "object")}>
               <Library size={16} />
@@ -3080,11 +3215,18 @@ function PanelFrame({ panel }) {
   return (
     <div
       className={`panelFrame perspective-${panelScene.perspective || "front-stage"} ${panelScene.className} ${panelShot.className} ${panelLighting.className} ${panelBackgroundTheme.className} ${panelObjectStyle.className} texture-${panel.texturePreset || panelBackgroundTheme.texturePreset || "paper-grain"}`}
+      style={{
+        "--scene-horizon": `${panelScene.horizon}%`,
+        "--scene-foreground": `${panelScene.foreground}%`,
+        "--scene-focus-x": `${panelScene.vanishingX || 50}%`,
+        "--scene-focus-y": `${panelScene.focusY || panelScene.horizon}%`
+      }}
     >
       <div className="panelStageInner stageCamera">
         <div className="stageTexture" />
         <div className="stageLighting" />
-        <div className="horizonGuide" />
+        <div className="horizonGuide" data-label={panelScene.focusLabel || "Focus"} />
+        <div className="focusPoint" aria-hidden="true" />
         <div className="setFloor" />
         {(panel.floorMarks || []).map((mark) => (
           <FloorMark key={mark.id} mark={mark} onActivate={() => {}} />
@@ -3269,15 +3411,28 @@ function StoryboardEditor({
   );
 }
 
-function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange, onRandomize }) {
+function CharacterEditor({
+  performer,
+  onRigChange,
+  onStyleChange,
+  onDesignChange,
+  onRandomize,
+  onMutate,
+  onBehaviorChange,
+  onPartChange,
+  onPartClear
+}) {
   if (!performer) return null;
 
   const baseCharacter = getCatalogItem(characterCatalog, performer.character);
   const rig = { ...baseCharacter.rigConfig, ...performer.state.rigConfig };
   const stylePreset = performer.state.stylePreset || baseCharacter.stylePreset;
   const selectedStyle = getCatalogItem(animationStyleCatalog, stylePreset);
+  const behaviorPreset = performer.state.behaviorPreset || "none";
+  const characterParts = performer.state.characterParts || {};
+  const hasParts = Object.values(characterParts).some((part) => part?.source || part?.shape || part?.mode === "drawn");
   const design = {
-    name: performer.state.characterDesign?.name || `${baseCharacter.name} Original`,
+    name: performer.state.characterDesign?.name || `${baseCharacter.name} Puppet`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
     accent: performer.state.characterDesign?.accent || baseCharacter.accent
   };
@@ -3285,22 +3440,52 @@ function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange
   return (
     <div className="characterEditor">
       <div className="dockGroup">
-        <h2>Character Editor</h2>
+        <h2>Build The Space</h2>
         <div className="editorHeader">
           <Palette size={18} />
           <div>
             <strong>{design.name}</strong>
-            <small>Make the preset weirder, then make it yours.</small>
+            <small>
+              {hasParts
+                ? "Keep assembling. Every part makes the rig less stock."
+                : "This is only a rig. Add shapes, doodles, or images to make the character yours."}
+            </small>
           </div>
         </div>
       </div>
 
+      <div className="dockGroup buildPartsPanel">
+        <h2>Assemble Parts</h2>
+        <small className="controlHint">
+          Start with simple shapes, mark a rough drawn part, or paste an image URL for each body piece.
+        </small>
+        <div className="partBuilderList">
+          {characterPartCatalog.map((part) => (
+            <PartBuilderRow
+              key={part.id}
+              part={part}
+              value={characterParts[part.id]}
+              onChange={(patch) => onPartChange(part.id, { label: part.label, ...patch })}
+              onClear={() => onPartClear(part.id)}
+            />
+          ))}
+        </div>
+      </div>
+
       <div className="dockGroup originalPanel">
-        <h2>Make Original</h2>
+        <h2>Playground Lab</h2>
         <button className="wideAction" onClick={onRandomize}>
           <Shuffle size={16} />
           Weird Starter
         </button>
+        <div className="mutationGrid">
+          {mutationRecipeCatalog.map((recipe) => (
+            <button key={recipe.id} onClick={() => onMutate(recipe.id)}>
+              <strong>{recipe.name}</strong>
+              <span>{recipe.description}</span>
+            </button>
+          ))}
+        </div>
         <label>
           Character Name
           <input
@@ -3319,6 +3504,23 @@ function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange
           value={design.accent}
           onChange={(accent) => onDesignChange({ accent })}
         />
+      </div>
+
+      <div className="dockGroup">
+        <h2>Behavior</h2>
+        <div className="behaviorGrid">
+          {behaviorPresetCatalog.map((behavior) => (
+            <button
+              key={behavior.id}
+              className={behaviorPreset === behavior.id ? "selected" : ""}
+              title={behavior.description}
+              onClick={() => onBehaviorChange(behavior.id)}
+            >
+              {behavior.name}
+            </button>
+          ))}
+        </div>
+        <small className="controlHint">Tiny built-in systems give a character personality before you animate.</small>
       </div>
 
       <div className="dockGroup">
@@ -3348,65 +3550,129 @@ function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange
         </div>
       </div>
 
-      <EditorSelect
-        label="Body"
-        value={rig.body}
-        options={bodyShapeCatalog}
-        onChange={(body) => onRigChange({ body })}
-      />
-      <EditorSelect
-        label="Limbs"
-        value={rig.limbs}
-        options={limbStyleCatalog}
-        onChange={(limbs) => onRigChange({ limbs })}
-      />
-      <EditorSelect
-        label="Walk Cycle"
-        value={rig.walkCycle}
-        options={walkCycleCatalog}
-        onChange={(walkCycle) => onRigChange({ walkCycle })}
-      />
-      <EditorSelect
-        label="Mouth"
-        value={rig.mouthStyle}
-        options={mouthStyleCatalog}
-        onChange={(mouthStyle) => onRigChange({ mouthStyle })}
-      />
+      <div className="advancedControl tuningStack">
+        <div className="dockGroup">
+          <h2>Expert Rig Tuning</h2>
+          <small className="controlHint">Use these once the broad playground buttons get you close.</small>
+        </div>
+        <EditorSelect
+          label="Body"
+          value={rig.body}
+          options={bodyShapeCatalog}
+          onChange={(body) => onRigChange({ body })}
+        />
+        <EditorSelect
+          label="Limbs"
+          value={rig.limbs}
+          options={limbStyleCatalog}
+          onChange={(limbs) => onRigChange({ limbs })}
+        />
+        <EditorSelect
+          label="Walk Cycle"
+          value={rig.walkCycle}
+          options={walkCycleCatalog}
+          onChange={(walkCycle) => onRigChange({ walkCycle })}
+        />
+        <EditorSelect
+          label="Mouth"
+          value={rig.mouthStyle}
+          options={mouthStyleCatalog}
+          onChange={(mouthStyle) => onRigChange({ mouthStyle })}
+        />
 
-      <div className="dockGroup">
-        <h2>Parts</h2>
-        <label className="toggleRow">
-          <input
-            type="checkbox"
-            checked={rig.arms}
-            onChange={(event) => onRigChange({ arms: event.target.checked })}
-          />
-          Arms
-        </label>
-        <label className="toggleRow">
-          <input
-            type="checkbox"
-            checked={rig.legs}
-            onChange={(event) => onRigChange({ legs: event.target.checked })}
-          />
-          Legs
-        </label>
+        <div className="dockGroup">
+          <h2>Parts</h2>
+          <label className="toggleRow">
+            <input
+              type="checkbox"
+              checked={rig.arms}
+              onChange={(event) => onRigChange({ arms: event.target.checked })}
+            />
+            Arms
+          </label>
+          <label className="toggleRow">
+            <input
+              type="checkbox"
+              checked={rig.legs}
+              onChange={(event) => onRigChange({ legs: event.target.checked })}
+            />
+            Legs
+          </label>
+        </div>
+
+        <EditorRange
+          label="Arm Length"
+          value={rig.armLength}
+          min={22}
+          max={64}
+          onChange={(armLength) => onRigChange({ armLength })}
+        />
+        <EditorRange
+          label="Leg Length"
+          value={rig.legLength}
+          min={18}
+          max={58}
+          onChange={(legLength) => onRigChange({ legLength })}
+        />
       </div>
+    </div>
+  );
+}
 
-      <EditorRange
-        label="Arm Length"
-        value={rig.armLength}
-        min={22}
-        max={64}
-        onChange={(armLength) => onRigChange({ armLength })}
+function PartBuilderRow({ part, value = {}, onChange, onClear }) {
+  const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
+
+  return (
+    <div className="partBuilderRow">
+      <div>
+        <strong>{part.name}</strong>
+        <small>{mode === "empty" ? "stick guide" : mode}</small>
+      </div>
+      <select
+        value={value.shape || ""}
+        onChange={(event) =>
+          onChange({
+            mode: "shape",
+            shape: event.target.value,
+            source: ""
+          })
+        }
+      >
+        <option value="">Shape...</option>
+        {partShapeCatalog.map((shape) => (
+          <option key={shape.id} value={shape.id}>
+            {shape.name}
+          </option>
+        ))}
+      </select>
+      <input
+        value={value.source || ""}
+        placeholder="Image URL"
+        onChange={(event) =>
+          onChange({
+            mode: "image",
+            source: event.target.value,
+            shape: value.shape || "oval"
+          })
+        }
       />
-      <EditorRange
-        label="Leg Length"
-        value={rig.legLength}
-        min={18}
-        max={58}
-        onChange={(legLength) => onRigChange({ legLength })}
-      />
+      <div className="partBuilderActions">
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              mode: "drawn",
+              source: "",
+              shape: "scribble"
+            })
+          }
+        >
+          Doodle
+        </button>
+        <button type="button" onClick={onClear}>
+          Clear
+        </button>
+      </div>
     </div>
   );
 }

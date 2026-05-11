@@ -6,7 +6,28 @@ import {
   poseCatalog,
   styleAdapterCatalog
 } from "../../shared/catalogs.js";
-import { getDepthScale } from "../../shared/depth.js";
+import { getDepthProgress, getDepthScale } from "../../shared/depth.js";
+
+function hasCustomPart(part) {
+  return Boolean(part?.source || part?.mode === "drawn" || part?.shape);
+}
+
+function PuppetPart({ part, className, label }) {
+  if (!hasCustomPart(part)) return null;
+
+  if (part.source) {
+    return <img className={`puppetPart ${className}`} src={part.source} alt="" draggable="false" />;
+  }
+
+  return (
+    <span
+      className={`puppetPart assembledPart partShape-${part.shape || "scribble"} ${className}`}
+      aria-hidden="true"
+    >
+      {part.label || label}
+    </span>
+  );
+}
 
 export function Puppet({ performer, isSelf, depthModel }) {
   const character = getCatalogItem(characterCatalog, performer.character);
@@ -14,6 +35,8 @@ export function Puppet({ performer, isSelf, depthModel }) {
   const pose = getCatalogItem(poseCatalog, performer.state.pose);
   const { state } = performer;
   const design = state.characterDesign || {};
+  const parts = state.characterParts || {};
+  const hasUserParts = Object.values(parts).some(hasCustomPart);
   const rig = { ...character.rigConfig, ...state.rigConfig };
   const stylePreset = state.stylePreset || character.stylePreset;
   const adapter = getCatalogItem(styleAdapterCatalog, stylePreset);
@@ -26,10 +49,7 @@ export function Puppet({ performer, isSelf, depthModel }) {
   const mouthOpen = Math.max(rawMouthOpen, state.speaking ? 0.16 : 0);
   const mouthLevel =
     mouthOpen > 0.72 ? "wide" : mouthOpen > 0.38 ? "medium" : mouthOpen > 0.1 ? "small" : "closed";
-  const depth = Math.max(
-    0,
-    Math.min(1, (state.y - (depthModel?.horizon || 20)) / ((depthModel?.foreground || 82) - (depthModel?.horizon || 20)))
-  );
+  const depth = getDepthProgress(state.y, depthModel);
   const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
   const actingLean = pose.bodyLean + (state.travelLean || 0);
   const motionSquash = state.walking ? 1 + Math.min(0.035, (state.groundSpeed || 0) * 0.018) : 1;
@@ -40,11 +60,14 @@ export function Puppet({ performer, isSelf, depthModel }) {
         "puppet",
         `body-${rig.body}`,
         `archetype-${character.archetype || character.id}`,
+        character.rig === "rig-model" ? "rigModel" : "",
+        hasUserParts ? "puppetCustom" : "needsParts",
         `limbs-${rig.limbs}`,
         `style-${stylePreset}`,
         `texture-${adapter.texturePreset || "paper-grain"}`,
         adapter.borderless ? "style-borderless" : "",
         `idle-${state.idleMotion}`,
+        `behavior-${state.behaviorPreset || "none"}`,
         `mouth-${mouthLevel}`,
         canIdle ? "idle-breathing" : "",
         canBlink ? "auto-blink" : "",
@@ -93,17 +116,27 @@ export function Puppet({ performer, isSelf, depthModel }) {
       <div className="puppetRig">
         {rig.arms ? (
           <>
-            <div className="limb arm armLeft" />
-            <div className="limb arm armRight" />
+            <div className="limb arm armLeft">
+              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" />
+            </div>
+            <div className="limb arm armRight">
+              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" />
+            </div>
           </>
         ) : null}
         {rig.legs ? (
           <>
-            <div className="limb leg legLeft" />
-            <div className="limb leg legRight" />
+            <div className="limb leg legLeft">
+              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" />
+            </div>
+            <div className="limb leg legRight">
+              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" />
+            </div>
           </>
         ) : null}
         <div className="puppetBody">
+          <PuppetPart part={parts.torso} className="partTorso" label="torso" />
+          <PuppetPart part={parts.head} className="partHead" label="head" />
           <div className="animalFeature ears" aria-hidden="true" />
           <div className="animalFeature snout" aria-hidden="true" />
           <div className="animalFeature beak" aria-hidden="true" />

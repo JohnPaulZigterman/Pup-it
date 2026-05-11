@@ -1,15 +1,17 @@
 import { motionFeelCatalog } from "./catalogs.js";
 
 export const defaultDepthModel = {
-  horizon: 20,
-  foreground: 82,
-  performerHorizonBuffer: 8,
+  horizon: 56,
+  foreground: 84,
+  performerHorizonBuffer: 2,
   minScale: 0.42,
   maxScale: 1.46,
   minTrim: 0.82,
   maxTrim: 1.18,
   perspective: "front-stage",
-  vanishingX: 50
+  horizonSource: "focus-point",
+  vanishingX: 50,
+  focusY: 56
 };
 
 export const perspectiveProfiles = {
@@ -19,9 +21,10 @@ export const perspectiveProfiles = {
     lateralNear: 1,
     verticalFar: 0.72,
     verticalNear: 1,
-    convergence: 0.012,
+    convergence: 0.004,
     scaleDepthStrength: 1,
-    scaleCurve: 1.18
+    scaleCurve: 1.08,
+    horizonSoftness: 0.16
   },
   "street-depth": {
     id: "street-depth",
@@ -29,9 +32,10 @@ export const perspectiveProfiles = {
     lateralNear: 0.98,
     verticalFar: 0.6,
     verticalNear: 0.92,
-    convergence: 0.028,
+    convergence: 0.014,
     scaleDepthStrength: 1.08,
-    scaleCurve: 1.28
+    scaleCurve: 1.18,
+    horizonSoftness: 0.2
   },
   "side-view": {
     id: "side-view",
@@ -41,7 +45,8 @@ export const perspectiveProfiles = {
     verticalNear: 0.48,
     convergence: 0,
     scaleDepthStrength: 0.34,
-    scaleCurve: 1
+    scaleCurve: 1,
+    horizonSoftness: 0.22
   },
   "surreal-float": {
     id: "surreal-float",
@@ -49,9 +54,10 @@ export const perspectiveProfiles = {
     lateralNear: 0.86,
     verticalFar: 0.64,
     verticalNear: 0.78,
-    convergence: 0.006,
+    convergence: 0.003,
     scaleDepthStrength: 0.72,
-    scaleCurve: 1.05
+    scaleCurve: 1.05,
+    horizonSoftness: 0.28
   }
 };
 
@@ -72,7 +78,8 @@ export function resolveDepthModel(depthModel = defaultDepthModel) {
 
 export function getDepthProgress(y, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
-  return clamp((y - model.horizon) / (model.foreground - model.horizon), 0, 1);
+  const walkableTop = model.horizon + (model.performerHorizonBuffer ?? 0);
+  return clamp((y - walkableTop) / (model.foreground - walkableTop), 0, 1);
 }
 
 function mix(from, to, progress) {
@@ -108,10 +115,11 @@ export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
 export function movePerformerState(state, input, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
   const progress = getDepthProgress(state.y, model);
+  const softenedProgress = clamp(progress + model.horizonSoftness, 0, 1);
   const profile = getMotionProfile(state.motionFeel);
   const frameScale = clamp(input.deltaMs ?? 16.67, 8, 48) / 16.67;
-  const lateralSpeed = mix(model.lateralFar, model.lateralNear, progress);
-  const verticalSpeed = mix(model.verticalFar, model.verticalNear, progress);
+  const lateralSpeed = mix(model.lateralFar, model.lateralNear, softenedProgress);
+  const verticalSpeed = mix(model.verticalFar, model.verticalNear, softenedProgress);
   const movingDiagonally = input.dx !== 0 && input.dy !== 0;
   const diagonalTrim = movingDiagonally ? Math.SQRT1_2 : 1;
   const targetVx = input.dx * diagonalTrim * profile.speed * lateralSpeed;
@@ -128,14 +136,18 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
 
   const dx = motionVx * frameScale;
   const dy = motionVy * frameScale;
-  const away = input.dy < 0;
-  const toward = input.dy > 0;
-  const convergenceDirection = away
-    ? model.vanishingX - state.x
-    : toward
-      ? state.x - model.vanishingX
-      : 0;
-  const convergenceX = convergenceDirection * Math.abs(motionVy) * model.convergence * frameScale;
+  const movingThroughDepth = Math.abs(motionVy) > Math.abs(motionVx) * 0.28;
+  const away = motionVy < -0.02;
+  const toward = motionVy > 0.02;
+  const focusPull = model.vanishingX - state.x;
+  const convergenceStrength = movingThroughDepth
+    ? away
+      ? model.convergence
+      : toward
+        ? model.convergence * 0.32
+        : 0
+    : 0;
+  const convergenceX = focusPull * Math.abs(motionVy) * convergenceStrength * frameScale;
   const nextX = clamp(state.x + dx + convergenceX, 5, 92);
   const minY = model.horizon + (model.performerHorizonBuffer ?? 0);
   const nextY = clamp(state.y + dy, minY, model.foreground);

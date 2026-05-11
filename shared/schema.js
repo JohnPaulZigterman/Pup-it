@@ -15,7 +15,7 @@ export function sanitizePerformerName(name) {
 export function createPerformerState(overrides = {}) {
   return {
     x: 48,
-    y: 60,
+    y: 68,
     scale: 1,
     facing: 1,
     expression: "neutral",
@@ -29,6 +29,7 @@ export function createPerformerState(overrides = {}) {
     groundSpeed: 0,
     travelLean: 0,
     depthProgress: 0.65,
+    behaviorPreset: "none",
     pose: "neutral",
     idleMotion: "alive",
     blinkSeed: 0,
@@ -36,6 +37,7 @@ export function createPerformerState(overrides = {}) {
     rigConfig: null,
     stylePreset: null,
     characterDesign: null,
+    characterParts: null,
     ...overrides
   };
 }
