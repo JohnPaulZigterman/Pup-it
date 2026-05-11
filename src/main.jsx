@@ -90,8 +90,6 @@ import {
 import { Puppet } from "./renderer/Puppet.jsx";
 import {
   computeBeginnerProgress,
-  developmentPathCards,
-  publicVersionMilestones,
   tutorialSteps,
   workflowSteps
 } from "./workflow/shortFlow.js";
@@ -1068,6 +1066,7 @@ function App() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [startedShortFormat, setStartedShortFormat] = useState("");
+  const [selectedPartId, setSelectedPartId] = useState("head");
   const [exportHistory, setExportHistory] = useState([]);
   const [doinkSubmitting, setDoinkSubmitting] = useState(false);
   const [doinkSubmission, setDoinkSubmission] = useState({
@@ -2976,8 +2975,6 @@ function App() {
             savedShows={savedShows}
             templates={showStarterTemplates}
             shortFormats={shortFormatTemplates}
-            developmentPaths={developmentPathCards}
-            publicMilestones={publicVersionMilestones}
             progress={beginnerProgress}
             takeCount={takeLibrary.length}
             panelCount={storyboardPanels.length}
@@ -3027,6 +3024,9 @@ function App() {
                   isSelf={performer.id === selfId}
                   depthModel={selectedScene}
                   showLabels={showPuppetLabels}
+                  editableParts={mode === "build" && performer.id === selfId}
+                  selectedPartId={mode === "build" ? selectedPartId : ""}
+                  onPartSelect={setSelectedPartId}
                 />
               ))}
             </div>
@@ -3057,6 +3057,7 @@ function App() {
           onCustomizeRig={() => setMode("build")}
           onPlaceInScene={() => openAssetSearch("", "object")}
           onPerform={() => setMode("perform")}
+          onSaveShow={saveShowSession}
         />
 
         <BeginnerRoadmap
@@ -3141,6 +3142,8 @@ function App() {
           <CharacterEditor
             performer={self}
             character={character}
+            selectedPartId={selectedPartId}
+            onSelectedPartChange={setSelectedPartId}
             onCharacterChange={changeCharacterRig}
             onRigChange={updateCharacterRig}
             onStyleChange={updateCharacterStyle}
@@ -3246,19 +3249,6 @@ function App() {
           onAssetSearch={openAssetSearch}
           onPolish={applyPolishPass}
         />
-
-        <div className="dockGroup performerGroup">
-          <h2>Performers</h2>
-          {stagePerformers.map((performer) => (
-            <div className="performerRow" key={performer.id}>
-              <span>{performer.name}</span>
-              <small>
-                {performer.state.characterDesign?.name ||
-                  getCatalogItem(characterCatalog, performer.character).name}
-              </small>
-            </div>
-          ))}
-        </div>
       </aside>
       <video
         ref={mouthVideoRef}
@@ -3354,8 +3344,6 @@ function ShowDashboard({
   savedShows,
   templates,
   shortFormats,
-  developmentPaths,
-  publicMilestones,
   progress,
   takeCount,
   panelCount,
@@ -3424,38 +3412,6 @@ function ShowDashboard({
               <small>{format.performanceGoal}</small>
               <em>{format.surpriseNudge}</em>
             </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="publicPathPanel" aria-label="Initial public version path">
-        <div>
-          <span className="eyebrow">Initial Public Version</span>
-          <h2>Make one good short quickly, then make another one weirder.</h2>
-        </div>
-        <div className="publicMilestoneGrid">
-          {publicMilestones.map((milestone) => (
-            <article key={milestone.id}>
-              <strong>{milestone.name}</strong>
-              <span>{milestone.detail}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="philosophyPanel" aria-label="How to make a short">
-        <div>
-          <span className="eyebrow">How To Make A Short</span>
-          <h2>Build a weird little world, perform inside it, finish the cartoon.</h2>
-        </div>
-        <div className="pathCardGrid">
-          {developmentPaths.map((path) => (
-            <article key={path.id} className="pathCard">
-              <span>{path.label}</span>
-              <strong>{path.name}</strong>
-              <em>{path.promise}</em>
-              <small>{path.focus}</small>
-            </article>
           ))}
         </div>
       </section>
@@ -3830,7 +3786,8 @@ function NewProjectGuide({
   onCharacterChange,
   onCustomizeRig,
   onPlaceInScene,
-  onPerform
+  onPerform,
+  onSaveShow
 }) {
   const steps = [
     { id: "setting", label: "Select setting", done: Boolean(scene), action: null },
@@ -3882,6 +3839,7 @@ function NewProjectGuide({
         <button type="button" onClick={onCustomizeRig}>Character Creator</button>
         <button type="button" onClick={onPlaceInScene}>Place Props</button>
         <button type="button" onClick={onPerform}>Perform</button>
+        <button type="button" onClick={onSaveShow}>Save Show</button>
       </div>
     </div>
   );
@@ -3904,10 +3862,10 @@ function ShowBiblePanel({
 }) {
   return (
     <div className="dockGroup showBiblePanel">
-      <h2>Show Toolbox</h2>
+      <h2>Show Kit</h2>
       <div className="bibleHeader">
-        <strong>{showName}</strong>
-        <small>Cast, sets, props, style, credits, and export rules for this show.</small>
+        <strong>Your Show's Stuff</strong>
+        <small>{showName}: reusable cast, sets, props, style, boards, and cuts.</small>
         <small>{activeStyle.family} / {activeStyle.theme}</small>
       </div>
       <div className="bibleGrid">
@@ -5456,6 +5414,8 @@ function StoryboardEditor({
 function CharacterEditor({
   performer,
   character,
+  selectedPartId,
+  onSelectedPartChange,
   onCharacterChange,
   onRigChange,
   onStyleChange,
@@ -5469,7 +5429,6 @@ function CharacterEditor({
   onPartSwap,
   onPartClear
 }) {
-  const [selectedPartId, setSelectedPartId] = useState("head");
   if (!performer) return null;
 
   const baseCharacter = getCatalogItem(characterCatalog, performer.character);
@@ -5648,7 +5607,7 @@ function CharacterEditor({
                   type="button"
                   key={part.id}
                   className={`partPaletteCard ${selectedPart.id === part.id ? "selected" : ""} ${populated ? "populated" : ""} ${value.hidden ? "hidden" : ""}`}
-                  onClick={() => setSelectedPartId(part.id)}
+                  onClick={() => onSelectedPartChange(part.id)}
                 >
                   <span
                     className={`partMiniPreview partShape-${value.shape || "scribble"}`}

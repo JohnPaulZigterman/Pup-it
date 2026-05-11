@@ -30,37 +30,6 @@ export const workflowSteps = [
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
 ];
 
-export const developmentPathCards = [
-  {
-    id: "five-minute",
-    label: "1",
-    name: "Five-Minute Cartoon",
-    promise: "Start, build, perform, replay, export.",
-    focus: "Keep the beginner rail obvious enough that a first short can happen before the user starts managing software."
-  },
-  {
-    id: "toybox",
-    label: "2",
-    name: "Creation Toybox",
-    promise: "Make the show's people, props, textures, and weird rules feel original.",
-    focus: "Treat presets as raw material. Shapes, doodles, imports, mutations, and behaviors should push users toward their own voice."
-  },
-  {
-    id: "studio",
-    label: "3",
-    name: "Performance Studio",
-    promise: "Make performing feel smooth, funny, and worth replaying.",
-    focus: "Motion, mouth, cue deck, camera, stings, and take review should feel like a playable comedy instrument."
-  }
-];
-
-export const publicVersionMilestones = [
-  { id: "perform", name: "Joy Loop", detail: "Record, replay, laugh, trim, export." },
-  { id: "toybox", name: "Toybox Identity", detail: "Original rigs, props, textures, and weird behavior." },
-  { id: "formats", name: "Comedy Formats", detail: "Arguments, fake ads, desk bits, street pieces, bumpers." },
-  { id: "render", name: "Render Path", detail: "720p WEBM now, stage-matched video next, backend reliability later." }
-];
-
 export function computeBeginnerProgress({
   showName,
   hasCustomRigParts,

@@ -12,30 +12,69 @@ function hasCustomPart(part) {
   return Boolean(!part?.hidden && (part?.source || part?.mode === "drawn" || part?.shape));
 }
 
-function PuppetPart({ part, className, label, showLabel }) {
+function PuppetPart({ part, className, label, showLabel, slot, selected, editableParts, onPartSelect }) {
   if (!hasCustomPart(part)) return null;
   const style = {
     "--part-scale": part.scale || 1,
     "--part-rotate": `${part.rotate || 0}deg`,
     "--part-tint": part.tint || "var(--puppet)"
   };
+  const selectPart = (event) => {
+    if (!editableParts || !onPartSelect) return;
+    event.stopPropagation();
+    onPartSelect(slot);
+  };
 
   if (part.source) {
-    return <img className={`puppetPart ${className}`} style={style} src={part.source} alt="" draggable="false" />;
+    return (
+      <img
+        className={`puppetPart ${className} ${selected ? "selectedPart" : ""}`}
+        style={style}
+        src={part.source}
+        alt=""
+        draggable="false"
+        onClick={selectPart}
+      />
+    );
   }
 
   return (
     <span
-      className={`puppetPart assembledPart partShape-${part.shape || "scribble"} ${className}`}
+      className={`puppetPart assembledPart partShape-${part.shape || "scribble"} ${className} ${selected ? "selectedPart" : ""}`}
       style={style}
       aria-hidden="true"
+      onClick={selectPart}
     >
       {showLabel ? part.label || label : null}
     </span>
   );
 }
 
-export function Puppet({ performer, isSelf, depthModel, showLabels = false }) {
+function PartHotspot({ slot, className, selected, editableParts, onPartSelect }) {
+  if (!editableParts || !onPartSelect) return null;
+  const readableSlot = slot.replace(/([A-Z])/g, " $1").toLowerCase();
+  return (
+    <button
+      type="button"
+      className={`partHotspot ${className} ${selected ? "selectedPartHotspot" : ""}`}
+      aria-label={`Select ${readableSlot}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPartSelect(slot);
+      }}
+    />
+  );
+}
+
+export function Puppet({
+  performer,
+  isSelf,
+  depthModel,
+  showLabels = false,
+  editableParts = false,
+  selectedPartId = "",
+  onPartSelect
+}) {
   const character = getCatalogItem(characterCatalog, performer.character);
   const expression = getCatalogItem(expressionCatalog, performer.state.expression);
   const pose = getCatalogItem(poseCatalog, performer.state.pose);
@@ -63,6 +102,11 @@ export function Puppet({ performer, isSelf, depthModel, showLabels = false }) {
   const motionSquash = state.walking
     ? (state.anticipationSquash || 1) + Math.min(0.032, walkBounce * 0.018)
     : (state.anticipationSquash || 1) - settleAmount * 0.006;
+  const selectBodyPart = (slot) => (event) => {
+    if (!editableParts || !onPartSelect) return;
+    event.stopPropagation();
+    onPartSelect(slot);
+  };
 
   return (
     <div
@@ -84,6 +128,7 @@ export function Puppet({ performer, isSelf, depthModel, showLabels = false }) {
         isWalking ? `walking walk-${rig.walkCycle}` : "",
         state.macro ? `macro-${state.macro}` : "",
         showLabels ? "showStageLabels" : "hideStageLabels",
+        editableParts ? "editableParts" : "",
         isSelf ? "self" : ""
       ].join(" ")}
       style={{
@@ -130,30 +175,36 @@ export function Puppet({ performer, isSelf, depthModel, showLabels = false }) {
         {rig.arms ? (
           <>
             <div className="limb arm armLeft">
-              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" showLabel={showLabels} />
+              <PartHotspot slot="leftArm" className="partHotspotLimb" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} />
+              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" slot="leftArm" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
             </div>
             <div className="limb arm armRight">
-              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" showLabel={showLabels} />
+              <PartHotspot slot="rightArm" className="partHotspotLimb" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} />
+              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" slot="rightArm" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
             </div>
           </>
         ) : null}
         {rig.legs ? (
           <>
             <div className="limb leg legLeft">
-              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" showLabel={showLabels} />
+              <PartHotspot slot="leftLeg" className="partHotspotLimb" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} />
+              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" slot="leftLeg" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
             </div>
             <div className="limb leg legRight">
-              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" showLabel={showLabels} />
+              <PartHotspot slot="rightLeg" className="partHotspotLimb" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} />
+              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" slot="rightLeg" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
             </div>
           </>
         ) : null}
-        <div className="puppetBody">
-          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" showLabel={showLabels} />
-          <PuppetPart part={parts.torso} className="partTorso" label="torso" showLabel={showLabels} />
-          <PuppetPart part={parts.head} className="partHead" label="head" showLabel={showLabels} />
-          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" showLabel={showLabels} />
-          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" showLabel={showLabels} />
-          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" showLabel={showLabels} />
+        <div className={`puppetBody ${selectedPartId === "torso" ? "selectedPartBody" : ""}`} onClick={selectBodyPart("torso")}>
+          <PartHotspot slot="head" className="partHotspotHead" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} />
+          <PartHotspot slot="torso" className="partHotspotTorso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} />
+          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" slot="backAppendage" selected={selectedPartId === "backAppendage"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PuppetPart part={parts.torso} className="partTorso" label="torso" slot="torso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PuppetPart part={parts.head} className="partHead" label="head" slot="head" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" slot="topAccessory" selected={selectedPartId === "topAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" slot="leftAccessory" selected={selectedPartId === "leftAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" slot="rightAccessory" selected={selectedPartId === "rightAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
           <div className="animalFeature ears" aria-hidden="true" />
           <div className="animalFeature snout" aria-hidden="true" />
           <div className="animalFeature beak" aria-hidden="true" />

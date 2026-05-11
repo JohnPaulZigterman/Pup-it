@@ -387,33 +387,6 @@ input[type="color"] {
   background: var(--meat);
 }
 
-.modeSwitch {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(68px, 1fr);
-  grid-template-columns: none;
-  gap: 4px;
-  min-width: max-content;
-  padding: 4px;
-  border: 2px solid var(--ink);
-  border-radius: 3px;
-  background: var(--rail);
-  box-shadow: inset 2px 2px 0 rgba(38, 41, 54, 0.06);
-}
-
-.modeSwitch button {
-  min-height: 32px;
-  padding: 0 10px;
-  color: #4b4e68;
-  background: transparent;
-  text-transform: capitalize;
-}
-
-.modeSwitch button.selected {
-  color: var(--ink);
-  background: var(--nicotine);
-}
-
 .workflowRail {
   min-height: 0;
   display: grid;
@@ -725,68 +698,6 @@ input[type="color"] {
   color: #4b4e68;
 }
 
-.philosophyPanel,
-.publicPathPanel {
-  display: grid;
-  grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
-  gap: 14px;
-  padding: 16px;
-  border: 3px solid var(--ink);
-  background:
-    var(--surface-grain),
-    linear-gradient(135deg, rgba(111, 166, 140, 0.18), transparent 48%),
-    var(--surface);
-  background-blend-mode: multiply, normal, normal;
-}
-
-.philosophyPanel h2,
-.publicPathPanel h2 {
-  margin: 4px 0 0;
-  color: var(--ink);
-  font-size: 22px;
-  line-height: 1.06;
-}
-
-.pathCardGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.pathCard {
-  display: grid;
-  gap: 5px;
-  padding: 10px;
-  border: 2px solid var(--ink);
-  background: var(--paper);
-}
-
-.pathCard > span {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border: 2px solid var(--ink);
-  background: var(--nicotine);
-  font-weight: 950;
-}
-
-.pathCard strong {
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.pathCard em,
-.pathCard small {
-  color: #4b4e68;
-  font-size: 12px;
-  font-style: normal;
-}
-
-.pathCard small {
-  color: #666b86;
-}
-
 .shortFormatGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -822,30 +733,6 @@ input[type="color"] {
 .shortFormatGrid em {
   color: var(--ink);
   font-weight: 800;
-}
-
-.publicMilestoneGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.publicMilestoneGrid article {
-  display: grid;
-  gap: 5px;
-  padding: 10px;
-  border: 2px solid var(--ink);
-  background: var(--paper);
-}
-
-.publicMilestoneGrid strong {
-  color: var(--ink);
-  font-size: 13px;
-}
-
-.publicMilestoneGrid span {
-  color: #4b4e68;
-  font-size: 11px;
 }
 
 .dashboardStats,
@@ -1879,7 +1766,7 @@ input[type="color"] {
 
 .projectGuideActions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -2036,6 +1923,12 @@ input[type="color"] {
 }
 
 .experience-beginner .advancedControl {
+  display: none;
+}
+
+.experience-beginner .showSessionPanel,
+.experience-beginner .showBiblePanel,
+.experience-beginner .contextInspector {
   display: none;
 }
 
@@ -2474,23 +2367,6 @@ input[type="color"] {
 .macroGrid button {
   color: var(--ink);
   background: var(--rail);
-}
-
-.performerGroup {
-  margin-top: 4px;
-}
-
-.performerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--rule);
-}
-
-.performerRow small {
-  color: #666b86;
 }
 
 .mouthMeter {
@@ -5542,6 +5418,79 @@ input[type="color"] {
   rotate: var(--part-rotate, 0deg);
 }
 
+.editableParts .puppetBody,
+.editableParts .puppetPart {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.partHotspot {
+  position: absolute;
+  z-index: 22;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 2px dashed rgba(38, 41, 54, 0.5);
+  border-radius: 6px;
+  background: rgba(227, 189, 69, 0.12);
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0.24;
+  pointer-events: auto;
+}
+
+.partHotspot:hover,
+.partHotspot:focus-visible,
+.selectedPartHotspot {
+  border-color: var(--nicotine);
+  background: rgba(227, 189, 69, 0.2);
+  opacity: 0.9;
+  outline: 2px solid rgba(38, 41, 54, 0.55);
+  outline-offset: 2px;
+}
+
+.partHotspotHead {
+  left: 50%;
+  top: -55px;
+  width: 64px;
+  height: 54px;
+  border-radius: 48% 45% 44% 52%;
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+.partHotspotTorso {
+  inset: 8px 10px 16px;
+}
+
+.partHotspotLimb {
+  left: 50%;
+  top: 4px;
+  width: 30px;
+  height: calc(100% + 8px);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.editableParts .selectedPart,
+.editableParts .selectedPartBody {
+  outline: 3px dashed var(--nicotine);
+  outline-offset: 5px;
+}
+
+.editableParts .selectedPart {
+  filter:
+    drop-shadow(0 0 0 var(--ink))
+    drop-shadow(3px 3px 0 rgba(227, 189, 69, 0.55));
+}
+
+.editableParts .puppetRig,
+.editableParts .puppetBody,
+.editableParts .limb,
+.editableParts .eye {
+  animation: none !important;
+}
+
 .assembledPart {
   border: max(1px, var(--detail-line-width)) solid var(--outline);
   background:
@@ -6082,9 +6031,6 @@ input[type="color"] {
     padding: 0 10px;
   }
 
-  .modeSwitch button {
-    padding: 0 8px;
-  }
 }
 
 @media (max-width: 900px) {
@@ -6140,12 +6086,9 @@ input[type="color"] {
 
   .dashboardHero,
   .makeShortPanel,
-  .philosophyPanel,
   .dashboardGrid,
   .dashboardStats,
   .templateGrid,
-  .pathCardGrid,
-  .publicMilestoneGrid,
   .shortFormatGrid {
     grid-template-columns: 1fr;
   }
