@@ -39,6 +39,43 @@ export const makeShortMilestones = [
   { id: "finish", label: "Export / Submit", shortLabel: "Finish", description: "Render, package, and submit when ready." }
 ];
 
+export const workspaceIdentity = {
+  home: {
+    label: "Start",
+    role: "Launchpad",
+    description: "Continue a show, pick a format, or follow the next best step."
+  },
+  build: {
+    label: "Rig",
+    role: "Paint Studio",
+    description: "Click the puppet, shape parts, import images, and make the performer yours."
+  },
+  assets: {
+    label: "Space",
+    role: "Set Builder",
+    description: "Assemble props, materials, settings, and reusable stage pieces."
+  },
+  perform: {
+    label: "Perform",
+    role: "Live Studio",
+    description: "Play the character, cue reactions, record takes, and keep the bit moving."
+  },
+  edit: {
+    label: "Finish",
+    role: "Production Desk",
+    description: "Review takes, render, package, and submit a short."
+  },
+  storyboard: {
+    label: "Board",
+    role: "Storyboard",
+    description: "Stage comic-strip beats and shot flow before recording."
+  }
+};
+
+export function getWorkspaceIdentity(mode) {
+  return workspaceIdentity[mode] || workspaceIdentity.home;
+}
+
 export function computeBeginnerProgress({
   showName,
   hasCustomRigParts,

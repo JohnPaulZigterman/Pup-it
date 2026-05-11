@@ -13,6 +13,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.locator(".newProjectGuide")).toBeVisible();
 
   await page.getByRole("button", { name: "1 Start" }).click();
+  await expect(page.getByLabel("Current workspace")).toContainText("Launchpad");
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pick a tiny format, then make it yours." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Make A Short" })).toBeVisible();
@@ -21,6 +22,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.locator("header").getByRole("button", { name: "Review" })).toBeVisible();
 
   await page.getByRole("button", { name: "Rig" }).first().click();
+  await expect(page.getByLabel("Current workspace")).toContainText("Paint Studio");
   await expect(page.getByRole("heading", { name: "Character Creator" })).toBeVisible();
   await expect(page.locator(".showKitBranches").getByText("Tech Tree")).toBeVisible();
   await expect(page.locator(".showKitBranches").getByText("Cast Branch")).toBeVisible();
@@ -50,6 +52,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Behavior" })).toBeVisible();
 
   await page.getByRole("button", { name: "Space" }).first().click();
+  await expect(page.getByLabel("Current workspace")).toContainText("Set Builder");
   await page.getByPlaceholder("rigs, mouths, diner setting, parody reference...").fill("furniture");
   await page.locator(".assetActions").getByRole("button", { name: "Use as Material" }).first().click();
 

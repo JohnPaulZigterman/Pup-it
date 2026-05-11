@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createShowToolbox } from "../shared/production.js";
 import { buildDoinkReviewChecklist, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
+import { getWorkspaceIdentity, makeShortMilestones } from "../src/workflow/shortFlow.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
   const project = {
@@ -81,4 +82,11 @@ test("finish confidence separates ready enough from review ready", () => {
   expect(confidence.readyEnough).toBe(true);
   expect(confidence.reviewReady).toBe(false);
   expect(confidence.missing.map((item) => item.id)).toEqual(["video"]);
+});
+
+test("workspace identity keeps the creative app modes legible", () => {
+  expect(makeShortMilestones.map((step) => step.shortLabel)).toEqual(["Start", "Rig", "Space", "Perform", "Review", "Finish"]);
+  expect(getWorkspaceIdentity("build")).toMatchObject({ label: "Rig", role: "Paint Studio" });
+  expect(getWorkspaceIdentity("perform")).toMatchObject({ label: "Perform", role: "Live Studio" });
+  expect(getWorkspaceIdentity("edit")).toMatchObject({ label: "Finish", role: "Production Desk" });
 });

@@ -99,6 +99,7 @@ import {
 import { SceneLibraryEditor } from "./workspaces/FinishWorkspace.jsx";
 import {
   computeBeginnerProgress,
+  getWorkspaceIdentity,
   makeShortMilestones,
   tutorialSteps,
   workflowSteps
@@ -2502,6 +2503,7 @@ function App() {
     () => sceneObjects.find((object) => object.id === selectedSceneObjectId) || null,
     [sceneObjects, selectedSceneObjectId]
   );
+  const workspace = getWorkspaceIdentity(mode);
 
   const addStoryboardPanel = () => {
     const panel = createStoryboardPanel({
@@ -3490,6 +3492,11 @@ function App() {
           <Theater size={22} />
           <strong>Pup-It</strong>
           <span>{status}</span>
+        </div>
+        <div className="workspaceBadge" aria-label="Current workspace">
+          <span>{workspace.label}</span>
+          <strong>{workspace.role}</strong>
+          <small>{workspace.description}</small>
         </div>
         <CommandSearch
           inputRef={commandInputRef}
