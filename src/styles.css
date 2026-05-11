@@ -332,6 +332,12 @@ input[type="color"] {
   display: grid;
 }
 
+.commandSearch.focused {
+  background:
+    linear-gradient(90deg, rgba(227, 189, 69, 0.16), transparent 62%),
+    var(--surface);
+}
+
 .commandResults button {
   justify-content: flex-start;
   min-height: 32px;
@@ -341,6 +347,31 @@ input[type="color"] {
   box-shadow: none;
   text-align: left;
   text-transform: none;
+}
+
+.topNextButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--nicotine);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.topNextButton span {
+  color: #5f4b13;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.topNextButton strong {
+  max-width: 132px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
 }
 
 .brandCompact strong {
@@ -1955,7 +1986,7 @@ input[type="color"] {
 
 .beginnerRail {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -2037,6 +2068,55 @@ input[type="color"] {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.contextActionStrip {
+  border-color: var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, var(--workspace-soft), transparent 52%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.contextActionHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.contextActionHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.contextActionHeader strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.contextActionHeader small {
+  color: #5f6278;
+  font-size: 11px;
+}
+
+.contextActionButtons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.contextActionButtons button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: var(--paper);
+  font-size: 11px;
 }
 
 .roadmapStep small {

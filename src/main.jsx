@@ -20,6 +20,7 @@ import {
   Play,
   Plus,
   Radio,
+  Redo2,
   RefreshCw,
   Search,
   Shuffle,
@@ -28,6 +29,7 @@ import {
   Square,
   Theater,
   Trash2,
+  Undo2,
   Video,
   Wand2,
   X
@@ -1017,6 +1019,7 @@ function App() {
   const mouthControlRef = useRef("audio");
   const mouthSensitivityRef = useRef(1);
   const mouthSmoothingRef = useRef(0.58);
+  const commandInputRef = useRef(null);
   const playbackTimersRef = useRef([]);
   const cameraTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
@@ -1039,6 +1042,7 @@ function App() {
   const [mode, setMode] = useState("home");
   const [experienceMode, setExperienceMode] = useState("beginner");
   const [commandQuery, setCommandQuery] = useState("");
+  const [commandFocused, setCommandFocused] = useState(false);
   const [cameraShot, setCameraShot] = useState("wide");
   const [cameraFollow, setCameraFollow] = useState(false);
   const [cameraPunchScale, setCameraPunchScale] = useState(1);
@@ -1067,6 +1071,9 @@ function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
   const [startedShortFormat, setStartedShortFormat] = useState("");
   const [selectedPartId, setSelectedPartId] = useState("head");
+  const [historyPast, setHistoryPast] = useState([]);
+  const [historyFuture, setHistoryFuture] = useState([]);
+  const [lastAutosaveAt, setLastAutosaveAt] = useState("");
   const [exportHistory, setExportHistory] = useState([]);
   const [doinkSubmitting, setDoinkSubmitting] = useState(false);
   const [doinkSubmission, setDoinkSubmission] = useState({
@@ -1115,6 +1122,13 @@ function App() {
   const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
   const activeTexturePreset = activeAnimationStyle.texturePreset || "paper-grain";
   const stageTexturePreset = selectedBackgroundTheme.texturePreset || activeTexturePreset;
+  const activePerformers = useMemo(() => performerList(performers), [performers]);
+  const stagePerformers = useMemo(
+    () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
+    [activePerformers, mode, previewPerformers]
+  );
+  const showStageMarkers = mode === "assets" || mode === "edit";
+  const showPuppetLabels = mode === "edit";
 
   useEffect(() => {
     const socket = io(SERVER_URL, { autoConnect: false });
@@ -1401,8 +1415,82 @@ function App() {
     }
   };
 
+  const makeHistorySnapshot = (label) => ({
+    label,
+    capturedAt: Date.now(),
+    showName,
+    character,
+    scene,
+    selectedSceneId: scene,
+    cameraShot,
+    lightingPreset,
+    backgroundTheme,
+    objectStyle,
+    performers: clonePerformers(activePerformers),
+    sceneObjects: sceneObjects.map((object) => ({ ...object })),
+    selectedSceneObjectId,
+    floorMarks: floorMarks.map((mark) => ({ ...mark })),
+    storyboardPanels: storyboardPanels.map((panel) => ({ ...panel })),
+    selectedStoryboardId,
+    productionTimeline: productionTimeline.map((clip) => ({ ...clip })),
+    takeLibrary,
+    selectedTakeId: selectedTake?.id || null,
+    startedShortFormat
+  });
+
+  const restoreHistorySnapshot = (snapshot) => {
+    if (!snapshot) return;
+    clearPlayback();
+    setShowName(snapshot.showName);
+    setCharacter(snapshot.character);
+    selectedSceneRef.current = snapshot.selectedSceneId || snapshot.scene;
+    setScene(snapshot.selectedSceneId || snapshot.scene);
+    socketRef.current?.emit("scene:set", snapshot.selectedSceneId || snapshot.scene);
+    setCameraShot(snapshot.cameraShot || "wide");
+    setLightingPreset(snapshot.lightingPreset || "scene");
+    setBackgroundTheme(snapshot.backgroundTheme || "painted-depth");
+    setObjectStyle(snapshot.objectStyle || "soft-material");
+    setPerformers(indexPerformers(snapshot.performers || []));
+    setSceneObjects(snapshot.sceneObjects || []);
+    setSelectedSceneObjectId(snapshot.selectedSceneObjectId || null);
+    setFloorMarks(snapshot.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, snapshot.scene || sceneCatalog[0].id)));
+    setStoryboardPanels(snapshot.storyboardPanels || []);
+    setSelectedStoryboardId(snapshot.selectedStoryboardId || null);
+    setProductionTimeline(snapshot.productionTimeline || []);
+    setTakeLibrary(snapshot.takeLibrary || []);
+    setSelectedTake((snapshot.takeLibrary || []).find((take) => take.id === snapshot.selectedTakeId) || null);
+    setStartedShortFormat(snapshot.startedShortFormat || "");
+    setStatus(`Restored ${snapshot.label}.`);
+  };
+
+  const recordHistory = (label) => {
+    setHistoryPast((current) => [...current.slice(-19), makeHistorySnapshot(label)]);
+    setHistoryFuture([]);
+  };
+
+  const undoLastAction = () => {
+    setHistoryPast((past) => {
+      if (!past.length) return past;
+      const snapshot = past[past.length - 1];
+      setHistoryFuture((future) => [makeHistorySnapshot("redo point"), ...future.slice(0, 19)]);
+      restoreHistorySnapshot(snapshot);
+      return past.slice(0, -1);
+    });
+  };
+
+  const redoLastAction = () => {
+    setHistoryFuture((future) => {
+      if (!future.length) return future;
+      const snapshot = future[0];
+      setHistoryPast((past) => [...past.slice(-19), makeHistorySnapshot("undo point")]);
+      restoreHistorySnapshot(snapshot);
+      return future.slice(1);
+    });
+  };
+
   const updateCharacterRig = (patch) => {
     if (!self) return;
+    recordHistory("rig tuning");
     const baseCharacter = getCatalogItem(characterCatalog, self.character);
     updateSelf({
       rigConfig: {
@@ -1413,8 +1501,12 @@ function App() {
     });
   };
 
-  const updateCharacterStyle = (stylePreset) => updateSelf({ stylePreset });
+  const updateCharacterStyle = (stylePreset) => {
+    recordHistory("style change");
+    updateSelf({ stylePreset });
+  };
   const changeCharacterRig = (nextCharacter) => {
+    recordHistory("rig model change");
     setCharacter(nextCharacter);
     if (!self) return;
     const baseCharacter = getCatalogItem(characterCatalog, nextCharacter);
@@ -1447,6 +1539,7 @@ function App() {
   };
   const updateCharacterDesign = (patch) => {
     if (!self) return;
+    recordHistory("character design");
     const baseCharacter = getCatalogItem(characterCatalog, self.character);
     updateSelf({
       characterDesign: {
@@ -1459,6 +1552,7 @@ function App() {
   };
   const updateCharacterPart = (partId, patch) => {
     if (!self) return;
+    recordHistory(`${getCatalogItem(characterPartCatalog, partId).name} edit`);
     const currentParts = self.state.characterParts || {};
     const currentPart = currentParts[partId] || {};
     updateSelf({
@@ -1476,6 +1570,7 @@ function App() {
     const currentParts = self.state.characterParts || {};
     const sourcePart = currentParts[partId];
     if (!sourcePart) return;
+    recordHistory(`${getCatalogItem(characterPartCatalog, partId).name} clone`);
     const targetPartId =
       extraPartSlots.find((slot) => !currentParts[slot]) ||
       extraPartSlots.find((slot) => currentParts[slot]?.hidden) ||
@@ -1498,6 +1593,7 @@ function App() {
     if (!self) return;
     const targetPartId = partSwapTargets[partId];
     if (!targetPartId) return;
+    recordHistory("part swap");
     const currentParts = self.state.characterParts || {};
     updateSelf({
       characterParts: {
@@ -1510,12 +1606,14 @@ function App() {
   };
   const clearCharacterPart = (partId) => {
     if (!self) return;
+    recordHistory(`${getCatalogItem(characterPartCatalog, partId).name} clear`);
     const currentParts = self.state.characterParts || {};
     const nextParts = { ...currentParts };
     delete nextParts[partId];
     updateSelf({ characterParts: nextParts });
   };
   const randomizeCharacterDesign = () => {
+    recordHistory("weird starter");
     updateSelf({
       characterDesign: makeOriginalDesign(),
       rigConfig: makeOriginalRig(),
@@ -1536,6 +1634,7 @@ function App() {
   };
   const applyCharacterMutation = (recipeId) => {
     if (!self) return;
+    recordHistory("character mutation");
     const recipe = getCatalogItem(mutationRecipeCatalog, recipeId);
     const baseCharacter = getCatalogItem(characterCatalog, self.character);
     const currentRig = {
@@ -1563,6 +1662,7 @@ function App() {
   const applyStyleMutation = (mutationId) => {
     const mutation = styleMutationControls.find((item) => item.id === mutationId);
     if (!mutation) return;
+    recordHistory("style mutation");
     if (mutation.stylePreset) updateCharacterStyle(mutation.stylePreset);
     if (mutation.backgroundTheme) setBackgroundTheme(mutation.backgroundTheme);
     if (mutation.objectStyle) setObjectStyle(mutation.objectStyle);
@@ -1573,6 +1673,7 @@ function App() {
   };
 
   const startQuickShort = (formatId) => {
+    recordHistory("quick short starter");
     const format = getCatalogItem(shortFormatTemplates, formatId);
     const template = getCatalogItem(showStarterTemplates, format.starterTemplate);
     changeScene(template.scene);
@@ -1601,6 +1702,7 @@ function App() {
   };
 
   const addSceneObjectFromAsset = (asset) => {
+    recordHistory("place asset");
     const sceneObject = createSceneObjectFromAsset(asset, sceneObjects.length);
     setSceneObjects((current) => [...current, sceneObject]);
     setSelectedSceneObjectId(sceneObject.id);
@@ -1609,6 +1711,7 @@ function App() {
 
   const addSceneObjectFromImage = (payload) => {
     if (!payload.imageUrl?.trim()) return;
+    recordHistory("place image prop");
     const sceneObject = createSceneObjectFromImage(
       { ...payload, imageUrl: payload.imageUrl.trim() },
       sceneObjects.length
@@ -1619,6 +1722,7 @@ function App() {
   };
 
   const addSceneObjectFromShape = (payload) => {
+    recordHistory("build prop");
     const sceneObject = createSceneObjectFromShape(payload, sceneObjects.length);
     setSceneObjects((current) => [...current, sceneObject]);
     setSelectedSceneObjectId(sceneObject.id);
@@ -1626,6 +1730,7 @@ function App() {
   };
 
   const updateSceneObject = (objectId, patch) => {
+    recordHistory("prop edit");
     setSceneObjects((current) =>
       current.map((object) => (object.id === objectId ? { ...object, ...patch } : object))
     );
@@ -1634,6 +1739,7 @@ function App() {
   const duplicateSceneObject = (objectId) => {
     const sourceObject = sceneObjects.find((object) => object.id === objectId);
     if (!sourceObject) return;
+    recordHistory("prop duplicate");
     const copy = {
       ...sourceObject,
       id: `scene-object-copy-${Date.now()}-${Math.round(Math.random() * 10000)}`,
@@ -1649,15 +1755,18 @@ function App() {
   const moveSceneObjectLayer = (objectId, delta) => {
     const object = sceneObjects.find((item) => item.id === objectId);
     if (!object) return;
+    recordHistory("prop layer");
     updateSceneObject(objectId, { layer: clamp((object.layer || 0) + delta, 0, 6) });
   };
 
   const deleteSceneObject = (objectId) => {
+    recordHistory("prop delete");
     setSceneObjects((current) => current.filter((object) => object.id !== objectId));
     setSelectedSceneObjectId((current) => (current === objectId ? null : current));
   };
 
   const saveCurrentSceneSet = () => {
+    recordHistory("save set");
     const sceneSet = {
       id: `scene-set-${Date.now()}-${Math.round(Math.random() * 10000)}`,
       name: `${selectedScene.name} Set ${sceneSets.length + 1}`,
@@ -1674,6 +1783,7 @@ function App() {
   const applySceneSet = (sceneSetId) => {
     const sceneSet = sceneSets.find((item) => item.id === sceneSetId);
     if (!sceneSet) return;
+    recordHistory("load set");
     changeScene(sceneSet.scene);
     setBackgroundTheme(sceneSet.backgroundTheme || backgroundTheme);
     setObjectStyle(sceneSet.objectStyle || objectStyle);
@@ -1706,6 +1816,7 @@ function App() {
   const importAsset = (assetId, importType) => {
     const asset = curatedAssetLibrary.find((item) => item.id === assetId);
     if (!asset) return;
+    recordHistory("asset import");
     const safe = isOneClickSafeAsset(asset);
     rememberAssetReference(asset, importType);
 
@@ -1787,6 +1898,7 @@ function App() {
   };
 
   const changeScene = (nextScene) => {
+    recordHistory("setting change");
     selectedSceneRef.current = nextScene;
     setScene(nextScene);
     socketRef.current.emit("scene:set", nextScene);
@@ -2215,13 +2327,6 @@ function App() {
 
   const playSelectedTake = () => playTake(selectedTake);
 
-  const activePerformers = useMemo(() => performerList(performers), [performers]);
-  const stagePerformers = useMemo(
-    () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
-    [activePerformers, mode, previewPerformers]
-  );
-  const showStageMarkers = mode === "assets" || mode === "edit";
-  const showPuppetLabels = mode === "edit";
   const activeShowToolbox = useMemo(
     () =>
       createShowToolbox({
@@ -2270,6 +2375,10 @@ function App() {
   const selectedStoryboardPanel = useMemo(
     () => storyboardPanels.find((panel) => panel.id === selectedStoryboardId) || null,
     [selectedStoryboardId, storyboardPanels]
+  );
+  const selectedSceneObject = useMemo(
+    () => sceneObjects.find((object) => object.id === selectedSceneObjectId) || null,
+    [sceneObjects, selectedSceneObjectId]
   );
 
   const addStoryboardPanel = () => {
@@ -2634,7 +2743,30 @@ function App() {
     setStatus("Applied a punchier camera and reaction setup.");
   };
 
+  const primaryNextAction = (() => {
+    if (!beginnerProgress.hasStartedShort) {
+      return { label: "Start Short", detail: "Pick a rough launch pad.", action: () => startQuickShort("argument") };
+    }
+    if (!beginnerProgress.hasRig) {
+      return { label: "Build Rig", detail: "Make the performer yours.", action: () => setMode("build") };
+    }
+    if (!beginnerProgress.hasSet) {
+      return { label: "Build Set", detail: "Drop something into the space.", action: () => setMode("assets") };
+    }
+    if (!beginnerProgress.hasTake) {
+      return { label: recording ? "Stop Take" : "Record Take", detail: "Capture the bit.", action: beginnerProgress.hasRehearsed ? toggleTake : () => setMode("perform") };
+    }
+    if (!beginnerProgress.hasCut) {
+      return { label: "Review Take", detail: "Replay and save the scene.", action: () => setMode("edit") };
+    }
+    if (!beginnerProgress.exported) {
+      return { label: "Export Short", detail: "Bundle the finished handoff.", action: exportProject };
+    }
+    return { label: "Submit DoinkTV", detail: "Send the short for review.", action: submitToDoinkTv };
+  })();
+
   const commandItems = [
+    { id: "next", label: `Next: ${primaryNextAction.label}`, keywords: "next step continue beginner flow do next", action: primaryNextAction.action },
     { id: "home", label: "Open show dashboard", keywords: "setup home project show", action: () => setMode("home") },
     { id: "cast", label: "Edit current character", keywords: "cast character rig build customize", action: () => setMode("build") },
     { id: "playground", label: "Open character playground", keywords: "playground weird mutate original character toybox", action: () => setMode("build") },
@@ -2646,6 +2778,9 @@ function App() {
     { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
     { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review", action: openReviewMode },
     { id: "board", label: "Open storyboard mode", keywords: "storyboard panel comic strip planning", action: () => setMode("storyboard") },
+    { id: "save", label: "Save show", keywords: "save autosave show session project", action: () => saveShowSession() },
+    { id: "undo", label: "Undo last creative edit", keywords: "undo revert back history", action: undoLastAction, disabled: !historyPast.length },
+    { id: "redo", label: "Redo creative edit", keywords: "redo forward history", action: redoLastAction, disabled: !historyFuture.length },
     { id: "export", label: "Export short package", keywords: "export publish package video project", action: exportProject },
     { id: "video-export", label: "Prepare video export", keywords: "render video mp4 export movie", action: queueVideoExport },
     { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
@@ -2654,9 +2789,57 @@ function App() {
   ];
 
   const runCommand = (command) => {
+    if (command.disabled) return;
     command.action();
     setCommandQuery("");
+    setCommandFocused(false);
+    commandInputRef.current?.blur();
   };
+
+  useEffect(() => {
+    const handleCommandKeys = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandFocused(true);
+        commandInputRef.current?.focus();
+        commandInputRef.current?.select();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undoLastAction();
+        return;
+      }
+      if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") || ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z")) {
+        event.preventDefault();
+        redoLastAction();
+        return;
+      }
+      if (event.key === "Escape" && commandFocused) {
+        setCommandQuery("");
+        setCommandFocused(false);
+        commandInputRef.current?.blur();
+        return;
+      }
+      if (event.key === "Enter" && commandFocused) {
+        const query = commandQuery.trim().toLowerCase();
+        const queryTokens = query.split(/\s+/).filter(Boolean);
+        const match = (query
+          ? commandItems.find((command) => {
+              const haystack = `${command.label} ${command.keywords}`.toLowerCase();
+              return queryTokens.every((token) => haystack.includes(token));
+            })
+          : commandItems[0]);
+        if (match) {
+          event.preventDefault();
+          runCommand(match);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleCommandKeys);
+    return () => window.removeEventListener("keydown", handleCommandKeys);
+  });
 
   const createShowSession = () => {
     const cleanShowName = showName.trim() || "Untitled Show";
@@ -2690,6 +2873,38 @@ function App() {
       showToolbox: activeShowToolbox
     };
   };
+
+  useEffect(() => {
+    if (!joined) return undefined;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem("pup-it-autosave-draft-v1", JSON.stringify(createShowSession()));
+        setLastAutosaveAt(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+      } catch (_error) {
+        setLastAutosaveAt("paused");
+      }
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [
+    joined,
+    showName,
+    roomId,
+    scene,
+    cameraShot,
+    lightingPreset,
+    backgroundTheme,
+    objectStyle,
+    activePerformers,
+    sceneObjects,
+    sceneSets,
+    floorMarks,
+    assetReferences,
+    storyboardPanels,
+    productionTimeline,
+    takeLibrary,
+    doinkSubmission,
+    activeShowToolbox
+  ]);
 
   const saveShowSession = async () => {
     const session = createShowSession();
@@ -2897,12 +3112,28 @@ function App() {
           <span>{status}</span>
         </div>
         <CommandSearch
+          inputRef={commandInputRef}
           query={commandQuery}
           commands={commandItems}
+          focused={commandFocused}
           onQueryChange={setCommandQuery}
+          onFocusChange={setCommandFocused}
           onRunCommand={runCommand}
         />
+        <button className="topNextButton" onClick={primaryNextAction.action} title={primaryNextAction.detail}>
+          <ChevronRight size={16} />
+          <span>Next</span>
+          <strong>{primaryNextAction.label}</strong>
+        </button>
         <div className="transport">
+          <button onClick={undoLastAction} disabled={!historyPast.length} title="Undo last creative edit">
+            <Undo2 size={17} />
+            Undo
+          </button>
+          <button onClick={redoLastAction} disabled={!historyFuture.length} title="Redo creative edit">
+            <Redo2 size={17} />
+            Redo
+          </button>
           <button className={recording ? "danger active" : ""} onClick={toggleTake}>
             {recording ? <Square size={17} /> : <Circle size={17} />}
             {recording ? "Stop" : "Record"}
@@ -3073,6 +3304,38 @@ function App() {
           onExport={exportProject}
           onSubmitToDoinkTv={submitToDoinkTv}
           onAddToCut={() => selectedTake && addTakeToTimeline(selectedTake)}
+        />
+
+        <ContextActionStrip
+          mode={mode}
+          selectedPart={getCatalogItem(characterPartCatalog, selectedPartId)}
+          selectedPartValue={self?.state.characterParts?.[selectedPartId]}
+          selectedSceneObject={selectedSceneObject}
+          selectedTake={selectedTake}
+          playbackActive={playbackActive}
+          canUndo={historyPast.length > 0}
+          canRedo={historyFuture.length > 0}
+          autosaveLabel={lastAutosaveAt ? `Autosaved ${lastAutosaveAt}` : "Autosave ready"}
+          onUndo={undoLastAction}
+          onRedo={redoLastAction}
+          onPartShape={() =>
+            updateCharacterPart(selectedPartId, {
+              label: getCatalogItem(characterPartCatalog, selectedPartId).label,
+              mode: "shape",
+              shape: selectedPartId === "torso" ? "bean" : "circle",
+              source: ""
+            })
+          }
+          onPartDuplicate={() => duplicateCharacterPart(selectedPartId)}
+          onPartToggleHidden={() => updateCharacterPart(selectedPartId, { hidden: !self?.state.characterParts?.[selectedPartId]?.hidden })}
+          onPartClear={() => clearCharacterPart(selectedPartId)}
+          onObjectDuplicate={() => selectedSceneObject && duplicateSceneObject(selectedSceneObject.id)}
+          onObjectForward={() => selectedSceneObject && moveSceneObjectLayer(selectedSceneObject.id, 1)}
+          onObjectDelete={() => selectedSceneObject && deleteSceneObject(selectedSceneObject.id)}
+          onReplay={playSelectedTake}
+          onMarkBestTake={markSelectedTakeBest}
+          onAddCut={() => selectedTake && addTakeToTimeline(selectedTake)}
+          onExport={exportProject}
         />
 
         <ShowBiblePanel
@@ -3313,24 +3576,51 @@ function TutorialOverlay({ step, mode, onClose, onStepChange }) {
   );
 }
 
-function CommandSearch({ query, commands, onQueryChange, onRunCommand }) {
+function CommandSearch({ inputRef, query, commands, focused, onQueryChange, onFocusChange, onRunCommand }) {
   const normalized = query.trim().toLowerCase();
+  const queryTokens = normalized.split(/\s+/).filter(Boolean);
   const visibleCommands = normalized
-    ? commands.filter((command) => `${command.label} ${command.keywords}`.toLowerCase().includes(normalized)).slice(0, 5)
+    ? commands
+        .filter((command) => {
+          const haystack = `${command.label} ${command.keywords}`.toLowerCase();
+          return queryTokens.every((token) => haystack.includes(token));
+        })
+        .slice(0, 5)
     : commands.slice(0, 4);
 
   return (
-    <div className="commandSearch">
+    <div className={`commandSearch ${focused ? "focused" : ""}`}>
       <Search size={16} />
       <input
+        ref={inputRef}
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
-        placeholder="Search actions, assets, exports..."
+        onFocus={() => onFocusChange(true)}
+        onBlur={() => window.setTimeout(() => onFocusChange(false), 120)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && visibleCommands[0]) {
+            event.preventDefault();
+            event.stopPropagation();
+            onRunCommand(visibleCommands[0]);
+          }
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onQueryChange("");
+            onFocusChange(false);
+            event.currentTarget.blur();
+          }
+        }}
+        placeholder="Ctrl+K actions, assets, exports..."
         aria-label="Command search"
       />
       <div className="commandResults">
         {visibleCommands.map((command) => (
-          <button key={command.id} onMouseDown={(event) => event.preventDefault()} onClick={() => onRunCommand(command)}>
+          <button
+            key={command.id}
+            disabled={command.disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onRunCommand(command)}
+          >
             {command.label}
           </button>
         ))}
@@ -3840,6 +4130,134 @@ function NewProjectGuide({
         <button type="button" onClick={onPlaceInScene}>Place Props</button>
         <button type="button" onClick={onPerform}>Perform</button>
         <button type="button" onClick={onSaveShow}>Save Show</button>
+      </div>
+    </div>
+  );
+}
+
+function ContextActionStrip({
+  mode,
+  selectedPart,
+  selectedPartValue,
+  selectedSceneObject,
+  selectedTake,
+  playbackActive,
+  canUndo,
+  canRedo,
+  autosaveLabel,
+  onUndo,
+  onRedo,
+  onPartShape,
+  onPartDuplicate,
+  onPartToggleHidden,
+  onPartClear,
+  onObjectDuplicate,
+  onObjectForward,
+  onObjectDelete,
+  onReplay,
+  onMarkBestTake,
+  onAddCut,
+  onExport
+}) {
+  const isBuild = mode === "build";
+  const isAssets = mode === "assets";
+  const isEdit = mode === "edit";
+  const heading = isBuild
+    ? selectedPart?.name || "Rig Part"
+    : isAssets
+    ? selectedSceneObject?.name || "Scene Piece"
+    : isEdit
+    ? selectedTake?.name || "Take Review"
+    : "Quick Actions";
+  const detail = isBuild
+    ? selectedPartValue?.source || selectedPartValue?.shape || selectedPartValue?.mode
+      ? "Selected part is editable."
+      : "Blank part selected. Add a shape or image when ready."
+    : isAssets
+    ? selectedSceneObject
+      ? "Arrange, duplicate, or remove the selected prop."
+      : "Select a prop to edit it."
+    : isEdit
+    ? selectedTake
+      ? "Replay, mark best, add to cut, or export."
+      : "Select a take to finish the short."
+    : "Undo, redo, and autosave stay available while you work.";
+
+  return (
+    <div className="dockGroup contextActionStrip">
+      <div className="contextActionHeader">
+        <div>
+          <span className="eyebrow">Right Now</span>
+          <strong>{heading}</strong>
+          <small>{detail}</small>
+        </div>
+        <small>{autosaveLabel}</small>
+      </div>
+      <div className="contextActionButtons">
+        <button onClick={onUndo} disabled={!canUndo}>
+          <Undo2 size={15} />
+          Undo
+        </button>
+        <button onClick={onRedo} disabled={!canRedo}>
+          <Redo2 size={15} />
+          Redo
+        </button>
+        {isBuild && (
+          <>
+            <button onClick={onPartShape}>
+              <Square size={15} />
+              Shape
+            </button>
+            <button onClick={onPartDuplicate} disabled={!selectedPartValue}>
+              <Copy size={15} />
+              Clone
+            </button>
+            <button onClick={onPartToggleHidden} disabled={!selectedPartValue}>
+              <X size={15} />
+              {selectedPartValue?.hidden ? "Show" : "Hide"}
+            </button>
+            <button onClick={onPartClear} disabled={!selectedPartValue}>
+              <Trash2 size={15} />
+              Clear
+            </button>
+          </>
+        )}
+        {isAssets && (
+          <>
+            <button onClick={onObjectDuplicate} disabled={!selectedSceneObject}>
+              <Copy size={15} />
+              Clone
+            </button>
+            <button onClick={onObjectForward} disabled={!selectedSceneObject}>
+              <ChevronRight size={15} />
+              Forward
+            </button>
+            <button onClick={onObjectDelete} disabled={!selectedSceneObject}>
+              <Trash2 size={15} />
+              Delete
+            </button>
+          </>
+        )}
+        {isEdit && (
+          <>
+            <button onClick={onReplay} disabled={!selectedTake}>
+              <Play size={15} />
+              {playbackActive ? "Playing" : "Replay"}
+            </button>
+            <button onClick={onMarkBestTake} disabled={!selectedTake}>
+              <Sparkles size={15} />
+              Best
+            </button>
+            <button onClick={onAddCut} disabled={!selectedTake}>
+              <Plus size={15} />
+              Add Cut
+            </button>
+            <button onClick={onExport}>
+              <Video size={15} />
+              Export
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
