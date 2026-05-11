@@ -166,7 +166,7 @@ io.on("connection", (socket) => {
     io.to(activeRoomId).emit("take:status", {
       recording: false,
       takeStartedAt: room.takeStartedAt,
-      savedTake: savedTake ? summarizeTake(savedTake) : null
+      savedTake
     });
   });
 

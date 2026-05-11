@@ -1886,6 +1886,57 @@ input[type="color"] {
   background: var(--nicotine);
 }
 
+.rigCheckPanel.ready {
+  border-color: var(--pond);
+}
+
+.rigCheckPanel.needsAttention {
+  border-color: var(--nicotine);
+}
+
+.rigCheckList {
+  display: grid;
+  gap: 7px;
+}
+
+.rigCheckItem {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.rigCheckItem > span {
+  display: grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.rigCheckItem.done > span {
+  background: #8fd8b5;
+}
+
+.rigCheckItem strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.rigCheckItem button {
+  min-height: 28px;
+  padding: 0 8px;
+  background: var(--nicotine);
+  font-size: 10px;
+}
+
 .performanceLoopPanel {
   border-color: var(--pond);
   background:

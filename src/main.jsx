@@ -639,6 +639,151 @@ function clonePerformers(performers) {
   }));
 }
 
+function applyTakeEventToPreview(performers, event) {
+  if (event.type === "performer:update") return updatePerformerState(performers, event.performerId, event.state);
+  if (event.type === "performer:joined" || event.type === "performer:configured") {
+    return upsertPerformer(performers, event.performer);
+  }
+  if (event.type === "performer:left") return removePerformer(performers, event.performerId);
+  if (event.type === "macro:trigger") {
+    return updatePerformerState(performers, event.performerId, { macro: event.macro });
+  }
+  return performers;
+}
+
+function drawPreviewVideoFrame(ctx, { take, performers, atMs, width, height }) {
+  const sceneItem = getCatalogItem(sceneCatalog, take.scene || "studio");
+  const background = {
+    studio: ["#f5f1e8", "#d9d1c3"],
+    street: ["#dfe8ef", "#b7c8c6"],
+    space: ["#242335", "#0f1020"]
+  }[sceneItem.id] || ["#f5f1e8", "#d9d1c3"];
+  const horizon = ((sceneItem.horizon || 50) / 100) * height;
+  const foreground = ((sceneItem.foreground || 86) / 100) * height;
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, background[0]);
+  gradient.addColorStop(1, background[1]);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  for (let x = -80; x < width + 80; x += 90) {
+    ctx.fillRect(x + ((atMs / 80) % 90), 0, 26, height);
+  }
+
+  ctx.strokeStyle = "rgba(43,45,66,0.22)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, horizon);
+  ctx.lineTo(width, horizon);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(43,45,66,0.08)";
+  ctx.beginPath();
+  ctx.moveTo(width * 0.08, foreground);
+  ctx.lineTo(width * 0.92, foreground);
+  ctx.lineTo(width * 0.7, horizon + 30);
+  ctx.lineTo(width * 0.3, horizon + 30);
+  ctx.closePath();
+  ctx.fill();
+
+  performerList(performers)
+    .sort((a, b) => a.state.y - b.state.y)
+    .forEach((performer) => {
+      const character = getCatalogItem(characterCatalog, performer.character);
+      const state = performer.state;
+      const x = (state.x / 100) * width;
+      const y = (state.y / 100) * height;
+      const depth = Math.max(0, Math.min(1, (state.y - (sceneItem.horizon || 50)) / ((sceneItem.foreground || 86) - (sceneItem.horizon || 50))));
+      const scale = (0.54 + depth * 0.48) * (state.scale || 1);
+      const bounce = state.walking ? Math.sin(atMs / 95) * 5 * scale : 0;
+      const bodyColor = state.characterDesign?.color || character.color || "#8fd8b5";
+      const accent = state.characterDesign?.accent || character.accent || "#2b2d42";
+
+      ctx.save();
+      ctx.translate(x, y + bounce);
+      ctx.scale(scale * (state.facing < 0 ? -1 : 1), scale);
+      ctx.fillStyle = "rgba(30,29,39,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(0, 14, 48, 12, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = bodyColor;
+      ctx.strokeStyle = "#2b2d42";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.roundRect(-34, -86, 68, 92, 20);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(0, -112, 38, 34, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(-13, -118, 4, 0, Math.PI * 2);
+      ctx.arc(13, -118, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      const mouthOpen = Math.max(state.mouthOpen || 0, state.speaking ? 0.2 : 0);
+      ctx.fillStyle = "#1c1b24";
+      ctx.beginPath();
+      ctx.ellipse(0, -101, 10, 3 + mouthOpen * 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+  ctx.fillStyle = "rgba(245,241,232,0.78)";
+  ctx.fillRect(24, 24, 360, 46);
+  ctx.fillStyle = "#2b2d42";
+  ctx.font = "700 22px Arial";
+  ctx.fillText(take.name || "Pup-It preview render", 42, 54);
+}
+
+async function exportTakePreviewVideo(take, { onFrame } = {}) {
+  if (!take || !window.MediaRecorder) throw new Error("Browser video export is not available here.");
+  const width = 1280;
+  const height = 720;
+  const fps = 12;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : "video/webm";
+  const recorder = new MediaRecorder(canvas.captureStream(fps), { mimeType });
+  const chunks = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data?.size) chunks.push(event.data);
+  };
+  const stopped = new Promise((resolve) => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+  let performers = makePreviewPerformers(take);
+  const events = [...(take.tracks?.motion || [])].sort((a, b) => a.at - b.at);
+  let eventIndex = 0;
+  const durationMs = Math.max(1000, Math.min(take.durationMs || 5000, 45000));
+  const frameMs = 1000 / fps;
+
+  recorder.start();
+  for (let atMs = 0; atMs <= durationMs; atMs += frameMs) {
+    while (eventIndex < events.length && (events[eventIndex].at || 0) <= atMs) {
+      performers = applyTakeEventToPreview(performers, events[eventIndex]);
+      eventIndex += 1;
+    }
+    drawPreviewVideoFrame(ctx, { take, performers, atMs, width, height });
+    onFrame?.(Math.min(1, atMs / durationMs));
+    await new Promise((resolve) => window.setTimeout(resolve, frameMs));
+  }
+  recorder.stop();
+  return stopped;
+}
+
 function makeShowId(showName) {
   const slug = (showName || "untitled-show")
     .trim()
@@ -852,6 +997,7 @@ function App() {
   const [selectedTake, setSelectedTake] = useState(null);
   const [previewPerformers, setPreviewPerformers] = useState(null);
   const [playbackActive, setPlaybackActive] = useState(false);
+  const [videoExporting, setVideoExporting] = useState(false);
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const [productionTimeline, setProductionTimeline] = useState([]);
@@ -935,7 +1081,17 @@ function App() {
           savedTake,
           ...current.filter((take) => take.id !== savedTake.id)
         ]);
-        loadTakeById(savedTake.id, { select: true, review: true });
+        clearPlayback();
+        setSelectedTake(savedTake);
+        setPreviewPerformers(makePreviewPerformers(savedTake));
+        setScene(savedTake.scene);
+        setCameraShot(savedTake.cameraShot || "wide");
+        setLightingPreset(savedTake.lightingPreset || "scene");
+        setCameraFollow(Boolean(savedTake.directorCamera?.follow));
+        setCameraPunchScale(savedTake.directorCamera?.punchScale || 1);
+        setCameraShakeOffset({ x: 0, y: 0 });
+        setMode("edit");
+        window.setTimeout(() => playTake(savedTake), 120);
       }
       setStatus(isRecording ? "Recording movement and audio chunks." : "Take saved. Replay it while the performance energy is fresh.");
     });
@@ -1884,9 +2040,9 @@ function App() {
     setTakeLibrary(library.takes || []);
   };
 
-  const loadTakeById = async (takeId, { select = false, review = false } = {}) => {
+  const loadTakeById = async (takeId, { select = false, review = false, roomOverride = roomId } = {}) => {
     const response = await fetch(
-      `${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes/${encodeURIComponent(takeId)}`
+      `${SERVER_URL}/api/rooms/${encodeURIComponent(roomOverride)}/takes/${encodeURIComponent(takeId)}`
     );
     if (!response.ok) return null;
     const take = await response.json();
@@ -1915,15 +2071,15 @@ function App() {
     setPlaybackActive(false);
   };
 
-  const playSelectedTake = () => {
-    if (!selectedTake) return;
+  const playTake = (take) => {
+    if (!take) return;
     clearPlayback();
-    setScene(selectedTake.scene);
-    setPreviewPerformers(makePreviewPerformers(selectedTake));
+    setScene(take.scene);
+    setPreviewPerformers(makePreviewPerformers(take));
     setPlaybackActive(true);
 
-    const events = [...selectedTake.tracks.motion].sort((a, b) => a.at - b.at);
-    const lastAt = events.length ? events[events.length - 1].at : selectedTake.durationMs || 0;
+    const events = [...take.tracks.motion].sort((a, b) => a.at - b.at);
+    const lastAt = events.length ? events[events.length - 1].at : take.durationMs || 0;
 
     playbackTimersRef.current = events.map((event) =>
       window.setTimeout(() => {
@@ -1956,6 +2112,8 @@ function App() {
       }, lastAt + 250)
     );
   };
+
+  const playSelectedTake = () => playTake(selectedTake);
 
   const activePerformers = useMemo(() => performerList(performers), [performers]);
   const stagePerformers = useMemo(
@@ -2076,6 +2234,7 @@ function App() {
         index: current.length + 1
       })
     ]);
+    setStatus(`Added "${take.name || "take"}" to the cut. Export the short when it feels good enough.`);
   };
 
   const removeTimelineClip = (clipId) => {
@@ -2170,6 +2329,35 @@ function App() {
   const queueVideoExport = () => {
     setMode("edit");
     setStatus("Video export is next on the render roadmap. For now, export the short package with takes, credits, and tracks.");
+  };
+
+  const exportSelectedTakeVideo = async () => {
+    if (!selectedTake || videoExporting) return;
+    setVideoExporting(true);
+    setStatus("Rendering a browser preview video. Keep this tab open for a moment.");
+    try {
+      const blob = await exportTakePreviewVideo(selectedTake, {
+        onFrame: (progress) => {
+          if (progress === 0 || progress >= 0.98) return;
+          setStatus(`Rendering preview video ${Math.round(progress * 100)}%.`);
+        }
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pup-it-${selectedTake.id || "take"}-preview.webm`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setExportHistory((current) => [
+        { id: `video-${Date.now()}`, type: "preview-webm", exportedAt: new Date().toISOString() },
+        ...current
+      ]);
+      setStatus("Preview WEBM exported. Package export still carries project data, tracks, credits, and metadata.");
+    } catch (error) {
+      setStatus(error.message || "Preview video export failed in this browser.");
+    } finally {
+      setVideoExporting(false);
+    }
   };
 
   const applyShowTemplate = (templateId) => {
@@ -2708,6 +2896,8 @@ function App() {
             onExport={downloadTake}
             onExportProject={exportProject}
             onQueueVideoExport={queueVideoExport}
+            onExportVideo={exportSelectedTakeVideo}
+            videoExporting={videoExporting}
             onAddTakeToTimeline={addTakeToTimeline}
             timeline={productionTimeline}
             episodeStatus={episodeStatus}
@@ -2964,7 +3154,8 @@ function ShowDashboard({
 
       <section className="dashboardGrid">
         <div className="dashboardPanel">
-          <h2>Reusable Formats</h2>
+          <h2>Rough Launch Pads</h2>
+          <small className="controlHint">These set up useful production shapes, then get out of the way so the show does not look canned.</small>
           <div className="templateGrid">
             {templates.map((template) => (
               <button key={template.id} onClick={() => onApplyTemplate(template.id)}>
@@ -4227,6 +4418,8 @@ function SceneLibraryEditor({
   onExport,
   onExportProject,
   onQueueVideoExport,
+  onExportVideo,
+  videoExporting,
   onAddTakeToTimeline,
   timeline,
   episodeStatus,
@@ -4304,6 +4497,10 @@ function SceneLibraryEditor({
                 <Plus size={16} />
                 Add Cut
               </button>
+              <button onClick={onExportVideo} disabled={videoExporting}>
+                <Video size={16} />
+                {videoExporting ? "Rendering" : "Preview WEBM"}
+              </button>
             </div>
           </div>
 
@@ -4354,7 +4551,7 @@ function SceneLibraryEditor({
 
           <div className="dockGroup exportPlanPanel">
             <h2>Export Short</h2>
-            <small className="controlHint">Use the package now; video rendering is the next render-system milestone.</small>
+            <small className="controlHint">Preview WEBM gives a quick browser video; package export carries the project data, audio tracks, credits, and metadata.</small>
             <div className="libraryActions">
               <button onClick={onExportProject}>
                 <Save size={16} />
@@ -4364,9 +4561,13 @@ function SceneLibraryEditor({
                 <Video size={16} />
                 Raw Take JSON
               </button>
+              <button onClick={onExportVideo} disabled={videoExporting}>
+                <Clapperboard size={16} />
+                {videoExporting ? "Rendering" : "Preview WEBM"}
+              </button>
               <button onClick={onQueueVideoExport}>
                 <Clapperboard size={16} />
-                Video Next
+                Render Roadmap
               </button>
             </div>
           </div>
@@ -4724,6 +4925,13 @@ function CharacterEditor({
     const part = characterParts[slot];
     return part?.source || part?.shape || part?.mode === "drawn";
   });
+  const rigCheckItems = [
+    { id: "head", label: "Head", required: true, ok: Boolean(characterParts.head?.source || characterParts.head?.shape || characterParts.head?.mode === "drawn") },
+    { id: "torso", label: "Torso", required: true, ok: Boolean(characterParts.torso?.source || characterParts.torso?.shape || characterParts.torso?.mode === "drawn") },
+    { id: "leftArm", label: "Arms", required: Boolean(rig.arms), ok: !rig.arms || Boolean(characterParts.leftArm?.source || characterParts.rightArm?.source || characterParts.leftArm?.shape || characterParts.rightArm?.shape || characterParts.leftArm?.mode === "drawn" || characterParts.rightArm?.mode === "drawn") },
+    { id: "leftLeg", label: "Legs", required: Boolean(rig.legs), ok: !rig.legs || Boolean(characterParts.leftLeg?.source || characterParts.rightLeg?.source || characterParts.leftLeg?.shape || characterParts.rightLeg?.shape || characterParts.leftLeg?.mode === "drawn" || characterParts.rightLeg?.mode === "drawn") }
+  ];
+  const missingRigParts = rigCheckItems.filter((item) => item.required && !item.ok);
   const design = {
     name: performer.state.characterDesign?.name || `${baseCharacter.name} Puppet`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
@@ -4744,6 +4952,34 @@ function CharacterEditor({
                 : "This is only a rig. Add shapes, doodles, or images to make the character yours."}
             </small>
           </div>
+        </div>
+      </div>
+
+      <div className={`dockGroup rigCheckPanel ${missingRigParts.length ? "needsAttention" : "ready"}`}>
+        <h2>Rig Check</h2>
+        <small className="controlHint">
+          Forgiving setup: stick-rig defaults still perform, but these quick fixes make the character read better on camera.
+        </small>
+        <div className="rigCheckList">
+          {rigCheckItems.map((item) => (
+            <div className={`rigCheckItem ${item.ok ? "done" : ""}`} key={item.label}>
+              <span>{item.ok ? "OK" : item.required ? "FIX" : "SKIP"}</span>
+              <strong>{item.label}</strong>
+              {!item.ok && item.required && (
+                <button
+                  onClick={() =>
+                    onPartChange(item.id, {
+                      label: getCatalogItem(characterPartCatalog, item.id).label,
+                      mode: "shape",
+                      shape: item.id === "torso" ? "bean" : "circle"
+                    })
+                  }
+                >
+                  Add Shape
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
