@@ -184,6 +184,30 @@ const workflowSteps = [
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
 ];
 
+const developmentPathCards = [
+  {
+    id: "five-minute",
+    label: "1",
+    name: "Five-Minute Cartoon",
+    promise: "Start, build, perform, replay, export.",
+    focus: "Keep the beginner rail obvious enough that a first short can happen before the user starts managing software."
+  },
+  {
+    id: "toybox",
+    label: "2",
+    name: "Creation Toybox",
+    promise: "Make the show’s people, props, textures, and weird rules feel original.",
+    focus: "Treat presets as raw material. Shapes, doodles, imports, mutations, and behaviors should push users toward their own voice."
+  },
+  {
+    id: "studio",
+    label: "3",
+    name: "Performance Studio",
+    promise: "Make performing feel smooth, funny, and worth replaying.",
+    focus: "Motion, mouth, cue deck, camera, stings, and take review should feel like a playable comedy instrument."
+  }
+];
+
 const styleMutationControls = [
   {
     id: "roughen",
@@ -2463,6 +2487,7 @@ function App() {
             savedShows={savedShows}
             templates={showStarterTemplates}
             shortFormats={shortFormatTemplates}
+            developmentPaths={developmentPathCards}
             progress={beginnerProgress}
             takeCount={takeLibrary.length}
             panelCount={storyboardPanels.length}
@@ -2594,6 +2619,9 @@ function App() {
             onMoveToMark={moveSelfToMark}
             onSetMarkFromSelf={setCurrentPositionAsMark}
             onApplyShotTemplate={applyShotTemplate}
+            recording={recording}
+            onRecordToggle={toggleTake}
+            onModeChange={setMode}
           />
         )}
         {mode === "build" && (
@@ -2803,6 +2831,7 @@ function ShowDashboard({
   savedShows,
   templates,
   shortFormats,
+  developmentPaths,
   progress,
   takeCount,
   panelCount,
@@ -2863,6 +2892,23 @@ function ShowDashboard({
               <strong>{format.name}</strong>
               <span>{format.description}</span>
             </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="philosophyPanel" aria-label="Development path">
+        <div>
+          <span className="eyebrow">Product Path</span>
+          <h2>Build a weird little world, perform inside it, finish the cartoon.</h2>
+        </div>
+        <div className="pathCardGrid">
+          {developmentPaths.map((path) => (
+            <article key={path.id} className="pathCard">
+              <span>{path.label}</span>
+              <strong>{path.name}</strong>
+              <em>{path.promise}</em>
+              <small>{path.focus}</small>
+            </article>
           ))}
         </div>
       </section>
@@ -3073,6 +3119,13 @@ function BeginnerRoadmap({
   return (
     <div className="dockGroup beginnerRoadmap">
       <h2>Make A Short</h2>
+      <div className="beginnerRail">
+        <span>Start</span>
+        <span>Build</span>
+        <span>Perform</span>
+        <span>Replay</span>
+        <span>Export</span>
+      </div>
       <div className="nextBestStep">
         <span>Next Best Step</span>
         <strong>{nextStep.label}</strong>
@@ -3321,7 +3374,10 @@ function PerformControls({
   onStoryboardCapture,
   onMoveToMark,
   onSetMarkFromSelf,
-  onApplyShotTemplate
+  onApplyShotTemplate,
+  recording,
+  onRecordToggle,
+  onModeChange
 }) {
   return (
     <>
@@ -3423,6 +3479,21 @@ function PerformControls({
           <button type="button" onClick={onCameraReset}>
             <RefreshCw size={16} />
             Reset
+          </button>
+        </div>
+      </div>
+
+      <div className="dockGroup performanceLoopPanel">
+        <h2>Performance Loop</h2>
+        <small className="controlHint">Keep the reward close: rehearse, record a short take, then jump straight to replay.</small>
+        <div className="performanceLoopActions">
+          <button className={recording ? "danger active" : ""} onClick={onRecordToggle}>
+            <Circle size={16} />
+            {recording ? "Stop Take" : "Record Take"}
+          </button>
+          <button onClick={() => onModeChange("edit")}>
+            <Play size={16} />
+            Replay Takes
           </button>
         </div>
       </div>
@@ -4684,10 +4755,27 @@ function CharacterEditor({
 
       <div className="dockGroup originalPanel">
         <h2>Playground Lab</h2>
-        <button className="wideAction" onClick={onRandomize}>
-          <Shuffle size={16} />
-          Weird Starter
-        </button>
+        <div className="toyboxQuickStrip">
+          <button onClick={onRandomize}>
+            <Shuffle size={16} />
+            Weird Starter
+          </button>
+          <button onClick={() => onMutate("odd-body")}>
+            <Sparkles size={16} />
+            Odd Body
+          </button>
+          <button onClick={() => onStyleMutate("collage")}>
+            <Palette size={16} />
+            Collage
+          </button>
+          <button onClick={() => onStyleMutate("roughen")}>
+            <Wand2 size={16} />
+            Roughen
+          </button>
+        </div>
+        <small className="controlHint">
+          Fast originality buttons first. Expert rig controls stay lower so new users can make a character before tuning one.
+        </small>
         <div className="mutationGrid">
           {mutationRecipeCatalog.map((recipe) => (
             <button key={recipe.id} onClick={() => onMutate(recipe.id)}>
