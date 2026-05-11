@@ -24,6 +24,9 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Character Creator" })).toBeVisible();
   await expect(page.locator(".showKitBranches").getByText("Tech Tree")).toBeVisible();
   await expect(page.locator(".showKitBranches").getByText("Cast Branch")).toBeVisible();
+  await expect(page.getByLabel("Canvas part editor")).toBeVisible();
+  await page.getByLabel("Canvas part editor").getByRole("button", { name: "Shape" }).click();
+  await expect(page.locator(".puppet.self .partHead")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rig Check" })).toBeVisible();
   await expect(page.locator(".buildToolStrip")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assemble Parts" })).toBeVisible();

@@ -3625,6 +3625,22 @@ function App() {
                   <span>Select a part, then nudge, stretch, color, or import it.</span>
                 </div>
               ) : null}
+              {mode === "build" && self ? (
+                <BuildCanvasPartToolbar
+                  selectedPart={getCatalogItem(characterPartCatalog, selectedPartId)}
+                  value={self.state.characterParts?.[selectedPartId] || {}}
+                  fallbackColor={self.state.characterDesign?.color || getCatalogItem(characterCatalog, self.character).color}
+                  onChange={(patch) =>
+                    updateCharacterPart(selectedPartId, {
+                      label: getCatalogItem(characterPartCatalog, selectedPartId).label,
+                      ...patch
+                    })
+                  }
+                  onDuplicate={() => duplicateCharacterPart(selectedPartId)}
+                  onSwap={partSwapTargets[selectedPartId] ? () => swapCharacterParts(selectedPartId) : null}
+                  onClear={() => clearCharacterPart(selectedPartId)}
+                />
+              ) : null}
               {sceneObjects.map((object) => (
                 <SceneObject
                   key={object.id}
@@ -6563,6 +6579,102 @@ function CharacterEditor({
           max={58}
           onChange={(legLength) => onRigChange({ legLength })}
         />
+      </div>
+    </div>
+  );
+}
+
+function BuildCanvasPartToolbar({ selectedPart, value = {}, fallbackColor, onChange, onDuplicate, onSwap, onClear }) {
+  const importPartImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () =>
+      onChange({
+        mode: "image",
+        source: String(reader.result || ""),
+        shape: value.shape || "oval"
+      });
+    reader.readAsDataURL(file);
+  };
+  const nudge = (x = 0, y = 0) =>
+    onChange({
+      x: Math.max(-36, Math.min(36, (value.x || 0) + x)),
+      y: Math.max(-36, Math.min(36, (value.y || 0) + y))
+    });
+  const hasPart = Boolean(value.source || value.shape || value.mode === "drawn");
+
+  return (
+    <div className="buildCanvasPartToolbar" aria-label="Canvas part editor">
+      <div className="canvasPartHeader">
+        <span
+          className={`canvasPartPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}
+          style={{ "--part-tint": value.tint || fallbackColor }}
+        >
+          {value.source ? <img src={value.source} alt="" /> : null}
+        </span>
+        <div>
+          <strong>{selectedPart?.name || "Part"}</strong>
+          <small>{hasPart ? "editing on canvas" : "empty stick guide"}</small>
+        </div>
+      </div>
+      <div className="canvasPartActions">
+        <button type="button" onClick={() => onChange({ mode: "shape", shape: selectedPart?.id === "torso" ? "bean" : "circle", source: "" })}>
+          Shape
+        </button>
+        <button type="button" onClick={() => onChange({ mode: "drawn", shape: "scribble", source: "" })}>
+          Doodle
+        </button>
+        <label>
+          Image
+          <input type="file" accept="image/*" onChange={(event) => importPartImage(event.target.files?.[0])} />
+        </label>
+        <button type="button" onClick={() => onChange({ hidden: !value.hidden })}>
+          {value.hidden ? "Show" : "Hide"}
+        </button>
+      </div>
+      <div className="canvasPartHandles" aria-label="Canvas part handles">
+        <button type="button" onClick={() => onChange({ scale: Math.max(0.55, (value.scale || 1) - 0.08) })}>
+          - Size
+        </button>
+        <button type="button" onClick={() => onChange({ scale: Math.min(1.65, (value.scale || 1) + 0.08) })}>
+          + Size
+        </button>
+        <button type="button" onClick={() => onChange({ rotate: Math.max(-45, (value.rotate || 0) - 5) })}>
+          Tilt L
+        </button>
+        <button type="button" onClick={() => onChange({ rotate: Math.min(45, (value.rotate || 0) + 5) })}>
+          Tilt R
+        </button>
+      </div>
+      <div className="canvasPartNudge" aria-label="Canvas nudge controls">
+        <button type="button" onClick={() => nudge(0, -4)}>Up</button>
+        <button type="button" onClick={() => nudge(-4, 0)}>Left</button>
+        <button type="button" onClick={() => onChange({ x: 0, y: 0 })}>Center</button>
+        <button type="button" onClick={() => nudge(4, 0)}>Right</button>
+        <button type="button" onClick={() => nudge(0, 4)}>Down</button>
+      </div>
+      <div className="canvasPartSwatches" aria-label="Canvas part colors">
+        {characterColorSwatches.slice(0, 8).map((color) => (
+          <button
+            type="button"
+            key={color}
+            className={value.tint === color ? "selected" : ""}
+            aria-label={`Use ${color}`}
+            style={{ background: color }}
+            onClick={() => onChange({ tint: color })}
+          />
+        ))}
+      </div>
+      <div className="canvasPartFooter">
+        <button type="button" disabled={!hasPart} onClick={onDuplicate}>
+          Clone
+        </button>
+        <button type="button" disabled={!onSwap} onClick={onSwap || undefined}>
+          Swap
+        </button>
+        <button type="button" disabled={!hasPart} onClick={onClear}>
+          Clear
+        </button>
       </div>
     </div>
   );
