@@ -975,6 +975,8 @@ input[type="color"] {
 }
 
 .sceneObject span {
+  position: relative;
+  z-index: 1;
   max-width: 94px;
   overflow: hidden;
   padding: 3px 5px;
@@ -985,8 +987,28 @@ input[type="color"] {
   white-space: nowrap;
 }
 
+.sceneObject img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(5px 8px 0 rgba(38, 41, 54, 0.14));
+}
+
 .sceneObject.selected {
   outline: 3px solid var(--nicotine);
+}
+
+.sceneObject.locked {
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+.sceneObject-image {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .sceneObject-kenney {
@@ -1133,6 +1155,35 @@ input[type="color"] {
 
 .experience-beginner .advancedControl {
   display: none;
+}
+
+.controlCheatSheet {
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.controlCheatSheet summary {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.controlCheatSheet div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 6px 8px;
+  padding-top: 10px;
+}
+
+.controlCheatSheet span {
+  color: #666b86;
+}
+
+.controlCheatSheet strong {
+  color: var(--ink);
 }
 
 .segmented,
@@ -1683,6 +1734,19 @@ input[type="color"] {
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+
+.sceneObjectActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sceneObjectActions button {
+  min-height: 30px;
+  padding: 0 6px;
+  background: var(--paper);
+  font-size: 11px;
 }
 
 .storyboardEmpty {

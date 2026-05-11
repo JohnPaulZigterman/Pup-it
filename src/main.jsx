@@ -221,6 +221,27 @@ function createSceneObjectFromAsset(asset, index = 0) {
   };
 }
 
+function createSceneObjectFromImage({ name, imageUrl, license, attribution }, index = 0) {
+  return {
+    id: `scene-object-image-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    assetId: "custom-image",
+    name: name || "Imported Image",
+    sourceUrl: imageUrl,
+    imageUrl,
+    license: license || "User Supplied",
+    attribution: attribution || "User supplied image. Confirm rights before publishing.",
+    kind: "object",
+    x: 34 + (index % 4) * 12,
+    y: 66,
+    scale: 0.75,
+    layer: 2,
+    tint: "#f5f1e8",
+    shape: "image",
+    flipped: false,
+    locked: false
+  };
+}
+
 function makePreviewPerformers(take) {
   return indexPerformers(
     take.performers.map((performer, index) => ({
@@ -291,6 +312,7 @@ function showSessionFromPersistedShow(show) {
     cast: show.cast || [],
     episodeStatus: showBible.episodeStatus || "draft",
     sceneObjects: showBible.sceneObjects || [],
+    sceneSets: showBible.sceneSets || [],
     assetReferences: show.assetReferences || [],
     storyboardPanels: showBible.storyboardPanels || [],
     productionTimeline: showBible.productionTimeline || [],
@@ -325,6 +347,7 @@ async function persistShowSession(session) {
         productionTimeline: session.productionTimeline,
         episodeStatus: session.episodeStatus,
         sceneObjects: session.sceneObjects,
+        sceneSets: session.sceneSets,
         takes: session.takes
       }
     })
@@ -332,6 +355,38 @@ async function persistShowSession(session) {
   if (!response.ok) throw new Error("Show database unavailable");
   const data = await response.json();
   return showSessionFromPersistedShow(data.show);
+}
+
+async function persistEpisodeSnapshot(showId, session) {
+  const response = await fetch(`${SERVER_URL}/api/shows/${encodeURIComponent(showId)}/episodes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seasonNumber: 1,
+      episodeNumber: 1,
+      title: `${session.showName} Episode 1`,
+      status: session.episodeStatus || "draft",
+      metadata: {
+        currentScene: session.scene,
+        cameraShot: session.cameraShot,
+        lightingPreset: session.lightingPreset,
+        backgroundTheme: session.backgroundTheme,
+        objectStyle: session.objectStyle
+      },
+      scenes: [
+        {
+          id: "current-stage",
+          scene: session.scene,
+          sceneObjects: session.sceneObjects || []
+        }
+      ],
+      takes: session.takes || [],
+      finalCuts: session.productionTimeline || [],
+      publishingPackages: []
+    })
+  });
+  if (!response.ok) throw new Error("Episode database unavailable");
+  return response.json();
 }
 
 function summarizeTakeForShow(take) {
@@ -400,6 +455,7 @@ function App() {
   const [episodeStatus, setEpisodeStatus] = useState("draft");
   const [sceneObjects, setSceneObjects] = useState([]);
   const [selectedSceneObjectId, setSelectedSceneObjectId] = useState(null);
+  const [sceneSets, setSceneSets] = useState([]);
   const [assetReferences, setAssetReferences] = useState([]);
   const [assetFilter, setAssetFilter] = useState("all");
   const [assetTarget, setAssetTarget] = useState("all");
@@ -670,15 +726,71 @@ function App() {
     setStatus(`Placed "${asset.name}" in the scene.`);
   };
 
+  const addSceneObjectFromImage = (payload) => {
+    if (!payload.imageUrl?.trim()) return;
+    const sceneObject = createSceneObjectFromImage(
+      { ...payload, imageUrl: payload.imageUrl.trim() },
+      sceneObjects.length
+    );
+    setSceneObjects((current) => [...current, sceneObject]);
+    setSelectedSceneObjectId(sceneObject.id);
+    setStatus(`Placed "${sceneObject.name}" from image URL.`);
+  };
+
   const updateSceneObject = (objectId, patch) => {
     setSceneObjects((current) =>
       current.map((object) => (object.id === objectId ? { ...object, ...patch } : object))
     );
   };
 
+  const duplicateSceneObject = (objectId) => {
+    const sourceObject = sceneObjects.find((object) => object.id === objectId);
+    if (!sourceObject) return;
+    const copy = {
+      ...sourceObject,
+      id: `scene-object-copy-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+      name: `${sourceObject.name} copy`,
+      x: clamp(sourceObject.x + 6, 5, 95),
+      y: clamp(sourceObject.y + 2, 25, 88),
+      locked: false
+    };
+    setSceneObjects((current) => [...current, copy]);
+    setSelectedSceneObjectId(copy.id);
+  };
+
+  const moveSceneObjectLayer = (objectId, delta) => {
+    const object = sceneObjects.find((item) => item.id === objectId);
+    if (!object) return;
+    updateSceneObject(objectId, { layer: clamp((object.layer || 0) + delta, 0, 6) });
+  };
+
   const deleteSceneObject = (objectId) => {
     setSceneObjects((current) => current.filter((object) => object.id !== objectId));
     setSelectedSceneObjectId((current) => (current === objectId ? null : current));
+  };
+
+  const saveCurrentSceneSet = () => {
+    const sceneSet = {
+      id: `scene-set-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+      name: `${selectedScene.name} Set ${sceneSets.length + 1}`,
+      scene,
+      backgroundTheme,
+      objectStyle,
+      sceneObjects: sceneObjects.map((object) => ({ ...object }))
+    };
+    setSceneSets((current) => [sceneSet, ...current]);
+    setStatus(`Saved "${sceneSet.name}" as a reusable set.`);
+  };
+
+  const applySceneSet = (sceneSetId) => {
+    const sceneSet = sceneSets.find((item) => item.id === sceneSetId);
+    if (!sceneSet) return;
+    changeScene(sceneSet.scene);
+    setBackgroundTheme(sceneSet.backgroundTheme || backgroundTheme);
+    setObjectStyle(sceneSet.objectStyle || objectStyle);
+    setSceneObjects(sceneSet.sceneObjects.map((object) => ({ ...object })));
+    setSelectedSceneObjectId(sceneSet.sceneObjects[0]?.id || null);
+    setStatus(`Loaded set "${sceneSet.name}".`);
   };
 
   const rememberAssetReference = (asset, importType) => {
@@ -1077,6 +1189,7 @@ function App() {
       ...selectedStoryboardPanel,
       id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
       title: `${selectedStoryboardPanel.title} copy`,
+      sceneObjects: (selectedStoryboardPanel.sceneObjects || []).map((object) => ({ ...object })),
       performers: clonePerformers(selectedStoryboardPanel.performers)
     };
     setStoryboardPanels((current) => [...current, panel]);
@@ -1155,6 +1268,7 @@ function App() {
       objectStyle,
       episodeStatus,
       sceneObjects,
+      sceneSets,
       assetReferences,
       storyboardPanels,
       timeline: productionTimeline,
@@ -1249,6 +1363,7 @@ function App() {
       cast: clonePerformers(activePerformers),
       episodeStatus,
       sceneObjects,
+      sceneSets,
       assetReferences,
       storyboardPanels,
       productionTimeline,
@@ -1260,6 +1375,10 @@ function App() {
     const session = createShowSession();
     try {
       const persistedSession = await persistShowSession(session);
+      await persistEpisodeSnapshot(persistedSession.databaseId || persistedSession.id, {
+        ...session,
+        id: persistedSession.id
+      });
       const nextShows = [
         persistedSession,
         ...savedShows.filter((show) => show.id !== persistedSession.id)
@@ -1267,7 +1386,7 @@ function App() {
       setSavedShows(nextShows);
       setSelectedShowId(persistedSession.id);
       setShowName(persistedSession.showName);
-      setStatus(`Saved show "${persistedSession.showName}" to Postgres.`);
+      setStatus(`Saved show "${persistedSession.showName}" and episode status to Postgres.`);
     } catch (_databaseError) {
       const nextShows = [
         session,
@@ -1295,6 +1414,7 @@ function App() {
     setEpisodeStatus(session.episodeStatus || "draft");
     setSceneObjects(session.sceneObjects || []);
     setSelectedSceneObjectId(session.sceneObjects?.[0]?.id || null);
+    setSceneSets(session.sceneSets || []);
     setStoryboardPanels(session.storyboardPanels || []);
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
@@ -1539,14 +1659,20 @@ function App() {
             search={assetSearch}
             sceneObjects={sceneObjects}
             selectedSceneObjectId={selectedSceneObjectId}
+            sceneSets={sceneSets}
             onFilterChange={setAssetFilter}
             onTargetChange={setAssetTarget}
             onSearchChange={setAssetSearch}
             onImportAsset={importAsset}
             onPlaceAsset={(asset) => addSceneObjectFromAsset(asset)}
+            onPlaceImage={addSceneObjectFromImage}
             onSelectSceneObject={setSelectedSceneObjectId}
             onUpdateSceneObject={updateSceneObject}
+            onDuplicateSceneObject={duplicateSceneObject}
+            onMoveSceneObjectLayer={moveSceneObjectLayer}
             onDeleteSceneObject={deleteSceneObject}
+            onSaveCurrentSet={saveCurrentSceneSet}
+            onApplySceneSet={applySceneSet}
           />
         )}
         {mode === "edit" && (
@@ -1867,17 +1993,18 @@ function SceneObject({ object, selected, onSelect }) {
   const Component = onSelect ? "button" : "div";
   return (
     <Component
-      className={`sceneObject sceneObject-${object.shape} ${selected ? "selected" : ""}`}
+      className={`sceneObject sceneObject-${object.shape} ${selected ? "selected" : ""} ${object.locked ? "locked" : ""}`}
       style={{
         left: `${object.x}%`,
         top: `${object.y}%`,
         zIndex: 40 + object.layer,
-        transform: `translate(-50%, -100%) scale(${object.scale})`,
+        transform: `translate(-50%, -100%) scale(${object.flipped ? -object.scale : object.scale}, ${object.scale})`,
         "--object-tint": object.tint
       }}
       title={object.name}
-      onClick={onSelect ? () => onSelect(object.id) : undefined}
+      onClick={onSelect && !object.locked ? () => onSelect(object.id) : undefined}
     >
+      {object.imageUrl && <img src={object.imageUrl} alt="" />}
       <span>{object.name}</span>
     </Component>
   );
@@ -2070,6 +2197,24 @@ function PerformControls({
         <small className="controlHint">Hotkeys: 1-4 poses, Z/X/C macros, H hold idle.</small>
       </div>
 
+      <details className="dockGroup controlCheatSheet">
+        <summary>Controls Cheat Sheet</summary>
+        <div>
+          <span>WASD / Arrows</span>
+          <strong>Move body</strong>
+          <span>Mouse height</span>
+          <strong>Mouth open</strong>
+          <span>1-4</span>
+          <strong>Quick poses</strong>
+          <span>Z / X / C</span>
+          <strong>Wave, hop, panic</strong>
+          <span>H</span>
+          <strong>Hold/release idle</strong>
+          <span>Q / E</span>
+          <strong>Scale trim</strong>
+        </div>
+      </details>
+
       <div className="dockGroup">
         <h2>Expression</h2>
         <div className="segmented">
@@ -2168,15 +2313,24 @@ function AssetLibraryPanel({
   search,
   sceneObjects,
   selectedSceneObjectId,
+  sceneSets,
   onFilterChange,
   onTargetChange,
   onSearchChange,
   onImportAsset,
   onPlaceAsset,
+  onPlaceImage,
   onSelectSceneObject,
   onUpdateSceneObject,
-  onDeleteSceneObject
+  onDuplicateSceneObject,
+  onMoveSceneObjectLayer,
+  onDeleteSceneObject,
+  onSaveCurrentSet,
+  onApplySceneSet
 }) {
+  const [imageName, setImageName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageLicense, setImageLicense] = useState("User Supplied");
   const searchQuery = search.trim().toLowerCase();
   const filteredAssets = assets.filter((asset) => {
     const matchesFormat = filter === "all" || asset.format === filter;
@@ -2240,6 +2394,40 @@ function AssetLibraryPanel({
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Import Image URL</h2>
+        <label>
+          Name
+          <input value={imageName} onChange={(event) => setImageName(event.target.value)} placeholder="Couch, skyline, weird sign..." />
+        </label>
+        <label>
+          Image URL
+          <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." />
+        </label>
+        <label>
+          License / rights note
+          <input value={imageLicense} onChange={(event) => setImageLicense(event.target.value)} />
+        </label>
+        <button
+          className="wideAction"
+          disabled={!imageUrl.trim()}
+          onClick={() => {
+            onPlaceImage({
+              name: imageName.trim() || "Imported Image",
+              imageUrl,
+              license: imageLicense,
+              attribution: imageLicense
+            });
+            setImageName("");
+            setImageUrl("");
+          }}
+        >
+          <Plus size={16} />
+          Place Image
+        </button>
+        <small className="controlHint">Use cleared, CC0, public-domain, or team-owned images for production.</small>
       </div>
 
       <div className="assetCardList">
@@ -2334,12 +2522,28 @@ function AssetLibraryPanel({
               >
                 <button onClick={() => onSelectSceneObject(object.id)}>{object.name}</button>
                 <label>
+                  Name
+                  <input
+                    value={object.name}
+                    onChange={(event) => onUpdateSceneObject(object.id, { name: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Tint
+                  <input
+                    type="color"
+                    value={object.tint || "#f5f1e8"}
+                    onChange={(event) => onUpdateSceneObject(object.id, { tint: event.target.value })}
+                  />
+                </label>
+                <label>
                   X
                   <input
                     type="range"
                     min="5"
                     max="95"
                     value={object.x}
+                    disabled={object.locked}
                     onChange={(event) => onUpdateSceneObject(object.id, { x: Number(event.target.value) })}
                   />
                 </label>
@@ -2350,6 +2554,7 @@ function AssetLibraryPanel({
                     min="25"
                     max="88"
                     value={object.y}
+                    disabled={object.locked}
                     onChange={(event) => onUpdateSceneObject(object.id, { y: Number(event.target.value) })}
                   />
                 </label>
@@ -2361,6 +2566,7 @@ function AssetLibraryPanel({
                     max="1.8"
                     step="0.05"
                     value={object.scale}
+                    disabled={object.locked}
                     onChange={(event) => onUpdateSceneObject(object.id, { scale: Number(event.target.value) })}
                   />
                 </label>
@@ -2371,18 +2577,50 @@ function AssetLibraryPanel({
                     min="0"
                     max="6"
                     value={object.layer}
+                    disabled={object.locked}
                     onChange={(event) => onUpdateSceneObject(object.id, { layer: Number(event.target.value) })}
                   />
                 </label>
-                <button className="danger" onClick={() => onDeleteSceneObject(object.id)}>
-                  Remove
-                </button>
+                <div className="sceneObjectActions">
+                  <button onClick={() => onUpdateSceneObject(object.id, { flipped: !object.flipped })}>
+                    Flip
+                  </button>
+                  <button onClick={() => onUpdateSceneObject(object.id, { locked: !object.locked })}>
+                    {object.locked ? "Unlock" : "Lock"}
+                  </button>
+                  <button onClick={() => onDuplicateSceneObject(object.id)}>Duplicate</button>
+                  <button onClick={() => onMoveSceneObjectLayer(object.id, 1)} disabled={object.locked}>
+                    Forward
+                  </button>
+                  <button onClick={() => onMoveSceneObjectLayer(object.id, -1)} disabled={object.locked}>
+                    Back
+                  </button>
+                  <button className="danger" onClick={() => onDeleteSceneObject(object.id)}>
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="emptyState">Search for props or settings, then place them into the scene.</div>
         )}
+        <div className="libraryActions">
+          <button onClick={onSaveCurrentSet} disabled={!sceneObjects.length}>
+            <Save size={16} />
+            Save Set
+          </button>
+        </div>
+        {sceneSets.length ? (
+          <div className="takeList">
+            {sceneSets.map((sceneSet) => (
+              <button className="takeButton" key={sceneSet.id} onClick={() => onApplySceneSet(sceneSet.id)}>
+                <span>{sceneSet.name}</span>
+                <small>{sceneSet.sceneObjects.length} objects</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
