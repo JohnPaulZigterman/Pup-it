@@ -35,6 +35,7 @@ export function SceneLibraryEditor({
   onQuickTrim,
   onSaveTakeAsScene,
   onKeepTake,
+  onMakeAnotherBit,
   onExportProject,
   onExportVideo,
   onExportThumbnail,
@@ -259,6 +260,19 @@ export function SceneLibraryEditor({
             <small className="controlHint">This is enough for a clean DoinkTV review pass.</small>
           )}
         </div>
+        {(selectedTake || timeline.length || renderSucceeded) ? (
+          <div className="anotherBitPanel">
+            <div>
+              <span className="eyebrow">Keep The Streak</span>
+              <strong>Make another bit with this show kit.</strong>
+              <small>Reuse the cast, look, and world. Pup-It will toss in a fresh setup and send you back to performing.</small>
+            </div>
+            <button type="button" onClick={() => onMakeAnotherBit()}>
+              <Sparkles size={16} />
+              Make Another Bit
+            </button>
+          </div>
+        ) : null}
         <div className="finishActionBar" aria-label="Finish actions">
           <button onClick={onBackendRender} disabled={backendRendering || !hasSubmissionSource}>
             <RefreshCw size={16} />
@@ -344,6 +358,10 @@ export function SceneLibraryEditor({
             <button className="wideAction keepTakeButton" onClick={onKeepTake}>
               <Sparkles size={16} />
               Keep This Take
+            </button>
+            <button className="wideAction anotherBitButton" onClick={() => onMakeAnotherBit()}>
+              <Plus size={16} />
+              Stage Another Bit
             </button>
             <div className="libraryActions">
               <button className={playbackActive ? "active" : ""} onClick={onPlay}>

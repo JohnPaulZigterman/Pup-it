@@ -1758,6 +1758,40 @@ function App() {
     setStatus(`${format.name} started. Customize the rig, tweak the prop, then record the bit.`);
   };
 
+  const startAnotherBit = (formatId = "") => {
+    recordHistory("next bit starter");
+    const candidates = shortFormatTemplates.filter((format) => format.id !== startedShortFormat);
+    const format = formatId
+      ? getCatalogItem(shortFormatTemplates, formatId)
+      : pickRandom(candidates.length ? candidates : shortFormatTemplates);
+    const template = getCatalogItem(showStarterTemplates, format.starterTemplate);
+    clearPlayback();
+    setPreviewPerformers(null);
+    setSelectedTake(null);
+    changeScene(template.scene);
+    setCameraShot(template.cameraShot);
+    setLightingPreset(template.lightingPreset);
+    setBackgroundTheme(template.backgroundTheme);
+    setObjectStyle(template.objectStyle);
+    setAssetTarget("object");
+    setAssetSearch(format.assetSearch);
+    setStartedShortFormat(format.id);
+    if (format.styleMutation) {
+      window.setTimeout(() => applyStyleMutation(format.styleMutation), 0);
+    }
+    const sceneObject = createSceneObjectFromShape(
+      {
+        ...format.prop,
+        name: `${format.prop.name} ${sceneObjects.length + 1}`
+      },
+      sceneObjects.length
+    );
+    setSceneObjects((current) => [...current, sceneObject]);
+    setSelectedSceneObjectId(sceneObject.id);
+    setMode(format.nextMode === "assets" ? "assets" : "perform");
+    setStatus(`${format.name} staged as the next bit. Same show kit, new excuse to perform.`);
+  };
+
   const addSceneObjectFromAsset = (asset) => {
     recordHistory("place asset");
     const sceneObject = createSceneObjectFromAsset(asset, sceneObjects.length);
@@ -3741,6 +3775,7 @@ function App() {
             onQuickTrim={quickTrimSelectedTake}
             onSaveTakeAsScene={saveSelectedTakeAsScene}
             onKeepTake={keepSelectedTake}
+            onMakeAnotherBit={startAnotherBit}
             onExportProject={exportProject}
             onExportVideo={exportSelectedTakeVideo}
             onExportThumbnail={exportSelectedTakeThumbnail}
