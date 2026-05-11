@@ -9,19 +9,24 @@ import {
 import { getDepthProgress, getDepthScale } from "../../shared/depth.js";
 
 function hasCustomPart(part) {
-  return Boolean(part?.source || part?.mode === "drawn" || part?.shape);
+  return Boolean(!part?.hidden && (part?.source || part?.mode === "drawn" || part?.shape));
 }
 
 function PuppetPart({ part, className, label }) {
   if (!hasCustomPart(part)) return null;
+  const style = {
+    "--part-scale": part.scale || 1,
+    "--part-rotate": `${part.rotate || 0}deg`
+  };
 
   if (part.source) {
-    return <img className={`puppetPart ${className}`} src={part.source} alt="" draggable="false" />;
+    return <img className={`puppetPart ${className}`} style={style} src={part.source} alt="" draggable="false" />;
   }
 
   return (
     <span
       className={`puppetPart assembledPart partShape-${part.shape || "scribble"} ${className}`}
+      style={style}
       aria-hidden="true"
     >
       {part.label || label}

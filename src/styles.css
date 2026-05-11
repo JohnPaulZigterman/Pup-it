@@ -1107,6 +1107,47 @@ input[type="color"] {
   background-blend-mode: multiply, normal;
 }
 
+.sceneObject-circle,
+.sceneObject-oval,
+.sceneObject-bean,
+.sceneObject-block,
+.sceneObject-triangle,
+.sceneObject-noodle,
+.sceneObject-scribble,
+.sceneObject-star {
+  background:
+    var(--model-grain),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 42%),
+    linear-gradient(315deg, rgba(38, 41, 54, 0.14), transparent 52%),
+    var(--object-tint, var(--surface));
+}
+
+.sceneObject-circle {
+  border-radius: 50%;
+}
+
+.sceneObject-oval,
+.sceneObject-noodle {
+  border-radius: 999px;
+}
+
+.sceneObject-bean,
+.sceneObject-scribble {
+  border-radius: 62% 38% 55% 45%;
+}
+
+.sceneObject-block {
+  border-radius: 7px;
+}
+
+.sceneObject-triangle {
+  clip-path: polygon(50% 0, 100% 92%, 8% 100%);
+}
+
+.sceneObject-star {
+  clip-path: polygon(50% 0, 62% 34%, 98% 35%, 69% 56%, 79% 91%, 50% 70%, 21% 91%, 31% 56%, 2% 35%, 38% 34%);
+}
+
 .object-thin-ink .setFloor {
   outline: 1px solid rgba(43, 45, 66, 0.18);
   outline-offset: -6px;
@@ -1583,7 +1624,7 @@ input[type="color"] {
 
 .partBuilderRow {
   display: grid;
-  grid-template-columns: minmax(74px, 0.7fr) minmax(86px, 0.8fr);
+  grid-template-columns: 54px minmax(70px, 0.8fr) minmax(86px, 1fr);
   gap: 7px;
   align-items: center;
   padding: 8px;
@@ -1591,9 +1632,35 @@ input[type="color"] {
   background: rgba(255, 255, 255, 0.22);
 }
 
-.partBuilderRow > div:first-child {
+.partBuilderRow > div:nth-child(2) {
   display: grid;
   gap: 2px;
+}
+
+.partCardPreview {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(43, 45, 66, 0.55);
+  color: rgba(43, 45, 66, 0.72);
+  background:
+    var(--model-grain),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 44%),
+    var(--paper);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.partCardPreview.hidden {
+  opacity: 0.38;
+}
+
+.partCardPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .partBuilderRow strong {
@@ -1606,15 +1673,78 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
-.partBuilderRow input {
+.partBuilderRow > input {
+  grid-column: 1 / -1;
+}
+
+.partBuilderActions,
+.partStretchControl {
   grid-column: 1 / -1;
 }
 
 .partBuilderActions {
-  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
+}
+
+.partStretchControl {
+  display: grid;
+  gap: 5px;
+}
+
+.compactRange {
+  display: grid;
+  gap: 6px;
+  padding-top: 3px;
+}
+
+.showBiblePanel {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(255, 242, 168, 0.24), transparent 46%),
+    var(--surface);
+}
+
+.bibleHeader {
+  display: grid;
+  gap: 3px;
+}
+
+.bibleHeader strong {
+  color: var(--ink);
+}
+
+.bibleHeader small {
+  color: #666b86;
+}
+
+.bibleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bibleGrid span {
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.25);
+  color: #666b86;
+  font-size: 11px;
+}
+
+.bibleGrid strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.propMakerPanel {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(143, 216, 181, 0.2), transparent 48%),
+    var(--surface);
 }
 
 .mouthCameraPreview {
@@ -3893,6 +4023,8 @@ input[type="color"] {
   object-fit: cover;
   pointer-events: none;
   user-select: none;
+  scale: var(--part-scale, 1);
+  rotate: var(--part-rotate, 0deg);
 }
 
 .assembledPart {

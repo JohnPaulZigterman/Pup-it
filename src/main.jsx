@@ -358,6 +358,26 @@ function createSceneObjectFromImage({ name, imageUrl, license, attribution }, in
   };
 }
 
+function createSceneObjectFromShape({ name, shape, tint }, index = 0) {
+  return {
+    id: `scene-object-shape-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    assetId: "assembled-shape",
+    name: name || "Assembled Prop",
+    sourceUrl: "",
+    license: "Show Built",
+    attribution: "Created inside Pup-It.",
+    kind: "object",
+    x: 28 + (index % 4) * 14,
+    y: 66,
+    scale: 0.72,
+    layer: 2,
+    tint: tint || "#f5f1e8",
+    shape: shape || "object",
+    flipped: false,
+    locked: false
+  };
+}
+
 function makePreviewPerformers(take) {
   return indexPerformers(
     take.performers.map((performer, index) => ({
@@ -569,6 +589,7 @@ function App() {
   const mouthValueRef = useRef(0);
   const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
   const mouthControlRef = useRef("audio");
+  const mouthSensitivityRef = useRef(1);
   const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
@@ -583,6 +604,7 @@ function App() {
   const [recording, setRecording] = useState(false);
   const [micLive, setMicLive] = useState(false);
   const [mouthCameraActive, setMouthCameraActive] = useState(false);
+  const [mouthSensitivity, setMouthSensitivity] = useState(1);
   const [mode, setMode] = useState("home");
   const [experienceMode, setExperienceMode] = useState("beginner");
   const [commandQuery, setCommandQuery] = useState("");
@@ -657,8 +679,9 @@ function App() {
           savedTake,
           ...current.filter((take) => take.id !== savedTake.id)
         ]);
+        loadTakeById(savedTake.id, { select: true, review: true });
       }
-      setStatus(isRecording ? "Recording movement and audio chunks." : "Take saved to the scene library.");
+      setStatus(isRecording ? "Recording movement and audio chunks." : "Take saved. Replay it while the performance energy is fresh.");
     });
     socket.on("macro:trigger", ({ performerId, macro }) => {
       flashMacro(performerId, macro);
@@ -748,6 +771,10 @@ function App() {
   useEffect(() => {
     mouthControlRef.current = self?.state.mouthControl || "audio";
   }, [self?.state.mouthControl]);
+
+  useEffect(() => {
+    mouthSensitivityRef.current = mouthSensitivity;
+  }, [mouthSensitivity]);
 
   useEffect(() => {
     if (joined && mode === "edit") loadTakeLibrary();
@@ -982,6 +1009,13 @@ function App() {
     setSceneObjects((current) => [...current, sceneObject]);
     setSelectedSceneObjectId(sceneObject.id);
     setStatus(`Placed "${sceneObject.name}" from image URL.`);
+  };
+
+  const addSceneObjectFromShape = (payload) => {
+    const sceneObject = createSceneObjectFromShape(payload, sceneObjects.length);
+    setSceneObjects((current) => [...current, sceneObject]);
+    setSelectedSceneObjectId(sceneObject.id);
+    setStatus(`Built "${sceneObject.name}" as an editable scene prop.`);
   };
 
   const updateSceneObject = (objectId, patch) => {
@@ -1227,7 +1261,7 @@ function App() {
         peak = Math.max(peak, centered);
       }
       const average = total / data.length;
-      const mouthOpen = clamp((average * 5.6 + peak * 1.4 - 0.055) * 3.2, 0, 1);
+      const mouthOpen = clamp((average * 5.6 + peak * 1.4 - 0.055) * 3.2 * mouthSensitivityRef.current, 0, 1);
       const now = performance.now();
       if (mouthControlRef.current === "audio" && now - audioRef.current.lastMouthSentAt > 55) {
         audioRef.current.lastMouthSentAt = now;
@@ -1388,17 +1422,24 @@ function App() {
     setTakeLibrary(library.takes || []);
   };
 
-  const selectTake = async (takeId) => {
+  const loadTakeById = async (takeId, { select = false, review = false } = {}) => {
     const response = await fetch(
       `${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes/${encodeURIComponent(takeId)}`
     );
-    if (!response.ok) return;
+    if (!response.ok) return null;
     const take = await response.json();
-    clearPlayback();
-    setSelectedTake(take);
-    setPreviewPerformers(makePreviewPerformers(take));
-    setScene(take.scene);
-    setMode("edit");
+    if (select) {
+      clearPlayback();
+      setSelectedTake(take);
+      setPreviewPerformers(makePreviewPerformers(take));
+      setScene(take.scene);
+      if (review) setMode("edit");
+    }
+    return take;
+  };
+
+  const selectTake = async (takeId) => {
+    await loadTakeById(takeId, { select: true, review: true });
   };
 
   const clearPlayback = () => {
@@ -1986,6 +2027,20 @@ function App() {
           onExportShow={exportShowSession}
         />
 
+        <ShowBiblePanel
+          showName={showName}
+          castCount={activePerformers.length}
+          sceneSetCount={sceneSets.length}
+          propCount={sceneObjects.length}
+          referenceCount={assetReferences.length}
+          boardCount={storyboardPanels.length}
+          timelineCount={productionTimeline.length}
+          activeStyle={activeAnimationStyle}
+          episodeStatus={episodeStatus}
+          onSaveShow={saveShowSession}
+          onModeChange={setMode}
+        />
+
         {mode === "perform" && (
           <PerformControls
             scene={scene}
@@ -1998,6 +2053,8 @@ function App() {
             onIdleMotionChange={setIdleMotion}
             onMotionFeelChange={setMotionFeel}
             onMouthControlChange={setMouthControl}
+            mouthSensitivity={mouthSensitivity}
+            onMouthSensitivityChange={setMouthSensitivity}
             micLive={micLive}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
@@ -2047,6 +2104,7 @@ function App() {
             onImportAsset={importAsset}
             onPlaceAsset={(asset) => addSceneObjectFromAsset(asset)}
             onPlaceImage={addSceneObjectFromImage}
+            onPlaceShape={addSceneObjectFromShape}
             onSelectSceneObject={setSelectedSceneObjectId}
             onUpdateSceneObject={updateSceneObject}
             onDuplicateSceneObject={duplicateSceneObject}
@@ -2466,6 +2524,65 @@ function ShowSessionControls({
   );
 }
 
+function ShowBiblePanel({
+  showName,
+  castCount,
+  sceneSetCount,
+  propCount,
+  referenceCount,
+  boardCount,
+  timelineCount,
+  activeStyle,
+  episodeStatus,
+  onSaveShow,
+  onModeChange
+}) {
+  return (
+    <div className="dockGroup showBiblePanel">
+      <h2>Show Bible</h2>
+      <div className="bibleHeader">
+        <strong>{showName}</strong>
+        <small>{activeStyle.family} / {activeStyle.theme}</small>
+      </div>
+      <div className="bibleGrid">
+        <span>
+          <strong>{castCount}</strong>
+          Cast
+        </span>
+        <span>
+          <strong>{sceneSetCount}</strong>
+          Sets
+        </span>
+        <span>
+          <strong>{propCount}</strong>
+          Props
+        </span>
+        <span>
+          <strong>{referenceCount}</strong>
+          Assets
+        </span>
+        <span>
+          <strong>{boardCount}</strong>
+          Boards
+        </span>
+        <span>
+          <strong>{timelineCount}</strong>
+          Cuts
+        </span>
+      </div>
+      <small className="controlHint">Status: {episodeStatus.replaceAll("_", " ")}</small>
+      <div className="libraryActions">
+        <button onClick={() => onModeChange("build")}>Cast</button>
+        <button onClick={() => onModeChange("assets")}>Props</button>
+        <button onClick={onSaveShow}>
+          <Save size={16} />
+          Save Bible
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PerformControls({
   scene,
   selectedScene,
@@ -2487,6 +2604,8 @@ function PerformControls({
   onIdleMotionChange,
   onMotionFeelChange,
   onMouthControlChange,
+  mouthSensitivity,
+  onMouthSensitivityChange,
   micLive,
   mouthCameraActive,
   onMacroTrigger,
@@ -2740,6 +2859,20 @@ function PerformControls({
         <div className="mouthMeter">
           <span style={{ width: `${(self?.state.mouthOpen || 0) * 100}%` }} />
         </div>
+        <div className="advancedControl compactRange">
+          <span className="rangeLabel">
+            Audio Sensitivity
+            <small>{mouthSensitivity.toFixed(1)}x</small>
+          </span>
+          <input
+            type="range"
+            min="0.4"
+            max="2"
+            step="0.1"
+            value={mouthSensitivity}
+            onChange={(event) => onMouthSensitivityChange(Number(event.target.value))}
+          />
+        </div>
         <small className="controlHint">
           {(self?.state.mouthControl || "audio") === "audio"
             ? micLive
@@ -2783,6 +2916,7 @@ function AssetLibraryPanel({
   onImportAsset,
   onPlaceAsset,
   onPlaceImage,
+  onPlaceShape,
   onSelectSceneObject,
   onUpdateSceneObject,
   onDuplicateSceneObject,
@@ -2794,6 +2928,9 @@ function AssetLibraryPanel({
   const [imageName, setImageName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageLicense, setImageLicense] = useState("User Supplied");
+  const [propName, setPropName] = useState("Weird Prop");
+  const [propShape, setPropShape] = useState("bean");
+  const [propTint, setPropTint] = useState("#fff2a8");
   const searchQuery = search.trim().toLowerCase();
   const filteredAssets = assets.filter((asset) => {
     const matchesFormat = filter === "all" || asset.format === filter;
@@ -2891,6 +3028,37 @@ function AssetLibraryPanel({
           Place Image
         </button>
         <small className="controlHint">Use cleared, CC0, public-domain, or team-owned images for production.</small>
+      </div>
+
+      <div className="dockGroup propMakerPanel">
+        <h2>Prop Maker</h2>
+        <small className="controlHint">Build scene pieces from simple shapes first, then swap in imported art later.</small>
+        <label>
+          Prop Name
+          <input value={propName} onChange={(event) => setPropName(event.target.value)} />
+        </label>
+        <label>
+          Shape
+          <select value={propShape} onChange={(event) => setPropShape(event.target.value)}>
+            {partShapeCatalog.map((shape) => (
+              <option key={shape.id} value={shape.id}>
+                {shape.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <ColorPicker
+          label="Prop Color"
+          value={propTint}
+          onChange={setPropTint}
+        />
+        <button
+          className="wideAction"
+          onClick={() => onPlaceShape({ name: propName, shape: propShape, tint: propTint })}
+        >
+          <Plus size={16} />
+          Build Prop
+        </button>
       </div>
 
       <div className="assetCardList">
@@ -3724,6 +3892,9 @@ function PartBuilderRow({ part, value = {}, onChange, onClear }) {
 
   return (
     <div className="partBuilderRow">
+      <div className={`partCardPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}>
+        {value.source ? <img src={value.source} alt="" /> : <span>{value.label || part.label}</span>}
+      </div>
       <div>
         <strong>{part.name}</strong>
         <small>{mode === "empty" ? "stick guide" : mode}</small>
@@ -3769,10 +3940,31 @@ function PartBuilderRow({ part, value = {}, onChange, onClear }) {
         >
           Doodle
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              hidden: !value.hidden
+            })
+          }
+        >
+          {value.hidden ? "Show" : "Hide"}
+        </button>
         <button type="button" onClick={onClear}>
           Clear
         </button>
       </div>
+      <label className="partStretchControl">
+        Stretch
+        <input
+          type="range"
+          min="0.55"
+          max="1.65"
+          step="0.05"
+          value={value.scale || 1}
+          onChange={(event) => onChange({ scale: Number(event.target.value) })}
+        />
+      </label>
     </div>
   );
 }
