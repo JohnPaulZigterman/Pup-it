@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,179 @@ import { createRenderModel } from "../shared/renderModel.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const renderRoot = path.resolve(__dirname, "../renders");
 const rendererVersion = "pup-it-headless-chromium-v2";
+const ffmpegCommand = process.env.FFMPEG_PATH || "ffmpeg";
+
+function sanitizeFilePart(value, fallback = "track") {
+  return String(value || fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || fallback;
+}
+
+function runProcess(command, args, { timeoutMs = 60000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { windowsHide: true });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      child.kill("SIGTERM");
+      reject(new Error(`${command} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(stderr || stdout || `${command} exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function hasFfmpeg() {
+  try {
+    await runProcess(ffmpegCommand, ["-version"], { timeoutMs: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeAudioTrackArtifacts(renderModel, jobDir, jobId) {
+  const audioTracks = renderModel.take?.tracks?.audio || [];
+  const usableTracks = audioTracks
+    .map((track, index) => {
+      const chunks = [...(track.chunks || [])]
+        .filter((chunk) => chunk?.data)
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+      return { track, index, chunks };
+    })
+    .filter(({ chunks }) => chunks.length > 0);
+
+  if (!usableTracks.length) return [];
+
+  const audioDir = path.join(jobDir, "audio");
+  await mkdir(audioDir, { recursive: true });
+
+  const artifacts = [];
+  for (const { track, index, chunks } of usableTracks) {
+    const performer = sanitizeFilePart(track.performerName || track.performerId, `performer-${index + 1}`);
+    const character = sanitizeFilePart(track.character, "character");
+    const extension = track.mimeType?.includes("webm") ? "webm" : "bin";
+    const fileName = `${String(index + 1).padStart(2, "0")}-${performer}-${character}.${extension}`;
+    const filePath = path.join(audioDir, fileName);
+    const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk.data, "base64")));
+    await writeFile(filePath, buffer);
+    artifacts.push({
+      performerId: track.performerId,
+      performerName: track.performerName,
+      character: track.character,
+      mimeType: track.mimeType || "audio/webm",
+      chunkCount: chunks.length,
+      delayMs: Math.max(0, Math.round(chunks[0]?.at || 0)),
+      bytes: buffer.length,
+      localPath: filePath,
+      path: `/renders/${jobId}/audio/${fileName}`
+    });
+  }
+  return artifacts.filter((artifact) => artifact.bytes > 0);
+}
+
+async function buildAudioMux({ renderModel, jobDir, jobId, safeName, videoPath, hasVideo }) {
+  const separateTracks = await writeAudioTrackArtifacts(renderModel, jobDir, jobId);
+  const base = {
+    status: separateTracks.length ? "pending" : "skipped_no_audio",
+    ffmpegAvailable: false,
+    trackCount: separateTracks.length,
+    separateTracks: separateTracks.map(({ localPath, ...track }) => track),
+    mixedAudio: false,
+    finalVideoPath: hasVideo ? `/renders/${jobId}/${safeName}.webm` : null
+  };
+
+  if (!hasVideo) {
+    return { ...base, status: separateTracks.length ? "skipped_no_video" : "skipped_no_audio" };
+  }
+  if (!separateTracks.length) return base;
+
+  const ffmpegAvailable = await hasFfmpeg();
+  if (!ffmpegAvailable) {
+    return {
+      ...base,
+      status: "skipped_ffmpeg_missing",
+      note: "Per-character audio tracks were preserved, but FFmpeg was not available to mux a final audio video."
+    };
+  }
+
+  const muxedFile = `${safeName}-with-audio.webm`;
+  const muxedPath = path.join(jobDir, muxedFile);
+  const args = ["-y", "-i", videoPath];
+  separateTracks.forEach((track) => args.push("-i", track.localPath));
+
+  const delayFilters = separateTracks.map((track, index) => {
+    const inputIndex = index + 1;
+    const delay = Math.max(0, Math.round(track.delayMs || 0));
+    return `[${inputIndex}:a]adelay=${delay}|${delay}[a${index}]`;
+  });
+  const mixInputs = separateTracks.map((_, index) => `[a${index}]`).join("");
+  const filterComplex =
+    separateTracks.length === 1
+      ? `${delayFilters[0]}`
+      : `${delayFilters.join(";")};${mixInputs}amix=inputs=${separateTracks.length}:duration=longest:dropout_transition=0[aout]`;
+  const audioOutput = separateTracks.length === 1 ? "[a0]" : "[aout]";
+
+  args.push(
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "0:v:0",
+    "-map",
+    audioOutput,
+    "-c:v",
+    "copy",
+    "-c:a",
+    "libopus",
+    "-shortest",
+    muxedPath
+  );
+
+  try {
+    await runProcess(ffmpegCommand, args, { timeoutMs: 120000 });
+    return {
+      ...base,
+      status: "muxed",
+      ffmpegAvailable: true,
+      mixedAudio: true,
+      finalVideoPath: `/renders/${jobId}/${muxedFile}`,
+      note: "Muxed performer audio into a broadcast preview while preserving separate per-character track files."
+    };
+  } catch (error) {
+    return {
+      ...base,
+      status: "failed",
+      ffmpegAvailable: true,
+      error: error.message,
+      note: "Per-character audio tracks were preserved, but FFmpeg could not mux the final video."
+    };
+  }
+}
 
 function renderHtml() {
   return `<!doctype html>
@@ -381,16 +555,27 @@ export async function renderWithHeadlessChromium(request, jobId) {
       await writeFile(videoPath, Buffer.from(result.video, "base64"));
     }
     await writeFile(thumbnailPath, Buffer.from(result.thumbnail, "base64"));
+    const audioMux = await buildAudioMux({
+      renderModel,
+      jobDir,
+      jobId,
+      safeName,
+      videoPath,
+      hasVideo: Boolean(result.video)
+    });
+    const finalVideoPath = audioMux.finalVideoPath || (result.video ? `/renders/${jobId}/${videoFile}` : null);
 
     const output = {
       artifactId: `artifact-${jobId}`,
       status: result.video ? "succeeded" : "succeeded_with_thumbnail_only",
-      videoPath: result.video ? `/renders/${jobId}/${videoFile}` : null,
+      videoPath: finalVideoPath,
+      previewVideoPath: result.video ? `/renders/${jobId}/${videoFile}` : null,
       thumbnailPath: `/renders/${jobId}/${thumbnailFile}`,
       manifestPath: `/renders/${jobId}/${manifestFile}`,
       mimeType: result.mimeType || "image/png",
       durationMs: result.durationMs,
       rendererVersion,
+      audioMux,
       note: result.video
         ? "Rendered with backend headless Chromium canvas capture."
         : "Rendered thumbnail with backend headless Chromium; MediaRecorder video was unavailable.",

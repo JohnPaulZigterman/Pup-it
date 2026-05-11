@@ -5711,6 +5711,16 @@ function SceneLibraryEditor({
           <div className="renderJobCard">
             <strong>Backend render: {renderJob.status}</strong>
             <small>{renderJob.output?.videoPath || "Waiting for artifact path."}</small>
+            <small>
+              Audio:{" "}
+              {renderJob.output?.audioMux?.status === "muxed"
+                ? "mixed into final render, with separate tracks saved"
+                : renderJob.output?.audioMux?.status === "skipped_ffmpeg_missing"
+                  ? "separate tracks saved; install FFmpeg for final mux"
+                  : renderJob.output?.audioMux?.status === "skipped_no_audio"
+                    ? "no recorded character tracks"
+                    : renderJob.output?.audioMux?.status || "waiting"}
+            </small>
           </div>
         )}
       </div>
