@@ -109,6 +109,49 @@ const texturePresetOptions = [
   { id: "stucco", name: "Stucco" }
 ];
 
+const performancePresetCatalog = [
+  {
+    id: "deadpan",
+    name: "Deadpan Sitcom",
+    description: "Small motion, held idle, clean reactions.",
+    state: { motionFeel: "direct", idleMotion: "held", behaviorPreset: "none", pose: "deadpan", expression: "neutral" },
+    cameraShot: "two-shot",
+    lightingPreset: "flat-tv"
+  },
+  {
+    id: "chaotic",
+    name: "Chaotic Puppet",
+    description: "Loose controls, wobble, big reaction energy.",
+    state: { motionFeel: "loose", idleMotion: "alive", behaviorPreset: "wobble", pose: "shrug", expression: "weird" },
+    cameraShot: "reaction",
+    lightingPreset: "dramatic"
+  },
+  {
+    id: "floaty",
+    name: "Floaty Weird",
+    description: "Slow drift and dreamy timing.",
+    state: { motionFeel: "loose", idleMotion: "subtle", behaviorPreset: "float", pose: "listen", expression: "neutral" },
+    cameraShot: "wide",
+    lightingPreset: "cozy"
+  },
+  {
+    id: "stiff",
+    name: "Stiff Cutout",
+    description: "Snappy blocking and paper-stage posture.",
+    state: { motionFeel: "direct", idleMotion: "held", behaviorPreset: "sticker", pose: "neutral", expression: "neutral" },
+    cameraShot: "wide",
+    lightingPreset: "scene"
+  },
+  {
+    id: "documentary",
+    name: "Awkward Doc",
+    description: "Subtle movement, patient timing, uncomfortable close-ups.",
+    state: { motionFeel: "smooth", idleMotion: "subtle", behaviorPreset: "none", pose: "listen", expression: "neutral" },
+    cameraShot: "close",
+    lightingPreset: "flat-tv"
+  }
+];
+
 const tutorialSteps = [
   {
     mode: "perform",
@@ -1448,8 +1491,54 @@ function App() {
   const triggerMacro = (macro) => {
     updateSelf({ macro });
     socketRef.current.emit("macro:trigger", macro);
+    playSoundSting(macro === "panic" ? "zap" : macro === "hop" ? "pop" : "tap");
     flashMacro(selfId, macro);
     window.setTimeout(() => updateSelf({ macro: null }), 850);
+  };
+
+  const playSoundSting = async (kind = "tap") => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const context = audioRef.current.context || new AudioContext();
+    audioRef.current.context = context;
+    if (context.state === "suspended") await context.resume().catch(() => {});
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    const settings = {
+      tap: { type: "square", frequency: 440, end: 0.08, gain: 0.04 },
+      pop: { type: "triangle", frequency: 660, end: 0.12, gain: 0.055 },
+      thump: { type: "sine", frequency: 120, end: 0.16, gain: 0.075 },
+      zap: { type: "sawtooth", frequency: 880, end: 0.14, gain: 0.045 },
+      drop: { type: "sine", frequency: 180, end: 0.22, gain: 0.06 },
+      button: { type: "triangle", frequency: 520, end: 0.1, gain: 0.05 }
+    }[kind] || { type: "square", frequency: 440, end: 0.08, gain: 0.04 };
+    oscillator.type = settings.type;
+    oscillator.frequency.setValueAtTime(settings.frequency, now);
+    if (kind === "drop") oscillator.frequency.exponentialRampToValueAtTime(70, now + settings.end);
+    if (kind === "zap") oscillator.frequency.exponentialRampToValueAtTime(220, now + settings.end);
+    gain.gain.setValueAtTime(settings.gain, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + settings.end);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + settings.end);
+  };
+
+  const applyPerformancePreset = (presetId) => {
+    const preset = getCatalogItem(performancePresetCatalog, presetId);
+    updateSelf({
+      ...preset.state,
+      macro: null,
+      walking: false,
+      motionVx: 0,
+      motionVy: 0,
+      anticipationLean: 0,
+      anticipationSquash: 1
+    });
+    if (preset.cameraShot) setCameraShot(preset.cameraShot);
+    if (preset.lightingPreset) setLightingPreset(preset.lightingPreset);
+    playSoundSting(preset.id === "chaotic" ? "pop" : "tap");
+    setStatus(`${preset.name} performance feel loaded.`);
   };
 
   const applyDirectorAction = (actionId) => {
@@ -1457,6 +1546,21 @@ function App() {
     if (action.cameraShot) setCameraShot(action.cameraShot);
     if (action.lightingPreset) setLightingPreset(action.lightingPreset);
     if (action.selfState) updateSelf(action.selfState);
+    if (action.propCue === "reveal") {
+      if (!sceneObjects.length) {
+        const sceneObject = createSceneObjectFromShape(
+          { name: "Cue Prop", shape: "star", tint: "#fff2a8", texturePreset: "photocopy" },
+          sceneObjects.length
+        );
+        setSceneObjects((current) => [...current, sceneObject]);
+        setSelectedSceneObjectId(sceneObject.id);
+      } else {
+        const target = sceneObjects.find((object) => object.hidden) || sceneObjects[0];
+        updateSceneObject(target.id, { hidden: !target.hidden, locked: false });
+        setSelectedSceneObjectId(target.id);
+      }
+    }
+    if (action.soundSting) playSoundSting(action.soundSting);
     setStatus(`${action.name} setup applied.`);
   };
 
@@ -2377,6 +2481,8 @@ function App() {
             micLive={micLive}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
+            performancePresets={performancePresetCatalog}
+            onPerformancePreset={applyPerformancePreset}
             cameraShot={cameraShot}
             lightingPreset={lightingPreset}
             backgroundTheme={backgroundTheme}
@@ -2917,7 +3023,7 @@ function SceneObject({ object, selected, onSelect }) {
   const Component = onSelect ? "button" : "div";
   return (
     <Component
-      className={`sceneObject sceneObject-${object.shape} objectTexture-${object.texturePreset || "paper-grain"} ${selected ? "selected" : ""} ${object.locked ? "locked" : ""}`}
+      className={`sceneObject sceneObject-${object.shape} objectTexture-${object.texturePreset || "paper-grain"} ${selected ? "selected" : ""} ${object.locked ? "locked" : ""} ${object.hidden ? "hidden" : ""}`}
       style={{
         left: `${object.x}%`,
         top: `${object.y}%`,
@@ -3107,6 +3213,8 @@ function PerformControls({
   micLive,
   mouthCameraActive,
   onMacroTrigger,
+  performancePresets,
+  onPerformancePreset,
   onDirectorAction,
   onStoryboardCapture,
   onMoveToMark,
@@ -3346,6 +3454,18 @@ function PerformControls({
               onClick={() => onIdleMotionChange(idle.id)}
             >
               {idle.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Performance Presets</h2>
+        <div className="shotTemplateList performancePresetList">
+          {performancePresets.map((preset) => (
+            <button key={preset.id} onClick={() => onPerformancePreset(preset.id)}>
+              <strong>{preset.name}</strong>
+              <span>{preset.description}</span>
             </button>
           ))}
         </div>
@@ -3822,6 +3942,9 @@ function AssetLibraryPanel({
                   </button>
                   <button onClick={() => onUpdateSceneObject(object.id, { locked: !object.locked })}>
                     {object.locked ? "Unlock" : "Lock"}
+                  </button>
+                  <button onClick={() => onUpdateSceneObject(object.id, { hidden: !object.hidden })}>
+                    {object.hidden ? "Reveal" : "Hide"}
                   </button>
                   <button onClick={() => onDuplicateSceneObject(object.id)}>Duplicate</button>
                   <button onClick={() => onMoveSceneObjectLayer(object.id, 1)} disabled={object.locked}>

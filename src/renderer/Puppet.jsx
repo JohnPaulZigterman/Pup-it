@@ -56,8 +56,10 @@ export function Puppet({ performer, isSelf, depthModel }) {
     mouthOpen > 0.72 ? "wide" : mouthOpen > 0.38 ? "medium" : mouthOpen > 0.1 ? "small" : "closed";
   const depth = getDepthProgress(state.y, depthModel);
   const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
-  const actingLean = pose.bodyLean + (state.travelLean || 0);
-  const motionSquash = state.walking ? 1 + Math.min(0.035, (state.groundSpeed || 0) * 0.018) : 1;
+  const actingLean = pose.bodyLean + (state.travelLean || 0) + (state.anticipationLean || 0);
+  const motionSquash = state.walking
+    ? (state.anticipationSquash || 1) + Math.min(0.045, (state.groundSpeed || 0) * 0.022)
+    : state.anticipationSquash || 1;
 
   return (
     <div

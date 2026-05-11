@@ -1169,6 +1169,12 @@ input[type="color"] {
   opacity: 0.82;
 }
 
+.sceneObject.hidden {
+  opacity: 0;
+  transform: translate(-50%, -100%) scale(0.001);
+  pointer-events: none;
+}
+
 .sceneObject-image {
   border: 0;
   background: transparent;
@@ -1532,6 +1538,15 @@ input[type="color"] {
 .shotTemplateList span {
   color: #666b86;
   font-size: 12px;
+}
+
+.performancePresetList button {
+  min-height: 64px;
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(111, 166, 140, 0.16), transparent 48%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
 }
 
 .markList {
@@ -4922,6 +4937,10 @@ input[type="color"] {
   animation: floatWalk 720ms ease-in-out infinite;
 }
 
+.walking .puppetRig {
+  animation: performanceBodyFollow calc(540ms / var(--ground-speed)) ease-in-out infinite;
+}
+
 .walking.walk-floaty .armLeft,
 .walking.walk-floaty .armRight,
 .walking.walk-floaty .legLeft,
@@ -4959,6 +4978,16 @@ input[type="color"] {
 @keyframes floatWalk {
   50% {
     translate: 0 -8px;
+  }
+}
+
+@keyframes performanceBodyFollow {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  45% {
+    translate: 0 -3px;
   }
 }
 

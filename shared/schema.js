@@ -28,6 +28,8 @@ export function createPerformerState(overrides = {}) {
     motionVy: 0,
     groundSpeed: 0,
     travelLean: 0,
+    anticipationLean: 0,
+    anticipationSquash: 1,
     depthProgress: 0.65,
     behaviorPreset: "none",
     pose: "neutral",

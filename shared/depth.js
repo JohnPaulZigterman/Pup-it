@@ -207,6 +207,8 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
   const targetVy = input.dy * diagonalTrim * profile.speed * verticalSpeed;
   const activelyMoving = input.dx !== 0 || input.dy !== 0;
   const easing = activelyMoving ? profile.acceleration : profile.deceleration;
+  const beforeVx = state.motionVx || 0;
+  const beforeVy = state.motionVy || 0;
   let motionVx = easeVelocity(state.motionVx || 0, targetVx, easing, frameScale);
   let motionVy = easeVelocity(state.motionVy || 0, targetVy, easing, frameScale);
 
@@ -236,7 +238,11 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
 
   const nextScale = clamp(state.scale + input.dScale * frameScale, model.minTrim, model.maxTrim);
   const groundSpeed = Math.hypot(motionVx, motionVy);
+  const accelerationX = motionVx - beforeVx;
+  const accelerationY = motionVy - beforeVy;
   const travelLean = clamp(motionVx * profile.lean, -profile.maxLean, profile.maxLean);
+  const anticipationLean = clamp(accelerationX * profile.maxLean * 1.5, -profile.maxLean * 0.75, profile.maxLean * 0.75);
+  const anticipationSquash = clamp(1 + Math.abs(accelerationY) * 0.035 - Math.abs(accelerationX) * 0.01, 0.96, 1.08);
 
   return {
     ...state,
@@ -249,6 +255,8 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     motionVy,
     groundSpeed,
     travelLean,
+    anticipationLean,
+    anticipationSquash,
     depthProgress: nextPoint.floor.progress
   };
 }

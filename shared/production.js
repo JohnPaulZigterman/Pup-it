@@ -74,15 +74,36 @@ export const directorActionCatalog = [
   {
     id: "reaction",
     name: "Reaction",
+    soundSting: "button",
     cameraShot: "reaction",
     selfState: { pose: "surprise", expression: "weird", mouthOpen: 0.18 }
   },
   {
     id: "button",
     name: "Button",
+    soundSting: "thump",
     cameraShot: "close",
     lightingPreset: "dramatic",
     selfState: { pose: "deadpan", expression: "neutral", mouthOpen: 0 }
+  },
+  {
+    id: "prop-reveal",
+    name: "Reveal Prop",
+    soundSting: "pop",
+    propCue: "reveal",
+    cameraShot: "close"
+  },
+  {
+    id: "lights-shift",
+    name: "Lights Shift",
+    soundSting: "zap",
+    lightingPreset: "dramatic"
+  },
+  {
+    id: "exit-beat",
+    name: "Exit Beat",
+    soundSting: "drop",
+    selfState: { x: 92, pose: "deadpan", expression: "neutral", walking: false }
   }
 ];
 
