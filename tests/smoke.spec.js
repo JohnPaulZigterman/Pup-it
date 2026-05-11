@@ -93,6 +93,24 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByText("Takes recorded")).toBeVisible();
 });
 
+test("tiered tutorial can set up an ultra beginner first cartoon", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByLabel("Room").fill(`tutorial-${Date.now()}`);
+  await page.getByLabel("Performer").fill("Tutorial QA");
+  await page.getByRole("button", { name: "Join Stage" }).click();
+
+  await page.locator("header").getByRole("button", { name: "Tutorial" }).click();
+  await expect(page.getByRole("region", { name: "Tutorial" })).toBeVisible();
+  await expect(page.getByText("Beginner / 1 of 5")).toBeVisible();
+  await page.locator(".tutorialTrackGrid").getByRole("button").filter({ hasText: "Ultra Beginner" }).click();
+  await expect(page.getByText("Ultra Beginner / 1 of 4")).toBeVisible();
+  await page.getByRole("button", { name: "Set Me Up" }).click();
+  await expect(page.getByLabel("Current workspace")).toContainText("Paint Studio");
+  await expect(page.locator("strong").filter({ hasText: "Single Shape Mouth Rig Puppet" }).first()).toBeVisible();
+  await expect(page.getByText("Ultra Beginner / 2 of 4")).toBeVisible();
+});
+
 test("main workstation avoids horizontal overflow across common viewport sizes", async ({ page }) => {
   for (const viewport of [
     { width: 1440, height: 900 },

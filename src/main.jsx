@@ -99,9 +99,10 @@ import {
 import { SceneLibraryEditor } from "./workspaces/FinishWorkspace.jsx";
 import {
   computeBeginnerProgress,
+  getTutorialTrack,
   getWorkspaceIdentity,
   makeShortMilestones,
-  tutorialSteps,
+  tutorialTracks,
   workflowSteps
 } from "./workflow/shortFlow.js";
 import "./styles.css";
@@ -1108,6 +1109,7 @@ function App() {
   const [assetTarget, setAssetTarget] = useState("all");
   const [assetSearch, setAssetSearch] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialTrackId, setTutorialTrackId] = useState("beginner");
   const [tutorialStep, setTutorialStep] = useState(0);
   const [startedShortFormat, setStartedShortFormat] = useState("");
   const [selectedPartId, setSelectedPartId] = useState("head");
@@ -1136,6 +1138,7 @@ function App() {
   const selectedLighting = getCatalogItem(lightingPresetCatalog, lightingPreset);
   const selectedBackgroundTheme = getCatalogItem(backgroundThemeCatalog, backgroundTheme);
   const selectedObjectStyle = getCatalogItem(objectStyleCatalog, objectStyle);
+  const activeTutorialTrack = getTutorialTrack(tutorialTrackId);
   const selfCharacter = self
     ? getCatalogItem(characterCatalog, self.character)
     : getCatalogItem(characterCatalog, character);
@@ -1386,7 +1389,9 @@ function App() {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("pup-it-tutorial-open");
+      const savedTrack = window.localStorage.getItem("pup-it-tutorial-track");
       if (saved === "true") setTutorialOpen(true);
+      if (tutorialTracks.some((track) => track.id === savedTrack)) setTutorialTrackId(savedTrack);
     } catch (_error) {
       setTutorialOpen(false);
     }
@@ -1395,10 +1400,11 @@ function App() {
   useEffect(() => {
     try {
       window.localStorage.setItem("pup-it-tutorial-open", String(tutorialOpen));
+      window.localStorage.setItem("pup-it-tutorial-track", tutorialTrackId);
     } catch (_error) {
       // Tutorial persistence is optional; the UI should keep working without storage.
     }
-  }, [tutorialOpen]);
+  }, [tutorialOpen, tutorialTrackId]);
 
   const joinRoom = (event) => {
     event.preventDefault();
@@ -3370,11 +3376,32 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const showTutorialStep = (index) => {
-    const nextIndex = (index + tutorialSteps.length) % tutorialSteps.length;
+  const openTutorialTrack = (trackId, index = 0) => {
+    const track = getTutorialTrack(trackId);
+    const nextIndex = (index + track.steps.length) % track.steps.length;
+    setTutorialTrackId(track.id);
     setTutorialStep(nextIndex);
-    setMode(tutorialSteps[nextIndex].mode);
+    setMode(track.steps[nextIndex].mode);
     setTutorialOpen(true);
+  };
+
+  const showTutorialStep = (index) => {
+    openTutorialTrack(tutorialTrackId, index);
+  };
+
+  const applyUltraBeginnerTutorialSetup = () => {
+    recordHistory("ultra beginner tutorial setup");
+    selectedSceneRef.current = "studio";
+    setScene("studio");
+    setStartedShortFormat("first-cartoon");
+    setCameraShot("wide");
+    setLightingPreset("flat-tv");
+    setBackgroundTheme("painted-depth");
+    setObjectStyle("soft-material");
+    changeCharacterRig("fuzzball");
+    setSelectedPartId("torso");
+    openTutorialTrack("ultra", 1);
+    setStatus("Ultra Beginner setup loaded: one simple rig in Kitchen Moon. Change one shape, then perform.");
   };
 
   if (!joined) {
@@ -3960,18 +3987,23 @@ function App() {
       />
       {tutorialOpen && (
         <TutorialOverlay
+          track={activeTutorialTrack}
+          tracks={tutorialTracks}
           step={tutorialStep}
           mode={mode}
           onClose={() => setTutorialOpen(false)}
           onStepChange={showTutorialStep}
+          onTrackChange={openTutorialTrack}
+          onApplySetup={applyUltraBeginnerTutorialSetup}
         />
       )}
     </main>
   );
 }
 
-function TutorialOverlay({ step, mode, onClose, onStepChange }) {
-  const current = tutorialSteps[step];
+function TutorialOverlay({ track, tracks, step, mode, onClose, onStepChange, onTrackChange, onApplySetup }) {
+  const steps = track.steps;
+  const current = steps[step] || steps[0];
 
   return (
     <section className="tutorialOverlay" aria-label="Tutorial">
@@ -3981,22 +4013,44 @@ function TutorialOverlay({ step, mode, onClose, onStepChange }) {
           <div>
             <strong>{current.title}</strong>
             <small>
-              {step + 1} / {tutorialSteps.length} / {mode}
+              {track.name} / {step + 1} of {steps.length} / {mode}
             </small>
           </div>
           <button aria-label="Close tutorial" onClick={onClose}>
             <X size={16} />
           </button>
         </div>
-        <p>{current.body}</p>
-        <div className="tutorialModes">
-          {tutorialSteps.map((item, index) => (
+        <div className="tutorialTrackIntro">
+          <strong>{track.level}</strong>
+          <span>{track.description}</span>
+        </div>
+        <div className="tutorialTrackGrid" aria-label="Tutorial skill level">
+          {tracks.map((item) => (
             <button
-              key={item.mode}
+              key={item.id}
+              className={item.id === track.id ? "selected" : ""}
+              onClick={() => onTrackChange(item.id, 0)}
+            >
+              <span>{item.name}</span>
+              <small>{item.level}</small>
+            </button>
+          ))}
+        </div>
+        <p>{current.body}</p>
+        {track.setupLabel && (
+          <button className="tutorialSetupButton" onClick={onApplySetup}>
+            <Wand2 size={16} />
+            {track.setupLabel}
+          </button>
+        )}
+        <div className="tutorialModes">
+          {steps.map((item, index) => (
+            <button
+              key={`${item.mode}-${item.title}`}
               className={index === step ? "selected" : ""}
               onClick={() => onStepChange(index)}
             >
-              {item.mode}
+              {index + 1}. {item.mode}
             </button>
           ))}
         </div>

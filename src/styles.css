@@ -3798,7 +3798,7 @@ input[type="color"] {
   left: 18px;
   bottom: 18px;
   z-index: 80;
-  width: min(430px, calc(100vw - 36px));
+  width: min(560px, calc(100vw - 36px));
   pointer-events: none;
 }
 
@@ -3847,6 +3847,57 @@ input[type="color"] {
   line-height: 1.4;
 }
 
+.tutorialTrackIntro {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 2px solid rgba(43, 45, 66, 0.14);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.tutorialTrackIntro strong,
+.tutorialTrackIntro span,
+.tutorialTrackGrid small {
+  display: block;
+}
+
+.tutorialTrackIntro span,
+.tutorialTrackGrid small {
+  color: #666b86;
+}
+
+.tutorialTrackGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tutorialTrackGrid button {
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 7px 6px;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+}
+
+.tutorialTrackGrid button span,
+.tutorialTrackGrid button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutorialTrackGrid button span {
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.tutorialTrackGrid button small {
+  font-size: 10px;
+}
+
 .tutorialModes,
 .tutorialActions {
   display: grid;
@@ -3854,7 +3905,7 @@ input[type="color"] {
 }
 
 .tutorialModes {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
 }
 
 .tutorialActions {
@@ -3862,7 +3913,8 @@ input[type="color"] {
 }
 
 .tutorialModes button,
-.tutorialActions button {
+.tutorialActions button,
+.tutorialSetupButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3871,6 +3923,11 @@ input[type="color"] {
   color: var(--ink);
   background: var(--surface);
   font-weight: 750;
+}
+
+.tutorialSetupButton {
+  width: 100%;
+  background: var(--blush);
 }
 
 .tutorialModes button {
@@ -3882,6 +3939,7 @@ input[type="color"] {
   text-transform: capitalize;
 }
 
+.tutorialTrackGrid button.selected,
 .tutorialModes button.selected,
 .tutorialActions button:last-child {
   background: var(--nicotine);

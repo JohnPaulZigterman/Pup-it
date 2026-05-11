@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createShowToolbox } from "../shared/production.js";
 import { buildDoinkReviewChecklist, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
-import { getWorkspaceIdentity, makeShortMilestones } from "../src/workflow/shortFlow.js";
+import { getTutorialTrack, getWorkspaceIdentity, makeShortMilestones, tutorialTracks } from "../src/workflow/shortFlow.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
   const project = {
@@ -89,4 +89,11 @@ test("workspace identity keeps the creative app modes legible", () => {
   expect(getWorkspaceIdentity("build")).toMatchObject({ label: "Rig", role: "Paint Studio" });
   expect(getWorkspaceIdentity("perform")).toMatchObject({ label: "Perform", role: "Live Studio" });
   expect(getWorkspaceIdentity("edit")).toMatchObject({ label: "Finish", role: "Production Desk" });
+});
+
+test("tutorial tracks scale from first cartoon to expert app tour", () => {
+  expect(tutorialTracks.map((track) => track.id)).toEqual(["ultra", "beginner", "intermediate", "advanced", "expert"]);
+  expect(getTutorialTrack("ultra")).toMatchObject({ setupLabel: "Set Me Up", level: "First cartoon" });
+  expect(getTutorialTrack("expert").steps.length).toBeGreaterThan(6);
+  expect(getTutorialTrack("missing").id).toBe("beginner");
 });
