@@ -31,6 +31,10 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.locator(".partPaletteCard").filter({ hasText: "Torso" }).click();
   await page.locator(".shapePaintGrid").getByRole("button", { name: "Bean" }).click();
   await expect(page.locator(".partWorkbenchPreview.partShape-bean")).toBeVisible();
+  await expect(page.locator(".buildCanvasHint")).toBeVisible();
+  await expect(page.locator(".partNudgePad")).toBeVisible();
+  await page.locator(".partNudgePad").getByRole("button", { name: "Right" }).click();
+  await expect(page.locator(".puppet.self .partTorso")).toHaveAttribute("style", /--part-x: 4px/);
   await page.locator(".partPaletteCard").filter({ hasText: "Head" }).click();
   await page.locator(".partWorkbench").getByRole("button", { name: "Doodle" }).click();
   await expect(page.locator(".partHandleStrip")).toBeVisible();

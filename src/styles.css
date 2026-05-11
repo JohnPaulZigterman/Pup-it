@@ -557,6 +557,37 @@ input[type="color"] {
   transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.buildCanvasHint {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 40;
+  display: grid;
+  gap: 2px;
+  max-width: min(260px, calc(100% - 28px));
+  padding: 7px 9px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    rgba(245, 241, 232, 0.82);
+  background-blend-mode: multiply, normal;
+  box-shadow: 3px 3px 0 rgba(38, 41, 54, 0.16);
+  pointer-events: none;
+}
+
+.buildCanvasHint strong,
+.buildCanvasHint span {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.buildCanvasHint span {
+  color: #4b4e68;
+  font-weight: 850;
+}
+
 .stageTexture {
   position: absolute;
   inset: 0;
@@ -2909,6 +2940,26 @@ input[type="color"] {
   font-weight: 900;
 }
 
+.partNudgePad {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--ink);
+  background:
+    linear-gradient(90deg, rgba(38, 41, 54, 0.07) 1px, transparent 1px) 0 0 / 12px 12px,
+    rgba(255, 255, 255, 0.3);
+}
+
+.partNudgePad button {
+  min-height: 30px;
+  padding: 4px 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 900;
+}
+
 .shapePaintGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2980,7 +3031,7 @@ input[type="color"] {
 
 .partWorkbenchSliders {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
 }
 
@@ -5971,6 +6022,7 @@ input[type="color"] {
   object-fit: cover;
   pointer-events: none;
   user-select: none;
+  translate: var(--part-x, 0px) var(--part-y, 0px);
   scale: var(--part-scale, 1);
   rotate: var(--part-rotate, 0deg);
 }

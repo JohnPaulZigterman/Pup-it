@@ -17,6 +17,8 @@ function PuppetPart({ part, className, label, showLabel, slot, selected, editabl
   const style = {
     "--part-scale": part.scale || 1,
     "--part-rotate": `${part.rotate || 0}deg`,
+    "--part-x": `${part.x || 0}px`,
+    "--part-y": `${part.y || 0}px`,
     "--part-tint": part.tint || "var(--puppet)"
   };
   const selectPart = (event) => {

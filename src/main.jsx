@@ -3482,6 +3482,12 @@ function App() {
               {showStageMarkers && floorMarks.map((mark) => (
                 <FloorMark key={mark.id} mark={mark} onActivate={moveSelfToMark} />
               ))}
+              {mode === "build" ? (
+                <div className="buildCanvasHint">
+                  <strong>Click the puppet</strong>
+                  <span>Select a part, then nudge, stretch, color, or import it.</span>
+                </div>
+              ) : null}
               {sceneObjects.map((object) => (
                 <SceneObject
                   key={object.id}
@@ -6056,7 +6062,7 @@ function CharacterEditor({
       <div className="dockGroup buildPartsPanel">
         <h2>Assemble Parts</h2>
         <small className="controlHint">
-          Click a part, then shape it like a tiny paint program. Detailed rows move into Pro when you need them.
+          Click the puppet on the canvas or pick a card, then shape it like a tiny paint program. Detailed rows move into Pro when you need them.
         </small>
         <div className="visualPartWorkbench" aria-label="Visual part builder">
           <div className="partPaletteBoard">
@@ -6313,6 +6319,7 @@ function CharacterEditor({
 
 function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate, onSwap, swapName, onClear }) {
   const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
+  const nudge = (x = 0, y = 0) => onChange({ x: Math.max(-36, Math.min(36, (value.x || 0) + x)), y: Math.max(-36, Math.min(36, (value.y || 0) + y)) });
   const importPartImage = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -6355,6 +6362,24 @@ function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate,
         </button>
         <button type="button" onClick={() => onChange({ scale: 1, rotate: 0 })}>
           Reset
+        </button>
+      </div>
+
+      <div className="partNudgePad" aria-label={`Move ${part.name}`}>
+        <button type="button" onClick={() => nudge(0, -4)}>
+          Up
+        </button>
+        <button type="button" onClick={() => nudge(-4, 0)}>
+          Left
+        </button>
+        <button type="button" onClick={() => onChange({ x: 0, y: 0 })}>
+          Center
+        </button>
+        <button type="button" onClick={() => nudge(4, 0)}>
+          Right
+        </button>
+        <button type="button" onClick={() => nudge(0, 4)}>
+          Down
         </button>
       </div>
 
@@ -6412,6 +6437,28 @@ function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate,
       </div>
 
       <div className="partWorkbenchSliders">
+        <label>
+          X
+          <input
+            type="range"
+            min="-36"
+            max="36"
+            step="2"
+            value={value.x || 0}
+            onChange={(event) => onChange({ x: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Y
+          <input
+            type="range"
+            min="-36"
+            max="36"
+            step="2"
+            value={value.y || 0}
+            onChange={(event) => onChange({ y: Number(event.target.value) })}
+          />
+        </label>
         <label>
           Size
           <input
