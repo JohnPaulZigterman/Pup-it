@@ -2809,6 +2809,64 @@ input[type="color"] {
   border-radius: 52% 46% 40% 44%;
 }
 
+.body-narrow .puppetBody {
+  left: 38px;
+  bottom: 42px;
+  width: 66px;
+  height: 128px;
+  border-radius: 44% 56% 38% 48%;
+}
+
+.body-capsule .puppetBody {
+  left: 36px;
+  bottom: 40px;
+  width: 68px;
+  height: 136px;
+  border-radius: 999px 999px 38px 42px;
+}
+
+.body-sliver .puppetBody {
+  left: 46px;
+  bottom: 40px;
+  width: 46px;
+  height: 142px;
+  border-radius: 48% 52% 30% 44%;
+  transform: rotate(calc(var(--body-lean) - 4deg)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
+}
+
+.body-kite .puppetBody {
+  left: 36px;
+  bottom: 40px;
+  width: 72px;
+  height: 130px;
+  clip-path: polygon(50% 0, 92% 38%, 65% 100%, 20% 88%, 8% 34%);
+}
+
+.body-plank .puppetBody {
+  left: 42px;
+  bottom: 40px;
+  width: 54px;
+  height: 138px;
+  border-radius: 6px 10px 8px 5px;
+}
+
+.body-panel .puppetBody {
+  left: 34px;
+  bottom: 42px;
+  width: 76px;
+  height: 116px;
+  border-radius: 4px;
+  transform: rotate(calc(var(--body-lean) + 2deg)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
+}
+
+.body-stack .puppetBody {
+  left: 34px;
+  bottom: 42px;
+  width: 76px;
+  height: 124px;
+  border-radius: 54% 44% 48% 42%;
+}
+
 .body-block .puppetBody {
   border-radius: 18px 26px 14px 22px;
 }
@@ -3670,6 +3728,68 @@ input[type="color"] {
   box-shadow: none;
 }
 
+.rigModel.needsParts:not(.archetype-rig-single) .puppetBody {
+  background:
+    radial-gradient(circle, rgba(43, 45, 66, 0.76) 0 3px, transparent 4px),
+    linear-gradient(90deg, transparent 0 44%, rgba(43, 45, 66, 0.28) 45% 46%, transparent 47%),
+    repeating-linear-gradient(90deg, rgba(141, 183, 255, 0.14) 0 1px, transparent 1px 12px),
+    rgba(245, 241, 232, 0.28);
+}
+
+.archetype-rig-biped.rigModel.needsParts .puppetBody {
+  left: 39px;
+  width: 64px;
+  height: 128px;
+}
+
+.archetype-rig-small.rigModel.needsParts .puppetBody {
+  left: 43px;
+  width: 54px;
+  height: 118px;
+  border-radius: 999px 999px 34px 38px;
+}
+
+.archetype-rig-winged.rigModel.needsParts .puppetBody {
+  left: 37px;
+  width: 68px;
+  height: 120px;
+  clip-path: polygon(50% 0, 92% 36%, 68% 100%, 19% 92%, 7% 34%);
+}
+
+.archetype-rig-spline.rigModel.needsParts .puppetBody {
+  left: 50px;
+  width: 38px;
+  height: 142px;
+  border-radius: 48%;
+}
+
+.archetype-rig-block.rigModel.needsParts .puppetBody {
+  left: 45px;
+  width: 50px;
+  height: 132px;
+  border-radius: 4px 9px 7px 3px;
+}
+
+.archetype-rig-angular.rigModel.needsParts .puppetBody {
+  left: 39px;
+  width: 66px;
+  height: 124px;
+}
+
+.archetype-rig-stack.rigModel.needsParts .puppetBody {
+  left: 36px;
+  width: 70px;
+  height: 126px;
+  border-radius: 58% 42% 52% 40%;
+}
+
+.archetype-rig-panel.rigModel.needsParts .puppetBody {
+  left: 37px;
+  width: 66px;
+  height: 112px;
+  border-radius: 3px;
+}
+
 .rigModel.needsParts .puppetBody::before {
   content: "HEAD";
   position: absolute;
@@ -3733,6 +3853,33 @@ input[type="color"] {
   opacity: 1;
 }
 
+.rigModel:not(.archetype-rig-single) .eye,
+.rigModel:not(.archetype-rig-single) .mouth {
+  z-index: 16;
+}
+
+.rigModel:not(.archetype-rig-single) .eye {
+  top: -41px;
+  color: rgba(20, 21, 29, 0.9);
+  text-shadow: 0 1px 0 rgba(245, 241, 232, 0.32);
+}
+
+.rigModel:not(.archetype-rig-single) .eye.left {
+  left: 28px;
+}
+
+.rigModel:not(.archetype-rig-single) .eye.right {
+  right: 28px;
+}
+
+.rigModel:not(.archetype-rig-single) .mouth {
+  top: -20px;
+}
+
+.rigModel:not(.archetype-rig-single).mouth-wide .mouth {
+  top: -24px;
+}
+
 .puppetPart {
   position: absolute;
   z-index: 8;
@@ -3769,6 +3916,13 @@ input[type="color"] {
 
 .partTorso {
   inset: 8px 10px 16px;
+}
+
+.body-narrow .partTorso,
+.body-capsule .partTorso,
+.body-sliver .partTorso,
+.body-plank .partTorso {
+  inset-inline: 5px;
 }
 
 .limb .puppetPart {
