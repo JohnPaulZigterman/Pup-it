@@ -55,6 +55,36 @@ function record(room, event) {
   });
 }
 
+function buildAudioTracks(audioChunks) {
+  const tracks = new Map();
+
+  for (const chunk of audioChunks) {
+    const trackId = `${chunk.performerId}:${chunk.character || "unknown"}`;
+    if (!tracks.has(trackId)) {
+      tracks.set(trackId, {
+        id: trackId,
+        performerId: chunk.performerId,
+        performerName: chunk.performerName,
+        character: chunk.character || "unknown",
+        mimeType: chunk.mimeType,
+        chunks: []
+      });
+    }
+
+    const track = tracks.get(trackId);
+    track.chunks.push({
+      sequence: chunk.sequence,
+      at: chunk.at,
+      data: chunk.data
+    });
+  }
+
+  return [...tracks.values()].map((track) => ({
+    ...track,
+    chunks: track.chunks.sort((a, b) => a.sequence - b.sequence)
+  }));
+}
+
 io.on("connection", (socket) => {
   let activeRoomId = null;
 
@@ -150,6 +180,7 @@ io.on("connection", (socket) => {
     const payload = {
       performerId: socket.id,
       performerName: performer?.name || "Performer",
+      character: performer?.character || "unknown",
       mimeType,
       sequence,
       at: room.takeStartedAt ? Date.now() - room.takeStartedAt : 0,
@@ -181,6 +212,7 @@ app.get("/api/rooms/:roomId/take", (req, res) => {
     takeStartedAt: room.takeStartedAt,
     exportedAt: new Date().toISOString(),
     events: room.events,
+    audioTracks: buildAudioTracks(room.audio),
     audio: room.audio
   });
 });

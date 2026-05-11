@@ -10,7 +10,7 @@ Pup-It is a browser-based prototype for collaborative live puppet animation. The
 - Use `Q` and `E` for small scale-trim adjustments when a shot needs a cheat.
 - Change expressions, scenes, and macros from the control dock.
 - Start a take to record movement events and relayed audio chunks.
-- Export the take as JSON for later playback or editing work.
+- Export the take as JSON with separate audio tracks for each character/performer.
 
 ## Development
 
