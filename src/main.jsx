@@ -3622,6 +3622,14 @@ function ShowBiblePanel({
         <span>Cut</span>
         <span>Export</span>
       </div>
+      <div className="publicReadinessList">
+        <span className={castCount ? "done" : ""}>Cast</span>
+        <span className={sceneSetCount || propCount ? "done" : ""}>World</span>
+        <span className={boardCount ? "done" : ""}>Board</span>
+        <span className={timelineCount ? "done" : ""}>Cut</span>
+        <span className={referenceCount ? "done" : ""}>Credits</span>
+        <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
+      </div>
       <div className="libraryActions">
         <button onClick={() => onModeChange("build")}>Rigs</button>
         <button onClick={() => onModeChange("assets")}>Props</button>
@@ -4649,6 +4657,13 @@ function SceneLibraryEditor({
           <div className="dockGroup exportPlanPanel">
             <h2>Export Short</h2>
             <small className="controlHint">Preview WEBM gives a quick browser video; package export carries the project data, audio tracks, credits, and metadata.</small>
+            <div className="renderChecklist">
+              <span className="done">Preview</span>
+              <span className={selectedTake.tracks.audio.length ? "done" : ""}>Audio</span>
+              <span className={selectedTake.sceneObjects?.length ? "done" : ""}>Props</span>
+              <span className={timeline.length ? "done" : ""}>Cut</span>
+              <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
+            </div>
             <div className="libraryActions">
               <button onClick={onExportProject}>
                 <Save size={16} />
@@ -4693,6 +4708,12 @@ function SceneLibraryEditor({
           <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>
             Producer approved
           </span>
+        </div>
+        <div className="reviewRoleStrip">
+          <span>Performer</span>
+          <span>Director</span>
+          <span>Editor</span>
+          <span>Producer</span>
         </div>
       </div>
 
@@ -5401,7 +5422,7 @@ function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapN
         </button>
       </div>
       <label className="partStretchControl">
-        Stretch
+        Size
         <input
           type="range"
           min="0.55"
@@ -5411,6 +5432,28 @@ function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapN
           onChange={(event) => onChange({ scale: Number(event.target.value) })}
         />
       </label>
+      <label className="partStretchControl">
+        Rotate
+        <input
+          type="range"
+          min="-45"
+          max="45"
+          step="3"
+          value={value.rotate || 0}
+          onChange={(event) => onChange({ rotate: Number(event.target.value) })}
+        />
+      </label>
+      <div className="partTransformButtons">
+        <button type="button" onClick={() => onChange({ scale: Math.max(0.55, (value.scale || 1) - 0.1) })}>
+          Smaller
+        </button>
+        <button type="button" onClick={() => onChange({ scale: Math.min(1.65, (value.scale || 1) + 0.1) })}>
+          Bigger
+        </button>
+        <button type="button" onClick={() => onChange({ rotate: 0, scale: 1 })}>
+          Reset Fit
+        </button>
+      </div>
     </div>
   );
 }

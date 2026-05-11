@@ -1977,6 +1977,48 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
+.renderChecklist {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.renderChecklist span {
+  display: grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.24);
+  color: #666b86;
+  font-size: 9px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.renderChecklist span.done {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: #8fd8b5;
+}
+
+.reviewRoleStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.reviewRoleStrip span {
+  display: grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px dashed rgba(43, 45, 66, 0.42);
+  color: #4b4e68;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 9px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
 .postTakeReward {
   border-color: var(--nicotine);
   background:
@@ -2009,6 +2051,30 @@ input[type="color"] {
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.publicReadinessList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.publicReadinessList span {
+  display: grid;
+  min-height: 24px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.22);
+  color: #666b86;
+  font-size: 9px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.publicReadinessList span.done {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: #8fd8b5;
 }
 
 .controlCheatSheet {
@@ -2216,7 +2282,8 @@ input[type="color"] {
 }
 
 .partBuilderActions,
-.partStretchControl {
+.partStretchControl,
+.partTransformButtons {
   grid-column: 1 / -1;
 }
 
@@ -2257,6 +2324,19 @@ input[type="color"] {
 .partStretchControl {
   display: grid;
   gap: 5px;
+}
+
+.partTransformButtons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.partTransformButtons button {
+  min-height: 30px;
+  padding: 0 6px;
+  background: var(--paper);
+  font-size: 10px;
 }
 
 .compactRange {
