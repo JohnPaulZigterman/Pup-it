@@ -261,6 +261,10 @@ app.post("/api/shows", async (req, res) => {
   try {
     res.status(201).json({ show: await upsertShow(req.body) });
   } catch (error) {
+    if (error?.code === "DATABASE_NOT_CONFIGURED") {
+      res.json({ show: null, persistence: "local" });
+      return;
+    }
     handleApiError(res, error);
   }
 });
@@ -269,6 +273,10 @@ app.put("/api/shows/:showId", async (req, res) => {
   try {
     res.json({ show: await upsertShow({ ...req.body, id: req.params.showId, slug: req.params.showId }) });
   } catch (error) {
+    if (error?.code === "DATABASE_NOT_CONFIGURED") {
+      res.json({ show: null, persistence: "local" });
+      return;
+    }
     handleApiError(res, error);
   }
 });

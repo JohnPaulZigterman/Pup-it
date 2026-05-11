@@ -922,6 +922,7 @@ async function persistShowSession(session) {
   });
   if (!response.ok) throw new Error("Show database unavailable");
   const data = await response.json();
+  if (data.persistence === "local") throw new Error("Show database unavailable");
   return showSessionFromPersistedShow(data.show);
 }
 
@@ -5270,6 +5271,7 @@ function CharacterEditor({
   onPartSwap,
   onPartClear
 }) {
+  const [selectedPartId, setSelectedPartId] = useState("head");
   if (!performer) return null;
 
   const baseCharacter = getCatalogItem(characterCatalog, performer.character);
@@ -5280,6 +5282,9 @@ function CharacterEditor({
   const characterParts = performer.state.characterParts || {};
   const coreParts = characterPartCatalog.filter((part) => corePartSlots.includes(part.id));
   const addOnParts = characterPartCatalog.filter((part) => extraPartSlots.includes(part.id));
+  const visiblePartSlots = [...coreParts, ...addOnParts];
+  const selectedPart = getCatalogItem(characterPartCatalog, selectedPartId) || coreParts[0];
+  const selectedPartValue = characterParts[selectedPart.id] || {};
   const hasParts = corePartSlots.some((slot) => {
     const part = characterParts[slot];
     return part?.source || part?.shape || part?.mode === "drawn";
@@ -5423,8 +5428,47 @@ function CharacterEditor({
       <div className="dockGroup buildPartsPanel">
         <h2>Assemble Parts</h2>
         <small className="controlHint">
-          Start with simple shapes, mark a rough drawn part, or import your own image for each body piece.
+          Click a part, then shape it like a tiny paint program. The detailed rows are still here when you need them.
         </small>
+        <div className="visualPartWorkbench" aria-label="Visual part builder">
+          <div className="partPaletteBoard">
+            {visiblePartSlots.map((part) => {
+              const value = characterParts[part.id] || {};
+              const populated = value.source || value.shape || value.mode === "drawn";
+              return (
+                <button
+                  type="button"
+                  key={part.id}
+                  className={`partPaletteCard ${selectedPart.id === part.id ? "selected" : ""} ${populated ? "populated" : ""} ${value.hidden ? "hidden" : ""}`}
+                  onClick={() => setSelectedPartId(part.id)}
+                >
+                  <span
+                    className={`partMiniPreview partShape-${value.shape || "scribble"}`}
+                    style={{ "--part-tint": value.tint || design.color }}
+                  >
+                    {value.source ? <img src={value.source} alt="" /> : null}
+                  </span>
+                  <strong>{part.name}</strong>
+                  <small>{populated ? value.hidden ? "hidden" : "ready" : "empty"}</small>
+                </button>
+              );
+            })}
+          </div>
+          <PartWorkbench
+            part={selectedPart}
+            value={selectedPartValue}
+            fallbackColor={design.color}
+            onChange={(patch) => onPartChange(selectedPart.id, { label: selectedPart.label, ...patch })}
+            onDuplicate={() => onPartDuplicate(selectedPart.id)}
+            onSwap={partSwapTargets[selectedPart.id] ? () => onPartSwap(selectedPart.id) : null}
+            swapName={
+              partSwapTargets[selectedPart.id]
+                ? getCatalogItem(characterPartCatalog, partSwapTargets[selectedPart.id]).name
+                : ""
+            }
+            onClear={() => onPartClear(selectedPart.id)}
+          />
+        </div>
         <div className="partBuilderList">
           {coreParts.map((part) => (
             <PartBuilderRow
@@ -5639,6 +5683,116 @@ function CharacterEditor({
   );
 }
 
+function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate, onSwap, swapName, onClear }) {
+  const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
+  const importPartImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () =>
+      onChange({
+        mode: "image",
+        source: String(reader.result || ""),
+        shape: value.shape || "oval"
+      });
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="partWorkbench">
+      <div className="partWorkbenchHeader">
+        <div
+          className={`partWorkbenchPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}
+          style={{ "--part-tint": value.tint || fallbackColor }}
+        >
+          {value.source ? <img src={value.source} alt="" /> : <span>{part.label}</span>}
+        </div>
+        <div>
+          <strong>{part.name}</strong>
+          <small>{mode === "empty" ? "stick guide until you make it yours" : mode}</small>
+        </div>
+      </div>
+
+      <div className="shapePaintGrid" aria-label={`Shapes for ${part.name}`}>
+        {partShapeCatalog.map((shape) => (
+          <button
+            type="button"
+            key={shape.id}
+            className={value.shape === shape.id ? "selected" : ""}
+            onClick={() => onChange({ mode: "shape", shape: shape.id, source: "" })}
+          >
+            <span className={`shapeChip partShape-${shape.id}`} />
+            {shape.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="partColorSwatches" aria-label={`Colors for ${part.name}`}>
+        {characterColorSwatches.map((color) => (
+          <button
+            type="button"
+            key={color}
+            className={value.tint === color ? "selected" : ""}
+            aria-label={color}
+            style={{ background: color }}
+            onClick={() => onChange({ tint: color })}
+          />
+        ))}
+      </div>
+
+      <div className="partWorkbenchActions">
+        <label className="partFileButton">
+          Import Image
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => importPartImage(event.target.files?.[0])}
+          />
+        </label>
+        <button type="button" onClick={() => onChange({ mode: "drawn", source: "", shape: "scribble" })}>
+          Doodle
+        </button>
+        <button type="button" disabled={mode === "empty"} onClick={onDuplicate}>
+          Clone
+        </button>
+        <button type="button" disabled={!onSwap} title={swapName ? `Swap with ${swapName}` : "No matching slot"} onClick={onSwap || undefined}>
+          Swap
+        </button>
+        <button type="button" onClick={() => onChange({ hidden: !value.hidden })}>
+          {value.hidden ? "Show" : "Hide"}
+        </button>
+        <button type="button" onClick={onClear}>
+          Clear
+        </button>
+      </div>
+
+      <div className="partWorkbenchSliders">
+        <label>
+          Size
+          <input
+            type="range"
+            min="0.55"
+            max="1.65"
+            step="0.05"
+            value={value.scale || 1}
+            onChange={(event) => onChange({ scale: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Rotate
+          <input
+            type="range"
+            min="-45"
+            max="45"
+            step="3"
+            value={value.rotate || 0}
+            onChange={(event) => onChange({ rotate: Number(event.target.value) })}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapName, onClear }) {
   const mode = value.source ? "image" : value.mode || (value.shape ? "shape" : "empty");
   const importPartImage = (file) => {
@@ -5655,7 +5809,10 @@ function PartBuilderRow({ part, value = {}, onChange, onDuplicate, onSwap, swapN
 
   return (
     <div className="partBuilderRow">
-      <div className={`partCardPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}>
+      <div
+        className={`partCardPreview partShape-${value.shape || "scribble"} ${value.hidden ? "hidden" : ""}`}
+        style={{ "--part-tint": value.tint || "var(--paper)" }}
+      >
         {value.source ? <img src={value.source} alt="" /> : <span>{value.label || part.label}</span>}
       </div>
       <div>

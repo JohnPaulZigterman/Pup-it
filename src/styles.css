@@ -2288,6 +2288,175 @@ input[type="color"] {
   gap: 9px;
 }
 
+.visualPartWorkbench {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.partPaletteBoard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.partPaletteCard {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-height: 54px;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.22);
+  text-align: left;
+}
+
+.partPaletteCard.selected {
+  border-color: var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(242, 209, 107, 0.36), rgba(141, 183, 255, 0.18)),
+    var(--surface);
+  box-shadow: inset 0 0 0 2px rgba(43, 45, 66, 0.08);
+}
+
+.partPaletteCard.hidden {
+  opacity: 0.5;
+}
+
+.partPaletteCard strong,
+.partPaletteCard small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partMiniPreview,
+.partWorkbenchPreview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(43, 45, 66, 0.56);
+  color: rgba(27, 28, 38, 0.72);
+  background:
+    var(--model-grain),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 44%),
+    var(--part-tint, var(--puppet));
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.partMiniPreview {
+  width: 30px;
+  height: 30px;
+}
+
+.partMiniPreview img,
+.partWorkbenchPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.partWorkbench {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 48%),
+    var(--paper);
+}
+
+.partWorkbenchHeader {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.partWorkbenchPreview {
+  width: 76px;
+  height: 76px;
+}
+
+.partWorkbenchPreview.hidden {
+  opacity: 0.38;
+}
+
+.shapePaintGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.shapePaintGrid button {
+  min-height: 44px;
+  padding: 5px;
+  gap: 4px;
+  flex-direction: column;
+  background: var(--surface);
+  font-size: 9px;
+}
+
+.shapePaintGrid button.selected {
+  background: var(--nicotine);
+}
+
+.shapeChip {
+  width: 20px;
+  height: 18px;
+  border: 1px solid var(--ink);
+  background: var(--pond);
+}
+
+.partColorSwatches {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.partColorSwatches button {
+  min-width: 0;
+  min-height: 24px;
+  border: 2px solid rgba(43, 45, 66, 0.42);
+  padding: 0;
+}
+
+.partColorSwatches button.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink);
+}
+
+.partWorkbenchActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.partWorkbenchActions button,
+.partWorkbenchActions .partFileButton {
+  min-height: 32px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.partWorkbenchSliders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.partWorkbenchSliders label {
+  display: grid;
+  gap: 5px;
+  font-size: 10px;
+}
+
 .partBuilderRow {
   display: grid;
   grid-template-columns: 54px minmax(70px, 0.8fr) minmax(86px, 1fr);
@@ -2314,7 +2483,7 @@ input[type="color"] {
   background:
     var(--model-grain),
     linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 44%),
-    var(--paper);
+    var(--part-tint, var(--paper));
   font-size: 8px;
   font-weight: 900;
 }
@@ -4963,7 +5132,7 @@ input[type="color"] {
   background:
     var(--model-grain),
     linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 42%),
-    var(--puppet);
+    var(--part-tint, var(--puppet));
   box-shadow:
     inset -7px -8px rgba(43, 45, 66, calc(var(--shadow-opacity) * 0.42)),
     2px 3px 0 rgba(43, 45, 66, 0.14);

@@ -16,7 +16,8 @@ function PuppetPart({ part, className, label, showLabel }) {
   if (!hasCustomPart(part)) return null;
   const style = {
     "--part-scale": part.scale || 1,
-    "--part-rotate": `${part.rotate || 0}deg`
+    "--part-rotate": `${part.rotate || 0}deg`,
+    "--part-tint": part.tint || "var(--puppet)"
   };
 
   if (part.source) {
