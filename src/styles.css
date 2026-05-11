@@ -647,6 +647,10 @@ input[type="color"] {
   font-weight: 850;
 }
 
+.mode-build .buildCanvasHint span::after {
+  content: " Drag selected parts directly on the puppet.";
+}
+
 .buildCanvasPartToolbar,
 .canvasObjectToolbar {
   position: absolute;
@@ -5072,6 +5076,53 @@ input[type="color"] {
   color: var(--ink);
 }
 
+.renderDepthPanel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid rgba(38, 41, 54, 0.72);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(141, 183, 255, 0.24), rgba(255, 242, 168, 0.22)),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.renderDepthPanel strong,
+.renderDepthPanel small {
+  display: block;
+}
+
+.renderDepthPanel small {
+  color: #666b86;
+  line-height: 1.35;
+}
+
+.renderDepthPanel div {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.renderDepthPanel span {
+  display: grid;
+  min-height: 26px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.26);
+  color: #666b86;
+  font-size: 9px;
+  font-weight: 950;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.renderDepthPanel span.done {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--pond);
+}
+
 .doinkManifestGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -7010,8 +7061,15 @@ input[type="color"] {
 
 .editableParts .puppetBody,
 .editableParts .puppetPart {
-  cursor: pointer;
+  cursor: grab;
   pointer-events: auto;
+  touch-action: none;
+}
+
+.editableParts .puppetBody:active,
+.editableParts .puppetPart:active,
+.editableParts .partHotspot:active {
+  cursor: grabbing;
 }
 
 .partHotspot {
@@ -7066,6 +7124,19 @@ input[type="color"] {
 .editableParts .selectedPartBody {
   outline: 3px dashed var(--nicotine);
   outline-offset: 5px;
+}
+
+.editableParts .selectedPart::after {
+  content: "";
+  position: absolute;
+  right: -9px;
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  background: var(--nicotine);
+  box-shadow: 2px 2px 0 rgba(38, 41, 54, 0.22);
+  pointer-events: none;
 }
 
 .editableParts .selectedPart {

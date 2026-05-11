@@ -107,6 +107,13 @@ export function SceneLibraryEditor({
     timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
   const renderClipCount = renderHealth?.clipCount || renderModel?.timelineSegments?.length || (finishTarget === "rough-cut" ? timeline.length : selectedTake ? 1 : 0);
   const { audioTrackCount, audioReady, label: audioStatus } = describeAudioStatus({ audioMux, selectedTake });
+  const renderDepthChecks = [
+    { id: "scene-depth", label: "Scene depth", ready: Boolean(renderModel?.sceneDepth || renderHealth?.depthModel) },
+    { id: "camera", label: "Camera", ready: Boolean(renderModel?.cameraShot || renderHealth?.styleSnapshot?.cameraShot) },
+    { id: "lighting", label: "Lighting", ready: Boolean(renderModel?.lightingPreset || renderHealth?.styleSnapshot?.lightingPreset) },
+    { id: "style", label: "Style", ready: Boolean(renderModel?.backgroundTheme || renderHealth?.styleSnapshot?.backgroundTheme) },
+    { id: "objects", label: "Objects", ready: Boolean(renderModel?.sceneObjects?.length || selectedTake?.sceneObjects?.length || timeline.length) }
+  ];
   const submissionTitle = doinkSubmission.title.trim() || selectedTake?.name || `${projectExport?.showName || "Untitled Show"} Short`;
   const submissionDurationMs = selectedTake?.durationMs || timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
   const doinkReviewChecklist = buildDoinkReviewChecklist({
@@ -312,6 +319,15 @@ export function SceneLibraryEditor({
             <span className={renderHealth?.hasVideo || renderSucceeded ? "done" : ""}>WEBM</span>
             <span className={audioMux ? "done" : ""}>Audio</span>
             <span className={renderHealth?.hasManifest || renderSucceeded ? "done" : ""}>Manifest</span>
+          </div>
+          <div className="renderDepthPanel" aria-label="Render depth fidelity">
+            <strong>Render Depth v1</strong>
+            <small>Backend render carries the stage horizon, camera, lighting, style, and object context into the review copy.</small>
+            <div>
+              {renderDepthChecks.map((item) => (
+                <span className={item.ready ? "done" : ""} key={item.id}>{item.label}</span>
+              ))}
+            </div>
           </div>
           {renderJob?.status === "failed" ? (
             <button type="button" className="wideAction danger" onClick={onBackendRender} disabled={backendRendering}>

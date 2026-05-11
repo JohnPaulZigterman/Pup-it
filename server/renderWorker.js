@@ -233,6 +233,10 @@ function renderHtml() {
 
       function drawBackground(model) {
         const [top, bottom] = sceneColors(model.scene, model.backgroundTheme);
+        const depth = model.sceneDepth || {};
+        const horizon = clamp((depth.horizon ?? 56) / 100, 0.32, 0.72);
+        const foreground = clamp((depth.foreground ?? 84) / 100, horizon + 0.12, 0.94);
+        const focusX = clamp((depth.focusX ?? 50) / 100, 0.08, 0.92);
         const gradient = ctx.createLinearGradient(0, 0, 0, H);
         gradient.addColorStop(0, top);
         gradient.addColorStop(1, bottom);
@@ -240,10 +244,10 @@ function renderHtml() {
         ctx.fillRect(0, 0, W, H);
 
         ctx.fillStyle = "rgba(38,41,54,0.1)";
-        ctx.fillRect(0, H * 0.45, W, 3);
+        ctx.fillRect(0, H * horizon, W, 3);
         ctx.fillStyle = "rgba(38,41,54,0.08)";
         ctx.beginPath();
-        ctx.ellipse(W * 0.5, H * 0.78, W * 0.44, H * 0.12, 0, 0, Math.PI * 2);
+        ctx.ellipse(W * focusX, H * foreground, W * 0.44, H * 0.12, 0, 0, Math.PI * 2);
         ctx.fill();
         drawGrain();
       }
@@ -350,7 +354,7 @@ function renderHtml() {
         const scale = part.scale || 1;
         const rotate = (part.rotate || 0) * Math.PI / 180;
         ctx.save();
-        ctx.translate(fallbackX, fallbackY);
+        ctx.translate(fallbackX + (part.x || 0), fallbackY + (part.y || 0));
         ctx.rotate(rotate);
         ctx.scale(scale, scale);
         ctx.fillStyle = part.tint || fallbackColor;
@@ -379,9 +383,12 @@ function renderHtml() {
         ctx.restore();
       }
 
-      function drawPuppet(performer, atMs) {
+      function drawPuppet(performer, atMs, model) {
         const state = performer.state || {};
-        const depth = clamp(((state.y || 68) - 42) / 46, 0, 1);
+        const sceneDepth = model?.sceneDepth || {};
+        const horizon = sceneDepth.horizon ?? 42;
+        const foreground = Math.max(horizon + 8, sceneDepth.foreground ?? 88);
+        const depth = clamp(((state.y || 68) - horizon) / (foreground - horizon), 0, 1);
         const scale = (0.62 + depth * 0.68) * (state.scale || 1);
         const x = (state.x || 50) / 100 * W;
         const y = (state.y || 68) / 100 * H;
@@ -517,7 +524,7 @@ function renderHtml() {
         ctx.scale(camera.scale, camera.scale);
         ctx.translate(-W * 0.5 + camera.panX / camera.scale, -H * 0.52 + camera.panY / camera.scale);
         drawObjects(activeModel.sceneObjects || take.sceneObjects || []);
-        performers.forEach((performer) => drawPuppet(performer, frame.localMs));
+        performers.forEach((performer) => drawPuppet(performer, frame.localMs, activeModel));
         ctx.restore();
         applyLighting(activeModel);
         drawTitle(activeModel);
@@ -603,7 +610,21 @@ export async function renderWithHeadlessChromium(request, jobId) {
       hasManifest: true,
       clipCount: renderModel.timelineSegments?.length || (renderModel.take ? 1 : 0),
       durationMs: result.durationMs,
-      audioStatus: audioMux.status
+      audioStatus: audioMux.status,
+      depthModel: renderModel.sceneDepth
+        ? {
+            horizon: renderModel.sceneDepth.horizon,
+            foreground: renderModel.sceneDepth.foreground,
+            focusX: renderModel.sceneDepth.focusX
+          }
+        : null,
+      styleSnapshot: {
+        scene: renderModel.scene,
+        cameraShot: renderModel.cameraShot,
+        lightingPreset: renderModel.lightingPreset,
+        backgroundTheme: renderModel.backgroundTheme,
+        objectStyle: renderModel.objectStyle
+      }
     };
 
     const output = {

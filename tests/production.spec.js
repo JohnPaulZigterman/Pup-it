@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { createDoinkTvSubmissionPackage, createShowToolbox } from "../shared/production.js";
+import { createDoinkTvSubmissionPackage, createProjectExport, createShowToolbox } from "../shared/production.js";
+import { createRenderModel } from "../shared/renderModel.js";
 import { buildDoinkReviewChecklist, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
 import { getTutorialTrack, getWorkspaceIdentity, makeShortMilestones, tutorialTracks } from "../src/workflow/shortFlow.js";
 
@@ -96,4 +97,51 @@ test("tutorial tracks scale from first cartoon to expert app tour", () => {
   expect(getTutorialTrack("ultra")).toMatchObject({ setupLabel: "Set Me Up", level: "First cartoon" });
   expect(getTutorialTrack("expert").steps.length).toBeGreaterThan(6);
   expect(getTutorialTrack("missing").id).toBe("beginner");
+});
+
+test("render model preserves scene depth and direct-manipulated part offsets", () => {
+  const take = {
+    id: "take-offsets",
+    name: "Offset Rig Take",
+    scene: "studio",
+    durationMs: 3000,
+    performers: [
+      {
+        id: "performer-1",
+        name: "Dragged Head",
+        character: "bear",
+        state: {
+          x: 46,
+          y: 70,
+          characterParts: {
+            head: { mode: "shape", shape: "circle", x: 18, y: -10, scale: 1.2 },
+            torso: { mode: "shape", shape: "bean", x: -6, y: 5 }
+          }
+        }
+      }
+    ],
+    tracks: { motion: [], audio: [] }
+  };
+  const project = createProjectExport({
+    roomId: "render-depth",
+    showName: "Render Depth Show",
+    scene: "studio",
+    perspective: "front-stage",
+    sceneDepth: { horizon: 56, foreground: 84, focusX: 50, focusY: 56 },
+    cameraShot: "wide",
+    lightingPreset: "flat-tv",
+    backgroundTheme: "painted-depth",
+    objectStyle: "soft-material",
+    sceneObjects: [],
+    sceneSets: [],
+    floorMarks: [],
+    assetReferences: [],
+    storyboardPanels: [],
+    timeline: [],
+    takes: [take]
+  });
+  const renderModel = createRenderModel({ project, selectedTake: take });
+
+  expect(renderModel.sceneDepth).toMatchObject({ horizon: 56, foreground: 84, focusX: 50 });
+  expect(renderModel.take.performers[0].state.characterParts.head).toMatchObject({ x: 18, y: -10, scale: 1.2 });
 });

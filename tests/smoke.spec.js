@@ -30,6 +30,14 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByLabel("Canvas part editor").getByRole("button", { name: "Shape" }).click();
   await expect(page.getByLabel("Canvas part editor").getByText("Made")).toBeVisible();
   await expect(page.locator(".puppet.self .partHead")).toBeVisible();
+  const headPart = page.locator(".puppet.self .partHead");
+  const headBox = await headPart.boundingBox();
+  expect(headBox).toBeTruthy();
+  await page.mouse.move(headBox.x + headBox.width / 2, headBox.y + headBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(headBox.x + headBox.width / 2 + 18, headBox.y + headBox.height / 2 - 8);
+  await page.mouse.up();
+  await expect(headPart).toHaveAttribute("style", /--part-x: 18px; --part-y: -8px/);
   await expect(page.getByRole("heading", { name: "Rig Check" })).toBeVisible();
   await expect(page.locator(".buildToolStrip")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assemble Parts" })).toBeVisible();
@@ -82,6 +90,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByLabel("Finish mode path")).toBeVisible();
   await expect(page.getByText("Render Check")).toBeVisible();
   await expect(page.getByLabel("Render pipeline")).toBeVisible();
+  await expect(page.getByLabel("Render depth fidelity")).toBeVisible();
+  await expect(page.getByText("Render Depth v1")).toBeVisible();
   await expect(page.getByText("DoinkTV Handoff")).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();
   await expect(page.getByText("Ready Enough Score")).toBeVisible();

@@ -102,6 +102,7 @@ export function createRenderModel({
     requestedBy,
     showName: project.showName || "Untitled Show",
     scene: take?.scene || project.scene || "studio",
+    sceneDepth: take?.sceneDepth || project.sceneDepth || null,
     cameraShot: take?.cameraShot || project.cameraShot || "wide",
     lightingPreset: take?.lightingPreset || project.lightingPreset || "scene",
     backgroundTheme: take?.backgroundTheme || project.backgroundTheme || "painted-depth",

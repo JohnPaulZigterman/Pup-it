@@ -1635,6 +1635,25 @@ function App() {
       }
     });
   };
+  const moveCharacterPartOnCanvas = (partId, patch) => {
+    if (!self) return;
+    const currentParts = self.state.characterParts || {};
+    const currentPart = currentParts[partId] || {};
+    const partMeta = getCatalogItem(characterPartCatalog, partId);
+    const hasPart = currentPart.source || currentPart.shape || currentPart.mode === "drawn";
+    updateSelf({
+      characterParts: {
+        ...currentParts,
+        [partId]: {
+          label: partMeta.label,
+          mode: hasPart ? currentPart.mode || "shape" : "shape",
+          shape: hasPart ? currentPart.shape || "circle" : partId === "torso" ? "bean" : "circle",
+          ...currentPart,
+          ...patch
+        }
+      }
+    });
+  };
   const duplicateCharacterPart = (partId) => {
     if (!self) return;
     const currentParts = self.state.characterParts || {};
@@ -2748,6 +2767,14 @@ function App() {
       showName,
       scene,
       perspective: selectedScene.perspective,
+      sceneDepth: {
+        horizon: selectedScene.horizon,
+        foreground: selectedScene.foreground,
+        focusX: selectedScene.vanishingX || 50,
+        focusY: selectedScene.focusY || selectedScene.horizon,
+        horizonSource: selectedScene.horizonSource,
+        movementModel: selectedScene.movementModel
+      },
       cameraShot,
       directorCamera: {
         follow: cameraFollow,
@@ -3709,6 +3736,7 @@ function App() {
                   editableParts={mode === "build" && performer.id === selfId}
                   selectedPartId={mode === "build" ? selectedPartId : ""}
                   onPartSelect={setSelectedPartId}
+                  onPartTransform={moveCharacterPartOnCanvas}
                 />
               ))}
             </div>

@@ -12,7 +12,7 @@ function hasCustomPart(part) {
   return Boolean(!part?.hidden && (part?.source || part?.mode === "drawn" || part?.shape));
 }
 
-function PuppetPart({ part, className, label, showLabel, slot, selected, editableParts, onPartSelect }) {
+function PuppetPart({ part, className, label, showLabel, slot, selected, editableParts, onPartSelect, onPartPointerDown, dragHandlers }) {
   if (!hasCustomPart(part)) return null;
   const style = {
     "--part-scale": part.scale || 1,
@@ -26,6 +26,11 @@ function PuppetPart({ part, className, label, showLabel, slot, selected, editabl
     event.stopPropagation();
     onPartSelect(slot);
   };
+  const beginPartDrag = (event) => {
+    if (!editableParts || !onPartPointerDown) return;
+    event.stopPropagation();
+    onPartPointerDown(slot, part, event);
+  };
 
   if (part.source) {
     return (
@@ -36,6 +41,8 @@ function PuppetPart({ part, className, label, showLabel, slot, selected, editabl
         alt=""
         draggable="false"
         onClick={selectPart}
+        onPointerDown={beginPartDrag}
+        {...dragHandlers}
       />
     );
   }
@@ -46,15 +53,21 @@ function PuppetPart({ part, className, label, showLabel, slot, selected, editabl
       style={style}
       aria-hidden="true"
       onClick={selectPart}
+      onPointerDown={beginPartDrag}
+      {...dragHandlers}
     >
       {showLabel ? part.label || label : null}
     </span>
   );
 }
 
-function PartHotspot({ slot, className, selected, editableParts, onPartSelect }) {
+function PartHotspot({ slot, className, selected, editableParts, onPartSelect, onPartPointerDown, dragHandlers }) {
   if (!editableParts || !onPartSelect) return null;
   const readableSlot = slot.replace(/([A-Z])/g, " $1").toLowerCase();
+  const beginPartDrag = (event) => {
+    event.stopPropagation();
+    if (onPartPointerDown) onPartPointerDown(slot, {}, event);
+  };
   return (
     <button
       type="button"
@@ -64,6 +77,8 @@ function PartHotspot({ slot, className, selected, editableParts, onPartSelect })
         event.stopPropagation();
         onPartSelect(slot);
       }}
+      onPointerDown={beginPartDrag}
+      {...dragHandlers}
     />
   );
 }
@@ -75,7 +90,8 @@ export function Puppet({
   showLabels = false,
   editableParts = false,
   selectedPartId = "",
-  onPartSelect
+  onPartSelect,
+  onPartTransform
 }) {
   const character = getCatalogItem(characterCatalog, performer.character);
   const expression = getCatalogItem(expressionCatalog, performer.state.expression);
@@ -112,6 +128,37 @@ export function Puppet({
     event.stopPropagation();
     onPartSelect(slot);
   };
+  const partDragRef = React.useRef(null);
+  const beginPartDrag = (slot, part, event) => {
+    if (!editableParts || !onPartTransform) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    onPartSelect?.(slot);
+    partDragRef.current = {
+      slot,
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      x: part?.x || 0,
+      y: part?.y || 0
+    };
+  };
+  const dragHandlers = editableParts && onPartTransform
+    ? {
+        onPointerMove: (event) => {
+          const drag = partDragRef.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          const nextX = Math.max(-36, Math.min(36, drag.x + event.clientX - drag.clientX));
+          const nextY = Math.max(-36, Math.min(36, drag.y + event.clientY - drag.clientY));
+          onPartTransform(drag.slot, { x: Math.round(nextX), y: Math.round(nextY) });
+        },
+        onPointerUp: (event) => {
+          if (partDragRef.current?.pointerId === event.pointerId) partDragRef.current = null;
+        },
+        onPointerCancel: () => {
+          partDragRef.current = null;
+        }
+      }
+    : {};
 
   return (
     <div
@@ -180,36 +227,36 @@ export function Puppet({
         {rig.arms ? (
           <>
             <div className="limb arm armLeft">
-              <PartHotspot slot="leftArm" className="partHotspotLimb" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} />
-              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" slot="leftArm" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+              <PartHotspot slot="leftArm" className="partHotspotLimb" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+              <PuppetPart part={parts.leftArm} className="partLeftArm" label="arm" slot="leftArm" selected={selectedPartId === "leftArm"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
             </div>
             <div className="limb arm armRight">
-              <PartHotspot slot="rightArm" className="partHotspotLimb" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} />
-              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" slot="rightArm" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+              <PartHotspot slot="rightArm" className="partHotspotLimb" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+              <PuppetPart part={parts.rightArm} className="partRightArm" label="arm" slot="rightArm" selected={selectedPartId === "rightArm"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
             </div>
           </>
         ) : null}
         {rig.legs ? (
           <>
             <div className="limb leg legLeft">
-              <PartHotspot slot="leftLeg" className="partHotspotLimb" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} />
-              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" slot="leftLeg" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+              <PartHotspot slot="leftLeg" className="partHotspotLimb" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+              <PuppetPart part={parts.leftLeg} className="partLeftLeg" label="leg" slot="leftLeg" selected={selectedPartId === "leftLeg"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
             </div>
             <div className="limb leg legRight">
-              <PartHotspot slot="rightLeg" className="partHotspotLimb" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} />
-              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" slot="rightLeg" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+              <PartHotspot slot="rightLeg" className="partHotspotLimb" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+              <PuppetPart part={parts.rightLeg} className="partRightLeg" label="leg" slot="rightLeg" selected={selectedPartId === "rightLeg"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
             </div>
           </>
         ) : null}
         <div className={`puppetBody ${selectedPartId === "torso" ? "selectedPartBody" : ""}`} onClick={selectBodyPart("torso")}>
-          <PartHotspot slot="head" className="partHotspotHead" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} />
-          <PartHotspot slot="torso" className="partHotspotTorso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} />
-          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" slot="backAppendage" selected={selectedPartId === "backAppendage"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
-          <PuppetPart part={parts.torso} className="partTorso" label="torso" slot="torso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
-          <PuppetPart part={parts.head} className="partHead" label="head" slot="head" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
-          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" slot="topAccessory" selected={selectedPartId === "topAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
-          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" slot="leftAccessory" selected={selectedPartId === "leftAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
-          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" slot="rightAccessory" selected={selectedPartId === "rightAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} showLabel={showLabels} />
+          <PartHotspot slot="head" className="partHotspotHead" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+          <PartHotspot slot="torso" className="partHotspotTorso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} />
+          <PuppetPart part={parts.backAppendage} className="partBackAppendage" label="??" slot="backAppendage" selected={selectedPartId === "backAppendage"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
+          <PuppetPart part={parts.torso} className="partTorso" label="torso" slot="torso" selected={selectedPartId === "torso"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
+          <PuppetPart part={parts.head} className="partHead" label="head" slot="head" selected={selectedPartId === "head"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
+          <PuppetPart part={parts.topAccessory} className="partTopAccessory" label="hat" slot="topAccessory" selected={selectedPartId === "topAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
+          <PuppetPart part={parts.leftAccessory} className="partLeftAccessory" label="prop" slot="leftAccessory" selected={selectedPartId === "leftAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
+          <PuppetPart part={parts.rightAccessory} className="partRightAccessory" label="prop" slot="rightAccessory" selected={selectedPartId === "rightAccessory"} editableParts={editableParts} onPartSelect={onPartSelect} onPartPointerDown={beginPartDrag} dragHandlers={dragHandlers} showLabel={showLabels} />
           <div className="animalFeature ears" aria-hidden="true" />
           <div className="animalFeature snout" aria-hidden="true" />
           <div className="animalFeature beak" aria-hidden="true" />
