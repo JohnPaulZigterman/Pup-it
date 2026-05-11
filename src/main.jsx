@@ -35,8 +35,21 @@ const macros = [
   { id: "panic", name: "Panic" }
 ];
 
+const depth = {
+  horizon: 20,
+  foreground: 82,
+  minScale: 0.42,
+  maxScale: 1.46
+};
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getDepthScale(y, trim = 1) {
+  const progress = clamp((y - depth.horizon) / (depth.foreground - depth.horizon), 0, 1);
+  const eased = Math.pow(progress, 1.18);
+  return (depth.minScale + (depth.maxScale - depth.minScale) * eased) * trim;
 }
 
 function App() {
@@ -117,16 +130,16 @@ function App() {
         if (pressed.has("ArrowRight") || pressed.has("d")) dx += 1.2;
         if (pressed.has("ArrowUp") || pressed.has("w")) dy -= 1.2;
         if (pressed.has("ArrowDown") || pressed.has("s")) dy += 1.2;
-        if (pressed.has("q")) scale -= 0.01;
-        if (pressed.has("e")) scale += 0.01;
+        if (pressed.has("q")) scale -= 0.005;
+        if (pressed.has("e")) scale += 0.005;
 
         if (!dx && !dy && scale === state.scale) return current;
 
         const nextState = {
           ...state,
           x: clamp(state.x + dx, 5, 92),
-          y: clamp(state.y + dy, 14, 82),
-          scale: clamp(scale, 0.55, 1.85),
+          y: clamp(state.y + dy, depth.horizon, depth.foreground),
+          scale: clamp(scale, 0.82, 1.18),
           facing: dx === 0 ? state.facing : dx > 0 ? 1 : -1
         };
 
@@ -331,6 +344,7 @@ function App() {
       </header>
 
       <section className={`stage ${selectedScene.className}`}>
+        <div className="horizonGuide" />
         <div className="setFloor" />
         {performerList.map((performer) => (
           <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
@@ -397,6 +411,7 @@ function App() {
 function Puppet({ performer, isSelf }) {
   const character = characters.find((item) => item.id === performer.character) || characters[0];
   const { state } = performer;
+  const scale = getDepthScale(state.y, state.scale);
   const face = {
     neutral: ["•", "•", "—"],
     happy: ["^", "^", "⌣"],
@@ -410,7 +425,8 @@ function Puppet({ performer, isSelf }) {
       style={{
         left: `${state.x}%`,
         top: `${state.y}%`,
-        transform: `translate(-50%, -100%) scale(${state.scale})`
+        zIndex: Math.round(state.y * 10),
+        transform: `translate(-50%, -100%) scale(${scale})`
       }}
     >
       <div className="nameTag">{performer.name}</div>

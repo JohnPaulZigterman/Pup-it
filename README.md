@@ -6,7 +6,8 @@ Pup-It is a browser-based prototype for collaborative live puppet animation. The
 
 - Join the same room from two browser tabs or machines.
 - Move your puppet with `WASD` or arrow keys.
-- Use `Q` and `E` to scale the puppet forward or backward for a simple 2.5D feel.
+- Move toward the horizon to automatically shrink the puppet, or toward camera to enlarge it.
+- Use `Q` and `E` for small scale-trim adjustments when a shot needs a cheat.
 - Change expressions, scenes, and macros from the control dock.
 - Start a take to record movement events and relayed audio chunks.
 - Export the take as JSON for later playback or editing work.
