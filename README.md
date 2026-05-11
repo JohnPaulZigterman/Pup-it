@@ -2,6 +2,8 @@
 
 Pup-It is a browser-based prototype for collaborative live puppet animation. The MVP is built around real-time performance: multiple users join a room, control characters together, record movement events, relay microphone audio chunks, switch scenes, and trigger simple animation macros.
 
+The current visual direction favors rough late-night mixed media: cutout bodies, grimy textures, harsh outlines, crooked UI, and intentionally weird stage palettes.
+
 ## MVP Loop
 
 - Join the same room from two browser tabs or machines.

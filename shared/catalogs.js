@@ -3,9 +3,9 @@ export const characterCatalog = [
     id: "bean",
     name: "Bean",
     rig: "full-body",
-    stylePreset: "flat-cutout",
-    color: "#f76f53",
-    accent: "#fee17a",
+    stylePreset: "trash-cutout",
+    color: "#d64d2f",
+    accent: "#f0d642",
     rigConfig: {
       body: "round",
       limbs: "rubber-hose",
@@ -21,9 +21,9 @@ export const characterCatalog = [
     id: "noodle",
     name: "Noodle",
     rig: "full-body",
-    stylePreset: "flat-cutout",
-    color: "#57a773",
-    accent: "#f7f1d1",
+    stylePreset: "xerox-grime",
+    color: "#7bb051",
+    accent: "#efe0b0",
     rigConfig: {
       body: "tall",
       limbs: "noodle",
@@ -40,8 +40,8 @@ export const characterCatalog = [
     name: "Square",
     rig: "full-body",
     stylePreset: "paper-cutout",
-    color: "#5d8bf4",
-    accent: "#ffb7c3",
+    color: "#4f78c8",
+    accent: "#f08ba2",
     rigConfig: {
       body: "block",
       limbs: "hinged",
@@ -58,8 +58,8 @@ export const characterCatalog = [
     name: "Moon",
     rig: "full-body",
     stylePreset: "ink-line",
-    color: "#d4a5ff",
-    accent: "#1f2030",
+    color: "#b884de",
+    accent: "#151720",
     rigConfig: {
       body: "round",
       limbs: "stick",
@@ -74,9 +74,9 @@ export const characterCatalog = [
 ];
 
 export const sceneCatalog = [
-  { id: "studio", name: "Studio", className: "sceneStudio", horizon: 20, foreground: 82 },
-  { id: "street", name: "Street", className: "sceneStreet", horizon: 20, foreground: 82 },
-  { id: "space", name: "Space", className: "sceneSpace", horizon: 20, foreground: 82 }
+  { id: "studio", name: "Basement", className: "sceneStudio", horizon: 20, foreground: 82 },
+  { id: "street", name: "Ditch", className: "sceneStreet", horizon: 20, foreground: 82 },
+  { id: "space", name: "Bad TV", className: "sceneSpace", horizon: 20, foreground: 82 }
 ];
 
 export const macroCatalog = [
@@ -169,9 +169,10 @@ export const expressionCatalog = [
 ];
 
 export const animationStyleCatalog = [
-  { id: "flat-cutout", name: "Flat Cutout" },
+  { id: "trash-cutout", name: "Trash Cutout" },
+  { id: "xerox-grime", name: "Xerox Grime" },
   { id: "paper-cutout", name: "Paper Cutout" },
-  { id: "ink-line", name: "Ink Line" }
+  { id: "ink-line", name: "Bad Ink" }
 ];
 
 export const bodyShapeCatalog = [
