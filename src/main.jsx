@@ -6515,7 +6515,7 @@ function CharacterEditor({
       <div className="dockGroup buildPartsPanel">
         <h2>Assemble Parts</h2>
         <small className="controlHint">
-          Click a part, then shape it like a tiny paint program. The detailed rows are still here when you need them.
+          Click a part, then shape it like a tiny paint program. Detailed rows move into Pro when you need them.
         </small>
         <div className="visualPartWorkbench" aria-label="Visual part builder">
           <div className="partPaletteBoard">
@@ -6556,7 +6556,7 @@ function CharacterEditor({
             onClear={() => onPartClear(selectedPart.id)}
           />
         </div>
-        <div className="partBuilderList">
+        <div className="partBuilderList advancedControl">
           {coreParts.map((part) => (
             <PartBuilderRow
               key={part.id}
@@ -6797,6 +6797,24 @@ function PartWorkbench({ part, value = {}, fallbackColor, onChange, onDuplicate,
           <strong>{part.name}</strong>
           <small>{mode === "empty" ? "stick guide until you make it yours" : mode}</small>
         </div>
+      </div>
+
+      <div className="partHandleStrip" aria-label={`Quick handles for ${part.name}`}>
+        <button type="button" onClick={() => onChange({ scale: Math.max(0.55, (value.scale || 1) - 0.1) })}>
+          - Size
+        </button>
+        <button type="button" onClick={() => onChange({ scale: Math.min(1.65, (value.scale || 1) + 0.1) })}>
+          + Size
+        </button>
+        <button type="button" onClick={() => onChange({ rotate: Math.max(-45, (value.rotate || 0) - 6) })}>
+          Tilt L
+        </button>
+        <button type="button" onClick={() => onChange({ rotate: Math.min(45, (value.rotate || 0) + 6) })}>
+          Tilt R
+        </button>
+        <button type="button" onClick={() => onChange({ scale: 1, rotate: 0 })}>
+          Reset
+        </button>
       </div>
 
       <div className="shapePaintGrid" aria-label={`Shapes for ${part.name}`}>
