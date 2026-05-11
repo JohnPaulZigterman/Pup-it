@@ -183,6 +183,7 @@ input[type="range"] {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  cursor: crosshair;
 }
 
 .sceneStudio {
@@ -288,6 +289,50 @@ input[type="range"] {
 
 .performerRow small {
   color: #b7afa2;
+}
+
+.mouthMeter {
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #15151b;
+}
+
+.mouthMeter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #79d99b, #fee17a);
+  transition: width 80ms linear;
+}
+
+.controlHint {
+  color: #b7afa2;
+  line-height: 1.35;
+}
+
+.mouthCameraPreview {
+  position: fixed;
+  right: 336px;
+  bottom: 16px;
+  z-index: 20;
+  width: 150px;
+  aspect-ratio: 4 / 3;
+  border: 2px solid rgba(254, 225, 122, 0.9);
+  border-radius: 8px;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.mouthCameraPreview.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .characterEditor {
@@ -516,12 +561,13 @@ input[type="range"] {
   top: 66px;
   width: 38px;
   min-height: 18px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scaleY(calc(0.72 + var(--mouth-open) * 1.24));
   font-size: 22px;
+  transform-origin: center;
 }
 
 .mouth-shape {
-  height: 14px;
+  height: calc(7px + var(--mouth-open) * 24px);
   border-radius: 50%;
   color: transparent;
   background: #141418;
@@ -532,8 +578,11 @@ input[type="range"] {
   opacity: 0.78;
 }
 
-.mouth.talking {
-  animation: talk 180ms infinite alternate;
+.mouth-flap.mouth-active {
+  color: transparent;
+  height: calc(6px + var(--mouth-open) * 22px);
+  border-radius: 48%;
+  background: #141418;
 }
 
 .shadow {
@@ -593,15 +642,6 @@ input[type="range"] {
 @keyframes panic {
   50% {
     translate: 8px 0;
-  }
-}
-
-@keyframes talk {
-  from {
-    transform: translateX(-50%) scaleY(0.65);
-  }
-  to {
-    transform: translateX(-50%) scaleY(1.35);
   }
 }
 

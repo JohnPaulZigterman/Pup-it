@@ -18,6 +18,7 @@ export function Puppet({ performer, isSelf }) {
   const isWalking = state.walking && rig.walkCycle !== "none";
   const canIdle = state.idleMotion !== "held" && !isWalking && !state.macro;
   const canBlink = state.idleMotion !== "held";
+  const mouthOpen = Math.max(state.mouthOpen || 0, state.speaking ? 0.62 : 0);
 
   return (
     <div
@@ -49,7 +50,8 @@ export function Puppet({ performer, isSelf }) {
         "--arm-right": `${pose.armRight * state.facing}deg`,
         "--leg-left": `${pose.legLeft}deg`,
         "--leg-right": `${pose.legRight}deg`,
-        "--blink-delay": `${-(state.blinkSeed || 0)}ms`
+        "--blink-delay": `${-(state.blinkSeed || 0)}ms`,
+        "--mouth-open": mouthOpen
       }}
     >
       <div className="nameTag">{performer.name}</div>
@@ -66,7 +68,7 @@ export function Puppet({ performer, isSelf }) {
         </>
       ) : null}
       <div className="puppetBody">
-        <div className={`mouth mouth-${rig.mouthStyle} ${state.speaking ? "talking" : ""}`}>
+        <div className={`mouth mouth-${rig.mouthStyle} ${mouthOpen > 0.06 ? "mouth-active" : ""}`}>
           {expression.face[2]}
         </div>
         <span className="eye eyeOpen left">{expression.face[0]}</span>

@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import {
+  Camera,
   Circle,
   Mic,
   MicOff,
+  MousePointer2,
   Palette,
   Radio,
   Square,
@@ -42,9 +44,15 @@ import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function App() {
   const socketRef = useRef(null);
   const audioRef = useRef({ context: null, sequence: 0, recorder: null, stream: null });
+  const mouthVideoRef = useRef(null);
+  const mouthCameraRef = useRef({ stream: null, frame: null, baseline: null, lastSentAt: 0 });
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
@@ -54,6 +62,7 @@ function App() {
   const [selfId, setSelfId] = useState(null);
   const [recording, setRecording] = useState(false);
   const [micLive, setMicLive] = useState(false);
+  const [mouthCameraActive, setMouthCameraActive] = useState(false);
   const [mode, setMode] = useState("perform");
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
@@ -142,6 +151,10 @@ function App() {
     };
   }, [joined, selfId]);
 
+  useEffect(() => {
+    return () => stopMouthCamera();
+  }, []);
+
   const joinRoom = (event) => {
     event.preventDefault();
     socketRef.current.connect();
@@ -164,6 +177,25 @@ function App() {
     updateSelf({ pose: pose.id, expression: pose.expression });
   };
   const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
+  const setMouthOpen = (mouthOpen) => {
+    const open = clamp(mouthOpen, 0, 1);
+    updateSelf({ mouthOpen: open, speaking: open > 0.08 });
+  };
+  const setMouthControl = async (mouthControl) => {
+    if (mouthControl === "camera") {
+      updateSelf({ mouthControl });
+      try {
+        await startMouthCamera();
+      } catch (_error) {
+        updateSelf({ mouthControl: "mouse", mouthOpen: 0, speaking: false });
+        setStatus("Camera mouth control was blocked. Mouse mouth control is still active.");
+      }
+      return;
+    }
+
+    stopMouthCamera();
+    updateSelf({ mouthControl, mouthOpen: 0, speaking: false });
+  };
 
   const updateCharacterRig = (patch) => {
     if (!self) return;
@@ -241,6 +273,80 @@ function App() {
     const audio = new Audio(`data:${mimeType};base64,${data}`);
     audio.volume = 0.8;
     await audio.play().catch(() => {});
+  };
+
+  const startMouthCamera = async () => {
+    if (mouthCameraRef.current.stream) {
+      setMouthCameraActive(true);
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 320, height: 240 },
+      audio: false
+    });
+    mouthCameraRef.current.stream = stream;
+    mouthCameraRef.current.baseline = null;
+    setMouthCameraActive(true);
+
+    if (mouthVideoRef.current) {
+      mouthVideoRef.current.srcObject = stream;
+      await mouthVideoRef.current.play().catch(() => {});
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 48;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    const sample = () => {
+      const video = mouthVideoRef.current;
+      if (!video || !mouthCameraRef.current.stream) return;
+      if (video.readyState >= 2) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const image = context.getImageData(20, 27, 24, 14).data;
+        let total = 0;
+        for (let index = 0; index < image.length; index += 4) {
+          total += (image[index] + image[index + 1] + image[index + 2]) / 3;
+        }
+        const average = total / (image.length / 4);
+        const baseline = mouthCameraRef.current.baseline ?? average;
+        mouthCameraRef.current.baseline = baseline * 0.92 + average * 0.08;
+        const mouthOpen = clamp(Math.abs(average - baseline) / 34, 0, 1);
+        const now = performance.now();
+        if (now - mouthCameraRef.current.lastSentAt > 80) {
+          mouthCameraRef.current.lastSentAt = now;
+          setMouthOpen(mouthOpen);
+        }
+      }
+      mouthCameraRef.current.frame = requestAnimationFrame(sample);
+    };
+
+    mouthCameraRef.current.frame = requestAnimationFrame(sample);
+  };
+
+  const stopMouthCamera = () => {
+    if (mouthCameraRef.current.frame) {
+      cancelAnimationFrame(mouthCameraRef.current.frame);
+    }
+    mouthCameraRef.current.stream?.getTracks().forEach((track) => track.stop());
+    mouthCameraRef.current = { stream: null, frame: null, baseline: null, lastSentAt: 0 };
+    if (mouthVideoRef.current) {
+      mouthVideoRef.current.srcObject = null;
+    }
+    setMouthCameraActive(false);
+  };
+
+  const handleStagePointerMove = (event) => {
+    if (!self || self.state.mouthControl !== "mouse") return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const y = clamp((event.clientY - bounds.top) / bounds.height, 0, 1);
+    setMouthOpen(Math.pow(1 - y, 1.35));
+  };
+
+  const handleStagePointerLeave = () => {
+    if (!self || self.state.mouthControl !== "mouse") return;
+    setMouthOpen(0);
   };
 
   const toggleTake = () => {
@@ -336,7 +442,11 @@ function App() {
         </div>
       </header>
 
-      <section className={`stage ${selectedScene.className}`}>
+      <section
+        className={`stage ${selectedScene.className}`}
+        onPointerMove={handleStagePointerMove}
+        onPointerLeave={handleStagePointerLeave}
+      >
         <div className="horizonGuide" />
         <div className="setFloor" />
             {activePerformers.map((performer) => (
@@ -353,6 +463,8 @@ function App() {
             onExpressionChange={setExpression}
             onPoseChange={setPose}
             onIdleMotionChange={setIdleMotion}
+            onMouthControlChange={setMouthControl}
+            mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
           />
         ) : (
@@ -373,6 +485,12 @@ function App() {
           ))}
         </div>
       </aside>
+      <video
+        ref={mouthVideoRef}
+        className={`mouthCameraPreview ${mouthCameraActive ? "visible" : ""}`}
+        muted
+        playsInline
+      />
     </main>
   );
 }
@@ -384,6 +502,8 @@ function PerformControls({
   onExpressionChange,
   onPoseChange,
   onIdleMotionChange,
+  onMouthControlChange,
+  mouthCameraActive,
   onMacroTrigger
 }) {
   return (
@@ -446,6 +566,36 @@ function PerformControls({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Mouth Control</h2>
+        <div className="segmented">
+          <button
+            className={self?.state.mouthControl === "mouse" ? "selected" : ""}
+            onClick={() => onMouthControlChange("mouse")}
+          >
+            <MousePointer2 size={15} />
+            Mouse
+          </button>
+          <button
+            className={self?.state.mouthControl === "camera" ? "selected" : ""}
+            onClick={() => onMouthControlChange("camera")}
+          >
+            <Camera size={15} />
+            Camera
+          </button>
+        </div>
+        <div className="mouthMeter">
+          <span style={{ width: `${(self?.state.mouthOpen || 0) * 100}%` }} />
+        </div>
+        <small className="controlHint">
+          {self?.state.mouthControl === "camera"
+            ? mouthCameraActive
+              ? "Camera is driving mouth motion."
+              : "Camera access may need browser permission."
+            : "Move the mouse higher on stage to open the mouth."}
+        </small>
       </div>
 
       <div className="dockGroup">
