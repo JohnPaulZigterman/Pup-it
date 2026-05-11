@@ -56,10 +56,12 @@ export function Puppet({ performer, isSelf, depthModel }) {
     mouthOpen > 0.72 ? "wide" : mouthOpen > 0.38 ? "medium" : mouthOpen > 0.1 ? "small" : "closed";
   const depth = getDepthProgress(state.y, depthModel);
   const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
-  const actingLean = pose.bodyLean + (state.travelLean || 0) + (state.anticipationLean || 0);
+  const settleAmount = state.settleAmount || 0;
+  const walkBounce = state.walkBounce || 0;
+  const actingLean = pose.bodyLean + (state.travelLean || 0) + (state.anticipationLean || 0) * 0.75;
   const motionSquash = state.walking
-    ? (state.anticipationSquash || 1) + Math.min(0.045, (state.groundSpeed || 0) * 0.022)
-    : state.anticipationSquash || 1;
+    ? (state.anticipationSquash || 1) + Math.min(0.032, walkBounce * 0.018)
+    : (state.anticipationSquash || 1) - settleAmount * 0.006;
 
   return (
     <div
@@ -85,7 +87,7 @@ export function Puppet({ performer, isSelf, depthModel }) {
       style={{
         left: `${state.x}%`,
         top: `${state.y}%`,
-        zIndex: Math.round(state.y * 10),
+        zIndex: 100 + Math.round((state.depthProgress ?? depth) * 1000),
         transform: `translate(-50%, -100%) scale(${scale})`,
         "--puppet": design.color || character.color,
         "--accent": design.accent || character.accent,
@@ -102,10 +104,12 @@ export function Puppet({ performer, isSelf, depthModel }) {
         "--texture-opacity": adapter.textureOpacity,
         "--depth": depth,
         "--ground-speed": groundSpeed,
+        "--walk-bounce": walkBounce,
+        "--settle": settleAmount,
         "--cast-shadow-x": `${-18 + depth * 10}px`,
-        "--cast-shadow-y": `${16 + depth * 18}px`,
-        "--cast-shadow-scale": 0.52 + depth * 0.56,
-        "--cast-shadow-opacity": 0.08 + depth * adapter.shadowOpacity,
+        "--cast-shadow-y": `${14 + depth * 16 + settleAmount * 2}px`,
+        "--cast-shadow-scale": 0.5 + depth * 0.54 + walkBounce * 0.025,
+        "--cast-shadow-opacity": 0.08 + depth * adapter.shadowOpacity + settleAmount * 0.018,
         "--arm-length": `${rig.armLength * adapter.limbScale}px`,
         "--leg-length": `${rig.legLength * adapter.limbScale}px`,
         "--body-lean": `${actingLean}deg`,

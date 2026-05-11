@@ -4,8 +4,8 @@ export const defaultDepthModel = {
   horizon: 56,
   foreground: 84,
   performerHorizonBuffer: 2,
-  minScale: 0.42,
-  maxScale: 1.46,
+  minScale: 0.74,
+  maxScale: 1.12,
   minTrim: 0.82,
   maxTrim: 1.18,
   perspective: "front-stage",
@@ -35,8 +35,8 @@ export const perspectiveProfiles = {
     lateralNear: 1,
     verticalFar: 0.72,
     verticalNear: 1,
-    convergence: 0.004,
-    scaleDepthStrength: 1,
+    floorSpeed: 0.012,
+    scaleDepthStrength: 0.72,
     scaleCurve: 1.08,
     horizonSoftness: 0.16
   },
@@ -52,8 +52,8 @@ export const perspectiveProfiles = {
     lateralNear: 0.98,
     verticalFar: 0.6,
     verticalNear: 0.92,
-    convergence: 0.014,
-    scaleDepthStrength: 1.08,
+    floorSpeed: 0.011,
+    scaleDepthStrength: 0.86,
     scaleCurve: 1.18,
     horizonSoftness: 0.2
   },
@@ -69,8 +69,8 @@ export const perspectiveProfiles = {
     lateralNear: 0.96,
     verticalFar: 0.34,
     verticalNear: 0.48,
-    convergence: 0,
-    scaleDepthStrength: 0.34,
+    floorSpeed: 0.012,
+    scaleDepthStrength: 0.22,
     scaleCurve: 1,
     horizonSoftness: 0.22
   },
@@ -86,8 +86,8 @@ export const perspectiveProfiles = {
     lateralNear: 0.86,
     verticalFar: 0.64,
     verticalNear: 0.78,
-    convergence: 0.003,
-    scaleDepthStrength: 0.72,
+    floorSpeed: 0.01,
+    scaleDepthStrength: 0.34,
     scaleCurve: 1.05,
     horizonSoftness: 0.28
   }
@@ -144,7 +144,7 @@ export function getMotionProfile(id = "smooth") {
   return motionProfiles[id] || motionProfiles.smooth;
 }
 
-export function hasResidualMotion(state, threshold = 0.035) {
+export function hasResidualMotion(state, threshold = 0.00035) {
   return Math.hypot(state.motionVx || 0, state.motionVy || 0) > threshold;
 }
 
@@ -178,9 +178,43 @@ function projectFloorRatio(ratio, floor) {
   return floor.left + (floor.right - floor.left) * ratio;
 }
 
+export function getFloorCoordinates(point, depthModel = defaultDepthModel) {
+  const clamped = clampPointToFloor(point, depthModel);
+  return {
+    u: getFloorRatio(clamped.x, clamped.floor),
+    z: clamped.floor.progress,
+    point: clamped
+  };
+}
+
+export function projectFloorCoordinates(coords, depthModel = defaultDepthModel) {
+  const model = resolveDepthModel(depthModel);
+  const z = clamp(coords.z, 0, 1);
+  const y = mix(model.floor.backY, model.floor.frontY, z);
+  const floor = getFloorAtY(y, model);
+  const x = projectFloorRatio(clamp(coords.u, 0, 1), floor);
+  return {
+    x,
+    y,
+    floor
+  };
+}
+
 function easeVelocity(current, target, amount, frameScale) {
   const adjustedAmount = 1 - Math.pow(1 - amount, frameScale);
   return current + (target - current) * adjustedAmount;
+}
+
+function cleanInputAxis(value, deadzone = 0.08) {
+  if (Math.abs(value) < deadzone) return 0;
+  const sign = Math.sign(value);
+  const cleaned = (Math.abs(value) - deadzone) / (1 - deadzone);
+  return clamp(cleaned, 0, 1) * sign;
+}
+
+function getAxisEase(current, target, activeEase, stopEase, reversalBoost = 1.75) {
+  const baseEase = target === 0 ? stopEase : activeEase;
+  return current * target < 0 ? Math.min(0.94, baseEase * reversalBoost) : baseEase;
 }
 
 export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
@@ -194,55 +228,72 @@ export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
 
 export function movePerformerState(state, input, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
-  const currentPoint = clampPointToFloor({ x: state.x, y: state.y }, model);
-  const progress = currentPoint.floor.progress;
+  const currentCoords = getFloorCoordinates({ x: state.x, y: state.y }, model);
+  const progress = currentCoords.z;
   const softenedProgress = clamp(progress + model.horizonSoftness, 0, 1);
   const profile = getMotionProfile(state.motionFeel);
   const frameScale = clamp(input.deltaMs ?? 16.67, 8, 48) / 16.67;
-  const lateralSpeed = mix(model.lateralFar, model.lateralNear, softenedProgress);
-  const verticalSpeed = mix(model.verticalFar, model.verticalNear, softenedProgress);
-  const movingDiagonally = input.dx !== 0 && input.dy !== 0;
+  const lateralSpeed = mix(model.lateralFar, model.lateralNear, softenedProgress) * (model.floorSpeed || 0.012);
+  const verticalSpeed = ((model.verticalFar + model.verticalNear) / 2) * (model.floorSpeed || 0.012);
+  const inputX = cleanInputAxis(input.dx || 0, profile.deadzone);
+  const inputY = cleanInputAxis(input.dy || 0, profile.deadzone);
+  const movingDiagonally = inputX !== 0 && inputY !== 0;
   const diagonalTrim = movingDiagonally ? Math.SQRT1_2 : 1;
-  const targetVx = input.dx * diagonalTrim * profile.speed * lateralSpeed;
-  const targetVy = input.dy * diagonalTrim * profile.speed * verticalSpeed;
-  const activelyMoving = input.dx !== 0 || input.dy !== 0;
-  const easing = activelyMoving ? profile.acceleration : profile.deceleration;
+  const targetVx = inputX * diagonalTrim * profile.speed * lateralSpeed;
+  const targetVy = inputY * diagonalTrim * profile.speed * verticalSpeed;
   const beforeVx = state.motionVx || 0;
   const beforeVy = state.motionVy || 0;
-  let motionVx = easeVelocity(state.motionVx || 0, targetVx, easing, frameScale);
-  let motionVy = easeVelocity(state.motionVy || 0, targetVy, easing, frameScale);
+  const easingX = getAxisEase(beforeVx, targetVx, profile.acceleration, profile.deceleration, profile.reversal);
+  const easingY = getAxisEase(
+    beforeVy,
+    targetVy,
+    profile.depthAcceleration || profile.acceleration,
+    profile.depthDeceleration || profile.deceleration,
+    profile.reversal
+  );
+  let motionVx = easeVelocity(beforeVx, targetVx, easingX, frameScale);
+  let motionVy = easeVelocity(beforeVy, targetVy, easingY, frameScale);
 
-  if (!activelyMoving && Math.hypot(motionVx, motionVy) < 0.025) {
+  if (targetVx === 0 && Math.abs(motionVx) < 0.00016) motionVx = 0;
+  if (targetVy === 0 && Math.abs(motionVy) < 0.00016) motionVy = 0;
+
+  if (targetVx === 0 && targetVy === 0 && Math.hypot(motionVx, motionVy) < 0.00025) {
     motionVx = 0;
     motionVy = 0;
   }
 
-  const dx = motionVx * frameScale;
-  const hitBack = currentPoint.y <= model.floor.backY + 0.001 && motionVy < 0;
-  const hitFront = currentPoint.y >= model.floor.frontY - 0.001 && motionVy > 0;
+  const hitBack = currentCoords.z <= 0.001 && motionVy < 0;
+  const hitFront = currentCoords.z >= 0.999 && motionVy > 0;
   if (hitBack || hitFront) {
     motionVy = 0;
   }
 
-  const floorRatio = getFloorRatio(currentPoint.x, currentPoint.floor);
-  const proposedY = currentPoint.y + motionVy * frameScale;
-  const nextFloor = getFloorAtY(proposedY, model);
-  const depthProjectedX = projectFloorRatio(floorRatio, nextFloor);
-  const nextXBeforeClamp = depthProjectedX + dx;
-  const nextPoint = clampPointToFloor({ x: nextXBeforeClamp, y: nextFloor.y }, model);
-  const hitLeft = nextPoint.x <= nextPoint.floor.left + 0.001 && motionVx < 0;
-  const hitRight = nextPoint.x >= nextPoint.floor.right - 0.001 && motionVx > 0;
+  const nextCoords = {
+    u: clamp(currentCoords.u + motionVx * frameScale, 0, 1),
+    z: clamp(currentCoords.z + motionVy * frameScale, 0, 1)
+  };
+  const nextPoint = projectFloorCoordinates(nextCoords, model);
+  const hitLeft = nextCoords.u <= 0.001 && motionVx < 0;
+  const hitRight = nextCoords.u >= 0.999 && motionVx > 0;
   if (hitLeft || hitRight) {
     motionVx = 0;
   }
 
   const nextScale = clamp(state.scale + input.dScale * frameScale, model.minTrim, model.maxTrim);
-  const groundSpeed = Math.hypot(motionVx, motionVy);
+  const floorSpeed = model.floorSpeed || 0.012;
+  const groundSpeed = Math.hypot(motionVx, motionVy) / floorSpeed;
   const accelerationX = motionVx - beforeVx;
   const accelerationY = motionVy - beforeVy;
-  const travelLean = clamp(motionVx * profile.lean, -profile.maxLean, profile.maxLean);
-  const anticipationLean = clamp(accelerationX * profile.maxLean * 1.5, -profile.maxLean * 0.75, profile.maxLean * 0.75);
-  const anticipationSquash = clamp(1 + Math.abs(accelerationY) * 0.035 - Math.abs(accelerationX) * 0.01, 0.96, 1.08);
+  const travelLean = clamp((motionVx / floorSpeed) * profile.lean, -profile.maxLean, profile.maxLean);
+  const anticipationLean = clamp((accelerationX / floorSpeed) * profile.maxLean * 1.5, -profile.maxLean * 0.75, profile.maxLean * 0.75);
+  const settleSource = Math.max(Math.abs(accelerationX), Math.abs(accelerationY)) / floorSpeed;
+  const settleAmount = clamp(settleSource * (profile.settle || 0.7), 0, 1);
+  const walkBounce = clamp(groundSpeed * (profile.bounce || 0.7), 0, 1.45);
+  const anticipationSquash = clamp(
+    1 + Math.abs(accelerationY / floorSpeed) * 0.026 - Math.abs(accelerationX / floorSpeed) * 0.008,
+    0.975,
+    1.055
+  );
 
   return {
     ...state,
@@ -257,6 +308,8 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     travelLean,
     anticipationLean,
     anticipationSquash,
+    settleAmount,
+    walkBounce,
     depthProgress: nextPoint.floor.progress
   };
 }

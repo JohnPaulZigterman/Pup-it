@@ -38,10 +38,46 @@ test("depth scale gets smaller away from the foreground", () => {
   const street = scene("street");
   const back = getFloorAtY(0, street);
   const front = getFloorAtY(100, street);
+  const backScale = getDepthScale(back.y, 1, street);
+  const frontScale = getDepthScale(front.y, 1, street);
 
   expect(getDepthProgress(back.y, street)).toBe(0);
   expect(getDepthProgress(front.y, street)).toBe(1);
-  expect(getDepthScale(back.y, 1, street)).toBeLessThan(getDepthScale(front.y, 1, street));
+  expect(backScale).toBeLessThan(frontScale);
+  expect(frontScale - backScale).toBeLessThan(0.4);
+});
+
+test("upstage and downstage travel are even on the floor", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "direct" });
+  const upstage = step(base, { dx: 0, dy: -1.2 }, studio, 30);
+  const downstage = step(base, { dx: 0, dy: 1.2 }, studio, 30);
+  const upTravel = Math.abs(getDepthProgress(base.y, studio) - getDepthProgress(upstage.y, studio));
+  const downTravel = Math.abs(getDepthProgress(downstage.y, studio) - getDepthProgress(base.y, studio));
+
+  expect(Math.abs(upTravel - downTravel)).toBeLessThan(0.035);
+});
+
+test("motion feel presets expose performance-layer movement values", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "loose" });
+  const moved = step(base, { dx: 1.2, dy: 0 }, studio, 16);
+
+  expect(moved.groundSpeed).toBeGreaterThan(0);
+  expect(moved.travelLean).not.toBe(0);
+  expect(moved.walkBounce).toBeGreaterThan(0);
+  expect(moved.settleAmount).toBeGreaterThan(0);
+});
+
+test("direction reversal is responsive without jumping off the floor", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });
+  const away = step(base, { dx: 0, dy: -1.2 }, studio, 18);
+  const returned = step(away, { dx: 0, dy: 1.2 }, studio, 18);
+
+  expect(returned.y).toBeGreaterThan(away.y);
+  expect(returned.y).toBeLessThanOrEqual(getFloorAtY(100, studio).y);
+  expect(Math.abs(returned.motionVy)).toBeLessThan(0.03);
 });
 
 test("street depth preserves floor position while converging toward the horizon", () => {

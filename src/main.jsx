@@ -130,7 +130,7 @@ const performancePresetCatalog = [
     id: "floaty",
     name: "Floaty Weird",
     description: "Slow drift and dreamy timing.",
-    state: { motionFeel: "loose", idleMotion: "subtle", behaviorPreset: "float", pose: "listen", expression: "neutral" },
+    state: { motionFeel: "floaty", idleMotion: "subtle", behaviorPreset: "float", pose: "listen", expression: "neutral" },
     cameraShot: "wide",
     lightingPreset: "cozy"
   },
@@ -146,7 +146,7 @@ const performancePresetCatalog = [
     id: "documentary",
     name: "Awkward Doc",
     description: "Subtle movement, patient timing, uncomfortable close-ups.",
-    state: { motionFeel: "smooth", idleMotion: "subtle", behaviorPreset: "none", pose: "listen", expression: "neutral" },
+    state: { motionFeel: "slow", idleMotion: "subtle", behaviorPreset: "none", pose: "listen", expression: "neutral" },
     cameraShot: "close",
     lightingPreset: "flat-tv"
   }

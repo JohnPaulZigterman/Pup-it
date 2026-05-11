@@ -397,6 +397,10 @@ input[type="color"] {
   --shot-scale: 1;
   --shot-x: 0%;
   --shot-y: 0%;
+  --camera-pan-x: 0%;
+  --camera-pan-y: 0%;
+  --camera-shake-x: 0%;
+  --camera-shake-y: 0%;
   --scene-horizon: 56%;
   --scene-foreground: 84%;
   --scene-focus-x: 50%;
@@ -406,9 +410,14 @@ input[type="color"] {
 .stageCamera {
   position: absolute;
   inset: 0;
-  transform: translate(var(--shot-x), var(--shot-y)) scale(var(--shot-scale));
+  transform:
+    translate(
+      calc(var(--shot-x) + var(--camera-pan-x) + var(--camera-shake-x)),
+      calc(var(--shot-y) + var(--camera-pan-y) + var(--camera-shake-y))
+    )
+    scale(var(--shot-scale));
   transform-origin: center 70%;
-  transition: transform 180ms ease;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .stageTexture {
@@ -1389,6 +1398,11 @@ input[type="color"] {
 
 .focusPoint::after {
   transform: rotate(90deg) translateX(-16px);
+}
+
+.experience-beginner .horizonGuide,
+.experience-beginner .focusPoint {
+  opacity: 0;
 }
 
 .perspective-street-depth .setFloor::before {
@@ -3140,9 +3154,9 @@ input[type="color"] {
   height: 196px;
   transform-origin: bottom center;
   transition:
-    left 70ms linear,
-    top 70ms linear,
-    transform 90ms linear;
+    left 82ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 82ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 110ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: left, top, transform;
   --outline: #2b2d42;
   --line-width: 4px;
@@ -3154,6 +3168,8 @@ input[type="color"] {
   --cast-shadow-y: 24px;
   --cast-shadow-scale: 0.9;
   --cast-shadow-opacity: 0.2;
+  --walk-bounce: 0;
+  --settle: 0;
   --form-light: rgba(255, 255, 255, 0.18);
   --form-shadow: rgba(26, 28, 38, 0.18);
   --rim-glaze: rgba(255, 244, 191, 0.2);
@@ -3171,9 +3187,11 @@ input[type="color"] {
 .puppetRig {
   position: absolute;
   inset: 0;
-  transform: scaleX(var(--facing));
+  transform:
+    translateY(calc(var(--walk-bounce) * -1.8px + var(--settle) * 1.2px))
+    scaleX(var(--facing));
   transform-origin: center bottom;
-  transition: transform 110ms steps(2, end);
+  transition: transform 130ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .castShadow {
@@ -3194,6 +3212,10 @@ input[type="color"] {
     skewX(-28deg)
     scale(var(--cast-shadow-scale), calc(0.62 + var(--depth) * 0.28));
   transform-origin: center;
+  transition:
+    opacity 140ms ease,
+    filter 140ms ease,
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .nameTag {

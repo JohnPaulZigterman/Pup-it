@@ -30,6 +30,8 @@ export function createPerformerState(overrides = {}) {
     travelLean: 0,
     anticipationLean: 0,
     anticipationSquash: 1,
+    settleAmount: 0,
+    walkBounce: 0,
     depthProgress: 0.65,
     behaviorPreset: "none",
     pose: "neutral",
