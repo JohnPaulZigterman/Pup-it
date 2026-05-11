@@ -861,7 +861,7 @@ input[type="color"] {
 
 .recordFlow {
   display: grid;
-  grid-template-columns: repeat(4, minmax(74px, 1fr));
+  grid-template-columns: repeat(6, minmax(64px, 1fr));
   gap: 6px;
 }
 
@@ -1068,6 +1068,15 @@ input[type="color"] {
     var(--paper);
   background-blend-mode: multiply, normal, normal;
   text-align: left;
+}
+
+.dashboardPriority .priorityNextAction {
+  border-width: 3px;
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(143, 216, 181, 0.42), rgba(255, 255, 255, 0.22)),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
 }
 
 .dashboardPriority svg {
@@ -7369,7 +7378,7 @@ input[type="color"] {
   }
 
   .recordFlow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .buildCanvasPartToolbar {

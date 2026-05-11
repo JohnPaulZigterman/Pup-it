@@ -22,12 +22,21 @@ export const tutorialSteps = [
 ];
 
 export const workflowSteps = [
-  { id: "home", label: "Setting", mode: "home", description: "Choose the show, starting setting, and first task." },
-  { id: "cast", label: "Creator", mode: "build", description: "Choose a rig model and customize it like a character creator." },
-  { id: "sets", label: "Place", mode: "assets", description: "Place settings, props, textures, and raw materials into the scene." },
+  { id: "home", label: "Start", mode: "home", description: "Choose the show, starting setting, and first task." },
+  { id: "cast", label: "Rig", mode: "build", description: "Choose a rig model and customize it like a character creator." },
+  { id: "sets", label: "Space", mode: "assets", description: "Place settings, props, textures, and raw materials into the scene." },
   { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
-  { id: "edit", label: "Finish", mode: "edit", description: "Replay, trim, export, and submit the short." },
+  { id: "edit", label: "Finish", mode: "edit", description: "Review, trim, export, and submit the short." },
   { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
+];
+
+export const makeShortMilestones = [
+  { id: "start", label: "Start", shortLabel: "Start", description: "Pick a show and a rough bit." },
+  { id: "rig", label: "Build Rig", shortLabel: "Rig", description: "Make the performer yours." },
+  { id: "space", label: "Build Space", shortLabel: "Space", description: "Give the bit somewhere to happen." },
+  { id: "perform", label: "Perform", shortLabel: "Perform", description: "Rehearse and record live." },
+  { id: "review", label: "Review", shortLabel: "Review", description: "Replay, trim, and keep the best take." },
+  { id: "finish", label: "Export / Submit", shortLabel: "Finish", description: "Render, package, and submit when ready." }
 ];
 
 export function computeBeginnerProgress({

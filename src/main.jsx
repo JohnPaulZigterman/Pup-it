@@ -99,6 +99,7 @@ import {
 import { SceneLibraryEditor } from "./workspaces/FinishWorkspace.jsx";
 import {
   computeBeginnerProgress,
+  makeShortMilestones,
   tutorialSteps,
   workflowSteps
 } from "./workflow/shortFlow.js";
@@ -3060,24 +3061,24 @@ function App() {
 
   const primaryNextAction = (() => {
     if (!beginnerProgress.hasStartedShort) {
-      return { label: "Start Short", detail: "Pick a rough launch pad.", action: () => startQuickShort("argument") };
+      return { label: "Start Show", detail: "Pick a rough launch pad.", action: () => startQuickShort("argument") };
     }
     if (!beginnerProgress.hasRig) {
       return { label: "Build Rig", detail: "Make the performer yours.", action: () => setMode("build") };
     }
     if (!beginnerProgress.hasSet) {
-      return { label: "Build Set", detail: "Drop something into the space.", action: () => setMode("assets") };
+      return { label: "Build Space", detail: "Drop something into the space.", action: () => setMode("assets") };
     }
     if (!beginnerProgress.hasTake) {
-      return { label: recording ? "Stop Take" : "Record Take", detail: "Capture the bit.", action: beginnerProgress.hasRehearsed ? toggleTake : () => setMode("perform") };
+      return { label: recording ? "Stop Take" : beginnerProgress.hasRehearsed ? "Record Take" : "Go Perform", detail: "Capture the bit.", action: beginnerProgress.hasRehearsed ? toggleTake : () => setMode("perform") };
     }
     if (!beginnerProgress.hasCut) {
       return { label: "Review Take", detail: "Replay and save the scene.", action: () => setMode("edit") };
     }
     if (!beginnerProgress.exported) {
-      return { label: "Export Short", detail: "Bundle the finished handoff.", action: exportProject };
+      return { label: "Finish Short", detail: "Render or package the finished handoff.", action: () => setMode("edit") };
     }
-    return { label: "Submit DoinkTV", detail: "Send the short for review.", action: submitToDoinkTv };
+    return { label: "Submit DoinkTV", detail: "Send the short for review.", action: () => setMode("edit") };
   })();
 
   const commandItems = [
@@ -3519,7 +3520,7 @@ function App() {
           </button>
           <button onClick={openReviewMode}>
             <ListChecks size={17} />
-            Finish
+            Review
           </button>
           <button className={micLive ? "active" : ""} onClick={toggleMic}>
             {micLive ? <Mic size={17} /> : <MicOff size={17} />}
@@ -3705,8 +3706,6 @@ function App() {
           recording={recording}
           onReplay={playSelectedTake}
           onSaveScene={saveSelectedTakeAsScene}
-          onExport={exportProject}
-          onSubmitToDoinkTv={submitToDoinkTv}
           onAddToCut={keepSelectedTake}
         />
 
@@ -4071,6 +4070,21 @@ function ShowDashboard({
   onLoadShow
 }) {
   const canFinish = progress.readyToExport;
+  const dashboardPath = makeShortMilestones.map((milestone) => ({
+    ...milestone,
+    done:
+      milestone.id === "start"
+        ? progress.hasStartedShort
+        : milestone.id === "rig"
+          ? progress.hasRig
+          : milestone.id === "space"
+            ? progress.hasSet
+            : milestone.id === "perform"
+              ? progress.hasTake
+              : milestone.id === "review"
+                ? progress.hasCut
+                : progress.exported || progress.hasSubmitted
+  }));
   const trialSteps = [
     {
       label: "Pick a bit",
@@ -4120,14 +4134,20 @@ function ShowDashboard({
           <p>Make a weird thing, perform it live, replay it, and export a short without leaving the app.</p>
         </div>
         <div className="recordFlow">
-          <span className={progress.hasRig ? "done" : ""}>Build</span>
-          <span className={progress.hasSet ? "done" : ""}>Stage</span>
-          <span className={progress.hasTake ? "done" : ""}>Record</span>
-          <span className={progress.readyToExport ? "done" : ""}>Export</span>
+          {dashboardPath.map((milestone) => (
+            <span className={milestone.done ? "done" : ""} key={milestone.id}>
+              {milestone.shortLabel}
+            </span>
+          ))}
         </div>
       </section>
 
       <section className="dashboardPriority" aria-label="Primary show actions">
+        <button onClick={nextTrialStep.action} className="priorityNextAction">
+          <ChevronRight size={17} />
+          <span>Next</span>
+          <strong>{nextTrialStep.label}</strong>
+        </button>
         {savedShows[0] && (
           <button onClick={() => onLoadShow(savedShows[0].id)}>
             <FolderOpen size={17} />
@@ -4144,11 +4164,6 @@ function ShowDashboard({
           <Shuffle size={17} />
           <span>Surprise</span>
           <strong>Give Me A Bit</strong>
-        </button>
-        <button onClick={canFinish ? onExport : () => onModeChange("edit")}>
-          <Video size={17} />
-          <span>Finish</span>
-          <strong>{canFinish ? "Export Short" : "Review the Cut"}</strong>
         </button>
       </section>
 
@@ -4339,14 +4354,12 @@ function BeginnerRoadmap({
   onRecordToggle,
   onReplay,
   onSaveScene,
-  onExport,
-  onSubmitToDoinkTv,
   onAddToCut
 }) {
   const steps = [
     {
       id: "short",
-      label: "Start a short",
+      label: "Start show",
       body: "Pick a rough launch pad so the blank page disappears.",
       complete: "Short started. Now make it unmistakably yours.",
       done: progress.hasStartedShort,
@@ -4364,7 +4377,7 @@ function BeginnerRoadmap({
     },
     {
       id: "set",
-      label: "Build the space",
+      label: "Build space",
       body: "Drop in a prop or material so the scene has somewhere to happen.",
       complete: "The stage has something to play against.",
       done: progress.hasSet,
@@ -4391,21 +4404,12 @@ function BeginnerRoadmap({
     },
     {
       id: "export",
-      label: "Export review file",
+      label: "Export / submit",
       body: "Bundle the cut, captions, credits, and license notes so the short can leave the room.",
       complete: "The short has a package. One more click sends it toward the channel.",
       done: progress.exported,
-      action: progress.readyToExport ? onExport : () => onModeChange("edit"),
-      actionLabel: progress.readyToExport ? "Export" : "Finish"
-    },
-    {
-      id: "submit",
-      label: "Submit to DoinkTV",
-      body: "Send a review handoff for approval and scheduling.",
-      complete: "Submitted. Start the next weird little bit.",
-      done: progress.hasSubmitted,
-      action: progress.readyToExport ? onSubmitToDoinkTv : () => onModeChange("edit"),
-      actionLabel: progress.readyToExport ? "Submit" : "Review"
+      action: () => onModeChange("edit"),
+      actionLabel: progress.readyToExport ? "Finish" : "Review"
     }
   ];
   const nextStep = steps.find((step) => !step.done) || steps[steps.length - 1];
@@ -4414,12 +4418,9 @@ function BeginnerRoadmap({
     <div className="dockGroup beginnerRoadmap">
       <h2>Make A Short</h2>
       <div className="beginnerRail">
-        <span>Start</span>
-        <span>Build</span>
-        <span>Perform</span>
-        <span>Replay</span>
-        <span>Export</span>
-        <span>Submit</span>
+        {makeShortMilestones.map((milestone) => (
+          <span key={milestone.id}>{milestone.shortLabel}</span>
+        ))}
       </div>
       <div className="nextBestStep">
         <span>Next Best Step</span>
