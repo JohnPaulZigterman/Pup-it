@@ -97,6 +97,7 @@ import {
   hasUsableFinishTake,
   resolveFinishTake as resolveFinishTakeFromState
 } from "./workflows/finishFlow.js";
+import { ProductionTimeline } from "./workspaces/ProductionTimeline.jsx";
 import {
   computeBeginnerProgress,
   tutorialSteps,
@@ -4653,6 +4654,12 @@ function ShowBiblePanel({
         <span>{toolbox?.submission?.targetChannel || "DoinkTV"}</span>
         <span>{toolbox?.takes?.filter((take) => take.best).length || 0} best takes</span>
       </div>
+      <div className="reusableShelf">
+        <strong>Reusable Kit</strong>
+        <span>{toolbox?.cast?.slice(0, 2).map((item) => item.name).join(", ") || "Build cast"}</span>
+        <span>{toolbox?.props?.slice(0, 2).map((item) => item.name).join(", ") || "Add props"}</span>
+        <span>{toolbox?.sets?.slice(0, 2).map((item) => item.name).join(", ") || "Save a set"}</span>
+      </div>
       <div className="publicReadinessList">
         <span className={castCount ? "done" : ""}>Cast</span>
         <span className={sceneSetCount || propCount ? "done" : ""}>World</span>
@@ -4833,6 +4840,46 @@ function PerformControls({
           <button onClick={() => onModeChange("edit")}>
             <Play size={16} />
             Replay Takes
+          </button>
+        </div>
+      </div>
+
+      <div className="dockGroup performanceFeelPanel">
+        <h2>Feel Boosters</h2>
+        <small className="controlHint">One-click performance polish: make the puppet feel better before you think about animation curves.</small>
+        <div className="quickRemixGrid">
+          <button
+            type="button"
+            onClick={() => {
+              onMotionFeelChange("direct");
+              onPoseChange("point");
+              onCameraPunch();
+            }}
+          >
+            <Sparkles size={15} />
+            Punchy Bit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMotionFeelChange("loose");
+              onIdleMotionChange("subtle");
+              onDirectorAction("hold-for-laugh");
+            }}
+          >
+            <Sparkles size={15} />
+            Awkward Hold
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMotionFeelChange("floaty");
+              onPoseChange("surprise");
+              onCameraShake();
+            }}
+          >
+            <Sparkles size={15} />
+            Weird Drift
           </button>
         </div>
       </div>
@@ -6027,63 +6074,6 @@ function SceneLibraryEditor({
       />
     </div>
   );
-}
-
-function ProductionTimeline({ clips, onRemoveClip, onMoveClip, onTrimClip, onUpdateClip }) {
-  return (
-    <div className="dockGroup productionTimelinePanel">
-      <h2>Episode Assembly</h2>
-      <small className="controlHint">
-        This is the rough cut shelf for now. Detailed lane editing will move here as recording gets richer.
-      </small>
-      {clips.length ? (
-        <div className="timelineList">
-          {clips.map((clip, index) => (
-            <div className="timelineClip" key={clip.id}>
-              <span>{index + 1}</span>
-              <div>
-                <input
-                  value={clip.title}
-                  aria-label={`Rename ${clip.title}`}
-                  onChange={(event) => onUpdateClip(clip.id, { title: event.target.value })}
-                />
-                <small>
-                  {clip.sourceType} / {clip.shot} / {formatClipDuration(clip.duration)}
-                </small>
-              </div>
-              <div className="timelineClipActions">
-                <button aria-label={`Move ${clip.title} earlier`} onClick={() => onMoveClip(clip.id, -1)} disabled={index === 0}>
-                  <ChevronLeft size={14} />
-                </button>
-                <button aria-label={`Shorten ${clip.title}`} onClick={() => onTrimClip(clip.id, -500)}>
-                  -0.5s
-                </button>
-                <button aria-label={`Lengthen ${clip.title}`} onClick={() => onTrimClip(clip.id, 500)}>
-                  +0.5s
-                </button>
-                <button aria-label={`Move ${clip.title} later`} onClick={() => onMoveClip(clip.id, 1)} disabled={index === clips.length - 1}>
-                  <ChevronRight size={14} />
-                </button>
-                <button aria-label={`Remove ${clip.title}`} onClick={() => onRemoveClip(clip.id)}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="emptyState actionEmpty">
-          <strong>No rough cut yet.</strong>
-          <span>Add the selected take above, or storyboard a shot and add that panel.</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatClipDuration(duration) {
-  if (typeof duration === "number") return formatDuration(duration);
-  return duration || "0:05";
 }
 
 function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {

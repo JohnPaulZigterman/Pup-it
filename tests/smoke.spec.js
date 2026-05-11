@@ -53,7 +53,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Director Camera" })).toBeVisible();
   await page.getByRole("button", { name: "Punch In" }).click();
 
-  await page.getByRole("button", { name: "Finish" }).first().click();
+  await page.locator("header").getByRole("button", { name: "Finish" }).click();
   await expect(page.getByRole("heading", { name: "Episode Pipeline" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();

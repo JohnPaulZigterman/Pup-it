@@ -2464,6 +2464,30 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
+.reusableShelf {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2), transparent 44%),
+    var(--rail);
+}
+
+.reusableShelf strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.reusableShelf span {
+  color: #4b4e68;
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .publicReadinessList {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3721,6 +3745,31 @@ input[type="color"] {
 .timelineList {
   display: grid;
   gap: 8px;
+}
+
+.roughCutSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.roughCutSummary span {
+  display: grid;
+  gap: 2px;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+  color: #4b4e68;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.roughCutSummary strong {
+  color: var(--ink);
+  font-size: 15px;
 }
 
 .timelineClip {
