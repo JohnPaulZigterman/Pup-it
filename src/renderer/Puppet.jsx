@@ -8,7 +8,7 @@ import {
 } from "../../shared/catalogs.js";
 import { getDepthScale } from "../../shared/depth.js";
 
-export function Puppet({ performer, isSelf }) {
+export function Puppet({ performer, isSelf, depthModel }) {
   const character = getCatalogItem(characterCatalog, performer.character);
   const expression = getCatalogItem(expressionCatalog, performer.state.expression);
   const pose = getCatalogItem(poseCatalog, performer.state.pose);
@@ -18,7 +18,7 @@ export function Puppet({ performer, isSelf }) {
   const stylePreset = state.stylePreset || character.stylePreset;
   const adapter = getCatalogItem(styleAdapterCatalog, stylePreset);
   const lineWidth = adapter.lineWidth || 0;
-  const scale = getDepthScale(state.y, state.scale);
+  const scale = getDepthScale(state.y, state.scale, depthModel);
   const isWalking = state.walking && rig.walkCycle !== "none";
   const canIdle = state.idleMotion !== "held" && !isWalking && !state.macro;
   const canBlink = state.idleMotion !== "held";
@@ -26,7 +26,11 @@ export function Puppet({ performer, isSelf }) {
   const mouthOpen = Math.max(rawMouthOpen, state.speaking ? 0.16 : 0);
   const mouthLevel =
     mouthOpen > 0.72 ? "wide" : mouthOpen > 0.38 ? "medium" : mouthOpen > 0.1 ? "small" : "closed";
-  const depth = Math.max(0, Math.min(1, (state.y - 20) / 62));
+  const depth = Math.max(
+    0,
+    Math.min(1, (state.y - (depthModel?.horizon || 20)) / ((depthModel?.foreground || 82) - (depthModel?.horizon || 20)))
+  );
+  const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
 
   return (
     <div
@@ -65,6 +69,7 @@ export function Puppet({ performer, isSelf }) {
         "--shadow-opacity": adapter.shadowOpacity,
         "--texture-opacity": adapter.textureOpacity,
         "--depth": depth,
+        "--ground-speed": groundSpeed,
         "--cast-shadow-x": `${-18 + depth * 10}px`,
         "--cast-shadow-y": `${16 + depth * 18}px`,
         "--cast-shadow-scale": 0.52 + depth * 0.56,

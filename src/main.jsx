@@ -62,6 +62,7 @@ import {
   mouthStyleCatalog,
   objectStyleCatalog,
   originalNameParts,
+  perspectiveCatalog,
   poseCatalog,
   sceneCatalog,
   walkCycleCatalog
@@ -161,6 +162,81 @@ const showStarterTemplates = [
     assetSearch: "furniture"
   }
 ];
+
+const shotTemplateCatalog = [
+  {
+    id: "two-shot-argument",
+    name: "Two-Shot Argument",
+    description: "Two performers staged on opposing marks with readable reaction space.",
+    scene: "studio",
+    cameraShot: "two-shot",
+    lightingPreset: "flat-tv",
+    backgroundTheme: "painted-depth",
+    objectStyle: "thin-ink",
+    marks: [
+      { id: "a", label: "A", name: "Left Speaker", x: 38, y: 64 },
+      { id: "b", label: "B", name: "Right Speaker", x: 62, y: 64 },
+      { id: "react", label: "R", name: "Reaction", x: 50, y: 59 },
+      { id: "fg", label: "FG", name: "Foreground Button", x: 50, y: 75 }
+    ]
+  },
+  {
+    id: "reaction-punch",
+    name: "Reaction Punch-In",
+    description: "A tight button setup where one performer lands a face-forward reaction.",
+    scene: "studio",
+    cameraShot: "reaction",
+    lightingPreset: "dramatic",
+    backgroundTheme: "late-night-copy",
+    objectStyle: "paper-cut",
+    marks: [
+      { id: "hero", label: "H", name: "Hero Reaction", x: 52, y: 66 },
+      { id: "off", label: "O", name: "Offscreen Setup", x: 30, y: 64 },
+      { id: "back", label: "B", name: "Back Wall", x: 50, y: 38 }
+    ]
+  },
+  {
+    id: "street-interview",
+    name: "Street Interview",
+    description: "Interviewer/interviewee marks with deeper alley blocking.",
+    scene: "street",
+    cameraShot: "two-shot",
+    lightingPreset: "scene",
+    backgroundTheme: "stucco-wall",
+    objectStyle: "soft-material",
+    marks: [
+      { id: "host", label: "HOST", name: "Host", x: 35, y: 68 },
+      { id: "guest", label: "GUEST", name: "Guest", x: 61, y: 61 },
+      { id: "walkby", label: "W", name: "Walk-by", x: 78, y: 48 },
+      { id: "near", label: "N", name: "Near Lens", x: 48, y: 77 }
+    ]
+  },
+  {
+    id: "podcast-desk",
+    name: "Podcast Desk",
+    description: "Simple recurring desk show marks for fast talk segments.",
+    scene: "studio",
+    cameraShot: "two-shot",
+    lightingPreset: "cozy",
+    backgroundTheme: "wood-panel",
+    objectStyle: "soft-material",
+    marks: [
+      { id: "host", label: "HOST", name: "Host Mic", x: 42, y: 66 },
+      { id: "guest", label: "GUEST", name: "Guest Mic", x: 58, y: 66 },
+      { id: "wide", label: "WIDE", name: "Wide Reset", x: 50, y: 62 }
+    ]
+  }
+];
+
+function createDefaultFloorMarks(sceneItem = sceneCatalog[0]) {
+  const horizonMark = sceneItem.horizon + (sceneItem.performerHorizonBuffer || 8) + 6;
+  return [
+    { id: "left", label: "L", name: "Left", x: 32, y: 64 },
+    { id: "center", label: "C", name: "Center", x: 50, y: 62 },
+    { id: "right", label: "R", name: "Right", x: 68, y: 64 },
+    { id: "back", label: "B", name: "Back", x: sceneItem.vanishingX || 50, y: horizonMark }
+  ];
+}
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -305,6 +381,7 @@ function showSessionFromPersistedShow(show) {
     savedAt: show.updatedAt || show.updated_at || new Date().toISOString(),
     roomId: showBible.roomId || defaultRoomId,
     scene: houseStyle.scene || sceneCatalog[0].id,
+    perspective: houseStyle.perspective,
     cameraShot: houseStyle.cameraShot || "wide",
     lightingPreset: houseStyle.lightingPreset || "scene",
     backgroundTheme: houseStyle.backgroundTheme || "painted-depth",
@@ -313,6 +390,7 @@ function showSessionFromPersistedShow(show) {
     episodeStatus: showBible.episodeStatus || "draft",
     sceneObjects: showBible.sceneObjects || [],
     sceneSets: showBible.sceneSets || [],
+    floorMarks: showBible.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, houseStyle.scene || sceneCatalog[0].id)),
     assetReferences: show.assetReferences || [],
     storyboardPanels: showBible.storyboardPanels || [],
     productionTimeline: showBible.productionTimeline || [],
@@ -336,6 +414,7 @@ async function persistShowSession(session) {
       slug: session.id,
       houseStyle: {
         scene: session.scene,
+        perspective: session.perspective,
         cameraShot: session.cameraShot,
         lightingPreset: session.lightingPreset,
         backgroundTheme: session.backgroundTheme,
@@ -348,6 +427,7 @@ async function persistShowSession(session) {
         episodeStatus: session.episodeStatus,
         sceneObjects: session.sceneObjects,
         sceneSets: session.sceneSets,
+        floorMarks: session.floorMarks,
         takes: session.takes
       }
     })
@@ -368,6 +448,7 @@ async function persistEpisodeSnapshot(showId, session) {
       status: session.episodeStatus || "draft",
       metadata: {
         currentScene: session.scene,
+        perspective: session.perspective,
         cameraShot: session.cameraShot,
         lightingPreset: session.lightingPreset,
         backgroundTheme: session.backgroundTheme,
@@ -377,7 +458,8 @@ async function persistEpisodeSnapshot(showId, session) {
         {
           id: "current-stage",
           scene: session.scene,
-          sceneObjects: session.sceneObjects || []
+          sceneObjects: session.sceneObjects || [],
+          floorMarks: session.floorMarks || []
         }
       ],
       takes: session.takes || [],
@@ -401,7 +483,16 @@ function summarizeTakeForShow(take) {
   };
 }
 
-function createStoryboardPanel({ scene, performers, index, backgroundTheme, objectStyle, texturePreset, sceneObjects }) {
+function createStoryboardPanel({
+  scene,
+  performers,
+  index,
+  backgroundTheme,
+  objectStyle,
+  texturePreset,
+  sceneObjects,
+  floorMarks
+}) {
   return {
     id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
     title: `Panel ${index}`,
@@ -414,6 +505,7 @@ function createStoryboardPanel({ scene, performers, index, backgroundTheme, obje
     objectStyle: objectStyle || "match-character",
     texturePreset: texturePreset || "paper-grain",
     sceneObjects: sceneObjects || [],
+    floorMarks: floorMarks || [],
     performers: clonePerformers(performers)
   };
 }
@@ -456,6 +548,7 @@ function App() {
   const [sceneObjects, setSceneObjects] = useState([]);
   const [selectedSceneObjectId, setSelectedSceneObjectId] = useState(null);
   const [sceneSets, setSceneSets] = useState([]);
+  const [floorMarks, setFloorMarks] = useState(() => createDefaultFloorMarks(sceneCatalog[0]));
   const [assetReferences, setAssetReferences] = useState([]);
   const [assetFilter, setAssetFilter] = useState("all");
   const [assetTarget, setAssetTarget] = useState("all");
@@ -466,6 +559,7 @@ function App() {
 
   const self = performers[selfId];
   const selectedScene = getCatalogItem(sceneCatalog, scene);
+  const selectedPerspective = getCatalogItem(perspectiveCatalog, selectedScene.perspective || "front-stage");
   const selectedCameraShot = getCatalogItem(cameraShotCatalog, cameraShot);
   const selectedLighting = getCatalogItem(lightingPresetCatalog, lightingPreset);
   const selectedBackgroundTheme = getCatalogItem(backgroundThemeCatalog, backgroundTheme);
@@ -650,15 +744,22 @@ function App() {
     const pose = getCatalogItem(poseCatalog, poseId);
     updateSelf({ pose: pose.id, expression: pose.expression });
   };
-  const moveSelfToMark = (mark) => {
-    const marks = {
-      left: { x: 30, y: 64 },
-      center: { x: 50, y: 62 },
-      right: { x: 70, y: 64 },
-      back: { x: 50, y: selectedScene.horizon + 12 }
-    };
-    updateSelf({ ...marks[mark], walking: false });
-    setStatus(`Snapped performer to ${mark} mark.`);
+  const moveSelfToMark = (markId) => {
+    const mark = floorMarks.find((item) => item.id === markId);
+    if (!mark) return;
+    updateSelf({ x: mark.x, y: mark.y, walking: false });
+    setStatus(`Snapped performer to ${mark.name}.`);
+  };
+  const setCurrentPositionAsMark = (markId) => {
+    if (!self) return;
+    setFloorMarks((current) =>
+      current.map((mark) =>
+        mark.id === markId
+          ? { ...mark, x: Math.round(self.state.x), y: Math.round(self.state.y) }
+          : mark
+      )
+    );
+    setStatus("Updated floor mark from the current performer position.");
   };
   const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
   const setMouthOpen = (mouthOpen, { immediate = false } = {}) => {
@@ -776,7 +877,8 @@ function App() {
       scene,
       backgroundTheme,
       objectStyle,
-      sceneObjects: sceneObjects.map((object) => ({ ...object }))
+      sceneObjects: sceneObjects.map((object) => ({ ...object })),
+      floorMarks: floorMarks.map((mark) => ({ ...mark }))
     };
     setSceneSets((current) => [sceneSet, ...current]);
     setStatus(`Saved "${sceneSet.name}" as a reusable set.`);
@@ -789,6 +891,7 @@ function App() {
     setBackgroundTheme(sceneSet.backgroundTheme || backgroundTheme);
     setObjectStyle(sceneSet.objectStyle || objectStyle);
     setSceneObjects(sceneSet.sceneObjects.map((object) => ({ ...object })));
+    if (sceneSet.floorMarks?.length) setFloorMarks(sceneSet.floorMarks.map((mark) => ({ ...mark })));
     setSelectedSceneObjectId(sceneSet.sceneObjects[0]?.id || null);
     setStatus(`Loaded set "${sceneSet.name}".`);
   };
@@ -1153,7 +1256,8 @@ function App() {
       backgroundTheme,
       objectStyle,
       texturePreset: stageTexturePreset,
-      sceneObjects
+      sceneObjects,
+      floorMarks
     });
     panel.shot = cameraShot;
     panel.lightingPreset = lightingPreset;
@@ -1176,6 +1280,7 @@ function App() {
               objectStyle,
               texturePreset: stageTexturePreset,
               sceneObjects,
+              floorMarks,
               performers: clonePerformers(activePerformers)
             }
           : panel
@@ -1190,6 +1295,7 @@ function App() {
       id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
       title: `${selectedStoryboardPanel.title} copy`,
       sceneObjects: (selectedStoryboardPanel.sceneObjects || []).map((object) => ({ ...object })),
+      floorMarks: (selectedStoryboardPanel.floorMarks || []).map((mark) => ({ ...mark })),
       performers: clonePerformers(selectedStoryboardPanel.performers)
     };
     setStoryboardPanels((current) => [...current, panel]);
@@ -1262,6 +1368,7 @@ function App() {
       roomId,
       showName,
       scene,
+      perspective: selectedScene.perspective,
       cameraShot,
       lightingPreset,
       backgroundTheme,
@@ -1269,6 +1376,7 @@ function App() {
       episodeStatus,
       sceneObjects,
       sceneSets,
+      floorMarks,
       assetReferences,
       storyboardPanels,
       timeline: productionTimeline,
@@ -1294,6 +1402,21 @@ function App() {
     setAssetSearch(template.assetSearch);
     setMode("perform");
     setStatus(`${template.name} template loaded. Rehearse, record, then review the take.`);
+  };
+
+  const applyShotTemplate = (templateId) => {
+    const template = getCatalogItem(shotTemplateCatalog, templateId);
+    changeScene(template.scene);
+    setCameraShot(template.cameraShot);
+    setLightingPreset(template.lightingPreset);
+    setBackgroundTheme(template.backgroundTheme);
+    setObjectStyle(template.objectStyle);
+    setFloorMarks(template.marks.map((mark) => ({ ...mark })));
+    if (template.marks[0] && self) {
+      updateSelf({ x: template.marks[0].x, y: template.marks[0].y, walking: false });
+    }
+    setMode("perform");
+    setStatus(`${template.name} shot template loaded with ${template.marks.length} floor marks.`);
   };
 
   const openAssetSearch = (query, target = "all") => {
@@ -1326,6 +1449,7 @@ function App() {
     { id: "home", label: "Open show dashboard", keywords: "setup home project show", action: () => setMode("home") },
     { id: "cast", label: "Edit current character", keywords: "cast character rig build customize", action: () => setMode("build") },
     { id: "sets", label: "Search settings and props", keywords: "assets objects settings props backgrounds", action: () => openAssetSearch("", "setting") },
+    { id: "shots", label: "Open shot templates", keywords: "shot template blocking marks two shot reaction", action: () => setMode("perform") },
     { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
     { id: "kitchen", label: "Find kitchen scene pieces", keywords: "kitchen diner room background furniture", action: () => openAssetSearch("kitchen", "setting") },
     { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
@@ -1356,6 +1480,7 @@ function App() {
       savedAt: new Date().toISOString(),
       roomId,
       scene,
+      perspective: selectedScene.perspective,
       cameraShot,
       lightingPreset,
       backgroundTheme,
@@ -1364,6 +1489,7 @@ function App() {
       episodeStatus,
       sceneObjects,
       sceneSets,
+      floorMarks,
       assetReferences,
       storyboardPanels,
       productionTimeline,
@@ -1415,6 +1541,7 @@ function App() {
     setSceneObjects(session.sceneObjects || []);
     setSelectedSceneObjectId(session.sceneObjects?.[0]?.id || null);
     setSceneSets(session.sceneSets || []);
+    setFloorMarks(session.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, session.scene || sceneCatalog[0].id)));
     setStoryboardPanels(session.storyboardPanels || []);
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
@@ -1558,7 +1685,7 @@ function App() {
             ? "dashboardStage"
             : mode === "storyboard"
             ? "storyboardStage"
-            : `stage ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
+            : `stage perspective-${selectedScene.perspective || "front-stage"} ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
         }
         onPointerMove={handleStagePointerMove}
         onPointerLeave={handleStagePointerLeave}
@@ -1589,6 +1716,9 @@ function App() {
               <div className="stageLighting" />
               <div className="horizonGuide" />
               <div className="setFloor" />
+              {floorMarks.map((mark) => (
+                <FloorMark key={mark.id} mark={mark} onActivate={moveSelfToMark} />
+              ))}
               {sceneObjects.map((object) => (
                 <SceneObject
                   key={object.id}
@@ -1598,7 +1728,12 @@ function App() {
                 />
               ))}
               {stagePerformers.map((performer) => (
-                <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
+                <Puppet
+                  key={performer.id}
+                  performer={performer}
+                  isSelf={performer.id === selfId}
+                  depthModel={selectedScene}
+                />
               ))}
             </div>
           </>
@@ -1620,6 +1755,8 @@ function App() {
         {mode === "perform" && (
           <PerformControls
             scene={scene}
+            selectedScene={selectedScene}
+            selectedPerspective={selectedPerspective}
             self={self}
             onSceneChange={changeScene}
             onExpressionChange={setExpression}
@@ -1632,6 +1769,8 @@ function App() {
             lightingPreset={lightingPreset}
             backgroundTheme={backgroundTheme}
             objectStyle={objectStyle}
+            floorMarks={floorMarks}
+            shotTemplates={shotTemplateCatalog}
             onCameraShotChange={setCameraShot}
             onLightingPresetChange={setLightingPreset}
             onBackgroundThemeChange={setBackgroundTheme}
@@ -1639,6 +1778,8 @@ function App() {
             onDirectorAction={applyDirectorAction}
             onStoryboardCapture={addStoryboardPanel}
             onMoveToMark={moveSelfToMark}
+            onSetMarkFromSelf={setCurrentPositionAsMark}
+            onApplyShotTemplate={applyShotTemplate}
           />
         )}
         {mode === "build" && (
@@ -1711,6 +1852,7 @@ function App() {
           mode={mode}
           self={self}
           scene={selectedScene}
+          perspective={selectedPerspective}
           cameraShot={selectedCameraShot}
           lighting={selectedLighting}
           backgroundTheme={selectedBackgroundTheme}
@@ -1927,6 +2069,7 @@ function ContextualInspector({
   mode,
   self,
   scene,
+  perspective,
   cameraShot,
   lighting,
   backgroundTheme,
@@ -1961,6 +2104,8 @@ function ContextualInspector({
         <strong>{characterName}</strong>
         <span>Scene</span>
         <strong>{scene.name}</strong>
+        <span>Perspective</span>
+        <strong>{perspective.name}</strong>
         <span>Shot</span>
         <strong>{cameraShot.name}</strong>
         <span>Look</span>
@@ -2006,6 +2151,21 @@ function SceneObject({ object, selected, onSelect }) {
     >
       {object.imageUrl && <img src={object.imageUrl} alt="" />}
       <span>{object.name}</span>
+    </Component>
+  );
+}
+
+function FloorMark({ mark, onActivate }) {
+  const Component = onActivate ? "button" : "div";
+  return (
+    <Component
+      className="floorMark"
+      style={{ left: `${mark.x}%`, top: `${mark.y}%`, zIndex: Math.round(mark.y * 10) - 1 }}
+      title={mark.name}
+      onClick={onActivate ? () => onActivate(mark.id) : undefined}
+    >
+      <span>{mark.label}</span>
+      <small>{mark.name}</small>
     </Component>
   );
 }
@@ -2068,11 +2228,15 @@ function ShowSessionControls({
 
 function PerformControls({
   scene,
+  selectedScene,
+  selectedPerspective,
   self,
   cameraShot,
   lightingPreset,
   backgroundTheme,
   objectStyle,
+  floorMarks,
+  shotTemplates,
   onSceneChange,
   onCameraShotChange,
   onLightingPresetChange,
@@ -2086,7 +2250,9 @@ function PerformControls({
   onMacroTrigger,
   onDirectorAction,
   onStoryboardCapture,
-  onMoveToMark
+  onMoveToMark,
+  onSetMarkFromSelf,
+  onApplyShotTemplate
 }) {
   return (
     <>
@@ -2100,6 +2266,25 @@ function PerformControls({
               onClick={() => onSceneChange(item.id)}
             >
               {item.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup perspectivePanel">
+        <h2>Perspective</h2>
+        <strong>{selectedPerspective.name}</strong>
+        <small>{selectedPerspective.description}</small>
+        <small>{selectedScene.perspectiveNote}</small>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Shot Templates</h2>
+        <div className="shotTemplateList">
+          {shotTemplates.map((template) => (
+            <button key={template.id} onClick={() => onApplyShotTemplate(template.id)}>
+              <strong>{template.name}</strong>
+              <span>{template.description}</span>
             </button>
           ))}
         </div>
@@ -2187,11 +2372,17 @@ function PerformControls({
 
       <div className="dockGroup">
         <h2>Marks</h2>
-        <div className="shotGrid">
-          {["left", "center", "right", "back"].map((mark) => (
-            <button key={mark} onClick={() => onMoveToMark(mark)}>
-              {mark}
-            </button>
+        <div className="markList">
+          {floorMarks.map((mark) => (
+            <div className="markRow" key={mark.id}>
+              <button onClick={() => onMoveToMark(mark.id)}>
+                <span>{mark.label}</span>
+                {mark.name}
+              </button>
+              <button onClick={() => onSetMarkFromSelf(mark.id)} disabled={!self}>
+                Set
+              </button>
+            </div>
           ))}
         </div>
         <small className="controlHint">Hotkeys: 1-4 poses, Z/X/C macros, H hold idle.</small>
@@ -2851,18 +3042,21 @@ function PanelFrame({ panel }) {
 
   return (
     <div
-      className={`panelFrame ${panelScene.className} ${panelShot.className} ${panelLighting.className} ${panelBackgroundTheme.className} ${panelObjectStyle.className} texture-${panel.texturePreset || panelBackgroundTheme.texturePreset || "paper-grain"}`}
+      className={`panelFrame perspective-${panelScene.perspective || "front-stage"} ${panelScene.className} ${panelShot.className} ${panelLighting.className} ${panelBackgroundTheme.className} ${panelObjectStyle.className} texture-${panel.texturePreset || panelBackgroundTheme.texturePreset || "paper-grain"}`}
     >
       <div className="panelStageInner stageCamera">
         <div className="stageTexture" />
         <div className="stageLighting" />
         <div className="horizonGuide" />
         <div className="setFloor" />
+        {(panel.floorMarks || []).map((mark) => (
+          <FloorMark key={mark.id} mark={mark} onActivate={() => {}} />
+        ))}
         {(panel.sceneObjects || []).map((object) => (
           <SceneObject key={object.id} object={object} selected={false} />
         ))}
         {panel.performers.map((performer) => (
-          <Puppet key={performer.id} performer={performer} isSelf={false} />
+          <Puppet key={performer.id} performer={performer} isSelf={false} depthModel={panelScene} />
         ))}
       </div>
     </div>

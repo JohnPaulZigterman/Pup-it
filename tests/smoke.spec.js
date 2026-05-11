@@ -24,3 +24,22 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Episode Pipeline" })).toBeVisible();
   await expect(page.getByText("Takes recorded")).toBeVisible();
 });
+
+test("main workstation avoids horizontal overflow across common viewport sizes", async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByLabel("Room").fill(`responsive-${viewport.width}-${Date.now()}`);
+    await page.getByLabel("Performer").fill("Responsive QA");
+    await page.getByRole("button", { name: "Join Stage" }).click();
+    await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
+  }
+});

@@ -177,25 +177,57 @@ export const sceneCatalog = [
     id: "studio",
     name: "Kitchen Moon",
     className: "sceneStudio",
+    perspective: "front-stage",
+    perspectiveNote: "Front-facing set with theatrical depth. Lateral movement compresses near the horizon.",
     horizon: 20,
     foreground: 82,
-    performerHorizonBuffer: 8
+    performerHorizonBuffer: 8,
+    vanishingX: 50
   },
   {
     id: "street",
     name: "Soft Alley",
     className: "sceneStreet",
+    perspective: "street-depth",
+    perspectiveNote: "Street-depth blocking. Moving away subtly pulls characters toward the vanishing point.",
     horizon: 20,
     foreground: 82,
-    performerHorizonBuffer: 8
+    performerHorizonBuffer: 8,
+    vanishingX: 55
   },
   {
     id: "space",
     name: "Dream Static",
     className: "sceneSpace",
+    perspective: "surreal-float",
+    perspectiveNote: "Floaty surreal space with gentler scale changes and looser floor logic.",
     horizon: 20,
     foreground: 82,
-    performerHorizonBuffer: 8
+    performerHorizonBuffer: 8,
+    vanishingX: 50
+  }
+];
+
+export const perspectiveCatalog = [
+  {
+    id: "front-stage",
+    name: "Front Stage",
+    description: "Traditional 2D stage depth: farther movement gets smaller and slower."
+  },
+  {
+    id: "street-depth",
+    name: "Street Depth",
+    description: "A mild one-point perspective where away/toward movement converges into the set."
+  },
+  {
+    id: "side-view",
+    name: "Side View",
+    description: "Mostly horizontal blocking with very little depth scaling."
+  },
+  {
+    id: "surreal-float",
+    name: "Surreal Float",
+    description: "Loose animated space with softer scale and ground rules."
   }
 ];
 
