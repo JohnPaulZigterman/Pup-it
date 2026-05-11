@@ -2336,6 +2336,55 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.puppetFeelPanel {
+  border-color: var(--honey);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(227, 189, 69, 0.16), transparent 48%),
+    var(--surface);
+}
+
+.feelReadout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid var(--ink);
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.feelReadout strong,
+.feelReadout span,
+.feelMeter span,
+.feelMeter small {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.feelMeter {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.feelMeter > div {
+  height: 10px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.feelMeter i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--pond), var(--honey));
+}
+
 .laneSummaryGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1258,7 +1258,15 @@ function App() {
               motionVx: 0,
               motionVy: 0,
               groundSpeed: 0,
-              travelLean: 0
+              travelLean: 0,
+              anticipationLean: 0,
+              anticipationSquash: 1,
+              settleAmount: 0,
+              walkBounce: 0,
+              visualLean: 0,
+              visualBounce: 0,
+              visualSquash: 1,
+              motionIntent: "idle"
             }
           };
           emitPerformerState(nextPerformer.state, now, { force: true });
@@ -4719,6 +4727,11 @@ function PerformControls({
   onRecordToggle,
   onModeChange
 }) {
+  const activeMotionFeel = getCatalogItem(motionFeelCatalog, self?.state.motionFeel || "smooth");
+  const motionEnergy = Math.min(100, Math.round((self?.state.groundSpeed || 0) * 100));
+  const depthPercent = Math.round(((self?.state.depthProgress ?? 0.65) || 0) * 100);
+  const intentLabel = self?.state.motionIntent === "settling" ? "settling" : self?.state.walking ? "moving" : "ready";
+
   return (
     <>
       <div className="dockGroup">
@@ -4836,6 +4849,25 @@ function PerformControls({
             Replay Takes
           </button>
         </div>
+      </div>
+
+      <div className="dockGroup puppetFeelPanel">
+        <h2>Puppet Feel</h2>
+        <div className="feelReadout">
+          <strong>{activeMotionFeel.name}</strong>
+          <span>{intentLabel}</span>
+        </div>
+        <div className="feelMeter">
+          <span>Motion</span>
+          <div><i style={{ width: `${motionEnergy}%` }} /></div>
+          <small>{motionEnergy}%</small>
+        </div>
+        <div className="feelMeter">
+          <span>Floor</span>
+          <div><i style={{ width: `${depthPercent}%` }} /></div>
+          <small>{depthPercent}%</small>
+        </div>
+        <small className="controlHint">Hold Shift to scoot, Alt for tiny adjustments. Movement still stays locked to the scene floor.</small>
       </div>
 
       <div className="dockGroup performanceFeelPanel">
@@ -4992,6 +5024,8 @@ function PerformControls({
           <strong>Hold/release idle</strong>
           <span>Q / E</span>
           <strong>Scale trim</strong>
+          <span>Shift / Alt</span>
+          <strong>Scoot, tiny step</strong>
         </div>
       </details>
 

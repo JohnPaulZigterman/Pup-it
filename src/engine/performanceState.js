@@ -48,8 +48,9 @@ export function inputFromPressedKeys(pressed, deltaMs = 16.67) {
   if (pressed.has("ArrowDown") || pressed.has("s")) dy += 1;
   if (pressed.has("q")) dScale -= 0.005;
   if (pressed.has("e")) dScale += 0.005;
+  const speedMultiplier = pressed.has("Shift") ? 1.35 : pressed.has("Alt") ? 0.45 : 1;
 
-  return { dx, dy, dScale, deltaMs };
+  return { dx, dy, dScale, deltaMs, speedMultiplier };
 }
 
 export function hasInput(input) {

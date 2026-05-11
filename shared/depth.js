@@ -211,6 +211,12 @@ function easeVelocity(current, target, amount, frameScale) {
   return current + (target - current) * adjustedAmount;
 }
 
+function easeSignal(current, target, amount, frameScale) {
+  const safeCurrent = Number.isFinite(current) ? current : target;
+  const adjustedAmount = 1 - Math.pow(1 - amount, frameScale);
+  return safeCurrent + (target - safeCurrent) * adjustedAmount;
+}
+
 function cleanInputAxis(value, deadzone = 0.08) {
   if (Math.abs(value) < deadzone) return 0;
   const sign = Math.sign(value);
@@ -245,8 +251,9 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
   const inputY = cleanInputAxis(input.dy || 0, profile.deadzone);
   const movingDiagonally = inputX !== 0 && inputY !== 0;
   const diagonalTrim = movingDiagonally ? Math.SQRT1_2 : 1;
-  const targetVx = inputX * diagonalTrim * profile.speed * lateralSpeed;
-  const targetVy = inputY * diagonalTrim * profile.speed * verticalSpeed;
+  const speedMultiplier = clamp(input.speedMultiplier ?? 1, 0.35, 1.5);
+  const targetVx = inputX * diagonalTrim * profile.speed * speedMultiplier * lateralSpeed;
+  const targetVy = inputY * diagonalTrim * profile.speed * speedMultiplier * verticalSpeed;
   const beforeVx = state.motionVx || 0;
   const beforeVy = state.motionVy || 0;
   const easingX = getAxisEase(beforeVx, targetVx, profile.acceleration, profile.deceleration, profile.reversal);
@@ -301,6 +308,10 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     0.975,
     1.055
   );
+  const visualEase = targetVx === 0 && targetVy === 0 ? 0.18 + (profile.deceleration || 0.5) * 0.25 : 0.34 + (profile.acceleration || 0.5) * 0.28;
+  const visualLean = easeSignal(state.visualLean, travelLean + anticipationLean * 0.75, visualEase, frameScale);
+  const visualBounce = easeSignal(state.visualBounce, walkBounce, visualEase, frameScale);
+  const visualSquash = easeSignal(state.visualSquash, anticipationSquash, visualEase, frameScale);
 
   return {
     ...state,
@@ -317,6 +328,10 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     anticipationSquash,
     settleAmount,
     walkBounce,
+    visualLean,
+    visualBounce,
+    visualSquash,
+    motionIntent: inputX || inputY ? "moving" : groundSpeed > 0.03 ? "settling" : "idle",
     depthProgress: nextPoint.floor.progress
   };
 }

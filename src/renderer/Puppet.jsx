@@ -97,11 +97,14 @@ export function Puppet({
   const depth = getDepthProgress(state.y, depthModel);
   const groundSpeed = Math.max(0.6, Math.min(1.7, state.groundSpeed || 1));
   const settleAmount = state.settleAmount || 0;
-  const walkBounce = state.walkBounce || 0;
-  const actingLean = pose.bodyLean + (state.travelLean || 0) + (state.anticipationLean || 0) * 0.75;
+  const walkBounce = Number.isFinite(state.visualBounce) ? state.visualBounce : state.walkBounce || 0;
+  const performanceLean = Number.isFinite(state.visualLean)
+    ? state.visualLean
+    : (state.travelLean || 0) + (state.anticipationLean || 0) * 0.75;
+  const actingLean = pose.bodyLean + performanceLean;
   const motionSquash = state.walking
-    ? (state.anticipationSquash || 1) + Math.min(0.032, walkBounce * 0.018)
-    : (state.anticipationSquash || 1) - settleAmount * 0.006;
+    ? (state.visualSquash || state.anticipationSquash || 1) + Math.min(0.032, walkBounce * 0.018)
+    : (state.visualSquash || state.anticipationSquash || 1) - settleAmount * 0.006;
   const selectBodyPart = (slot) => (event) => {
     if (!editableParts || !onPartSelect) return;
     event.stopPropagation();

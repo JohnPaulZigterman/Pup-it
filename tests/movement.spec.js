@@ -82,6 +82,31 @@ test("smooth motion reaches useful speed quickly and settles cleanly", () => {
   expect(stopped.walking).toBe(false);
 });
 
+test("movement speed modifiers help performers scoot or make tiny marks", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });
+  const regular = step(base, { dx: 1, dy: 0, speedMultiplier: 1 }, studio, 18);
+  const scoot = step(base, { dx: 1, dy: 0, speedMultiplier: 1.35 }, studio, 18);
+  const tiny = step(base, { dx: 1, dy: 0, speedMultiplier: 0.45 }, studio, 18);
+
+  expect(scoot.x - base.x).toBeGreaterThan(regular.x - base.x);
+  expect(tiny.x - base.x).toBeLessThan(regular.x - base.x);
+  expect(scoot.x).toBeLessThanOrEqual(getFloorAtY(scoot.y, studio).right);
+});
+
+test("performance visuals ease after movement instead of popping", () => {
+  const studio = scene("studio");
+  const base = createPerformerState({ x: 50, y: 70, motionFeel: "loose" });
+  const moving = step(base, { dx: 1, dy: 0 }, studio, 14);
+  const settling = step(moving, { dx: 0, dy: 0 }, studio, 4);
+  const stopped = step(settling, { dx: 0, dy: 0 }, studio, 24);
+
+  expect(Math.abs(moving.visualLean)).toBeGreaterThan(1);
+  expect(Math.abs(settling.visualLean)).toBeGreaterThan(0.2);
+  expect(Math.abs(stopped.visualLean)).toBeLessThan(Math.abs(settling.visualLean));
+  expect(stopped.visualBounce).toBeLessThan(moving.visualBounce);
+});
+
 test("depth movement starts without visible hesitation", () => {
   const studio = scene("studio");
   const base = createPerformerState({ x: 50, y: 70, motionFeel: "smooth" });
