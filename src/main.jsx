@@ -1742,6 +1742,7 @@ function App() {
     setAssetSearch(format.assetSearch);
     setStartedShortFormat(format.id);
     setExportHistory([]);
+    setRenderJob(null);
     if (showName.trim() === "Untitled Show") {
       setShowName(`${format.name} Show`);
     }
@@ -1768,6 +1769,7 @@ function App() {
     clearPlayback();
     setPreviewPerformers(null);
     setSelectedTake(null);
+    setRenderJob(null);
     changeScene(template.scene);
     setCameraShot(template.cameraShot);
     setLightingPreset(template.lightingPreset);
@@ -2803,6 +2805,15 @@ function App() {
       label: describeFinishTarget(),
       timelineClipCount: productionTimeline.length
     };
+    setRenderJob({
+      id: `pending-${Date.now()}`,
+      status: "running",
+      renderer: "browser-server",
+      request: { renderModel },
+      output: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
     setBackendRendering(true);
     setStatus(`Sending ${describeFinishTarget()} to the backend render queue.`);
     try {
@@ -2829,6 +2840,15 @@ function App() {
       ]);
       setStatus(`Backend render ${data.renderJob.status}. ${data.renderJob.output?.videoPath || "Artifact path pending."}`);
     } catch (error) {
+      setRenderJob((current) => ({
+        ...(current || {}),
+        id: current?.id || `failed-${Date.now()}`,
+        status: "failed",
+        renderer: "browser-server",
+        output: current?.output || {},
+        error: error.message || "Backend render request failed.",
+        updatedAt: new Date().toISOString()
+      }));
       setStatus(error.message || "Backend render request failed.");
     } finally {
       setBackendRendering(false);

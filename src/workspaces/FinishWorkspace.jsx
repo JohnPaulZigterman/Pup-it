@@ -87,7 +87,15 @@ export function SceneLibraryEditor({
   const finalVideoPath = renderJob?.output?.videoPath || "";
   const finalVideoUrl = finalVideoPath ? `${serverUrl}${finalVideoPath}` : "";
   const audioMux = renderJob?.output?.audioMux || null;
+  const renderModel = renderJob?.request?.renderModel || null;
+  const renderHealth = renderJob?.output?.renderHealth || null;
   const renderSucceeded = renderJob?.status === "succeeded" && Boolean(finalVideoPath);
+  const renderDurationMs =
+    renderHealth?.durationMs ||
+    renderModel?.durationMs ||
+    selectedTake?.durationMs ||
+    timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
+  const renderClipCount = renderHealth?.clipCount || renderModel?.timelineSegments?.length || (finishTarget === "rough-cut" ? timeline.length : selectedTake ? 1 : 0);
   const audioTrackCount = audioMux?.trackCount ?? selectedTake?.tracks?.audio?.length ?? 0;
   const audioStatus =
     audioMux?.status === "muxed"
@@ -220,6 +228,27 @@ export function SceneLibraryEditor({
               </div>
             ))}
           </div>
+        </div>
+        <div className="renderReliabilityPanel">
+          <div>
+            <span className="eyebrow">Render Check</span>
+            <strong>{backendRendering ? "Rendering review copy..." : renderSucceeded ? "Review render ready." : "Ready to render a review copy."}</strong>
+            <small>{finishTargetLabel} / {formatDuration(renderDurationMs)} / {renderClipCount || 1} clip{(renderClipCount || 1) === 1 ? "" : "s"}</small>
+          </div>
+          <div className="renderHealthGrid">
+            <span className={hasSubmissionSource ? "done" : ""}>Source</span>
+            <span className={renderClipCount ? "done" : ""}>Timing</span>
+            <span className={renderHealth?.hasThumbnail || renderSucceeded ? "done" : ""}>Thumbnail</span>
+            <span className={renderHealth?.hasVideo || renderSucceeded ? "done" : ""}>WEBM</span>
+            <span className={audioMux ? "done" : ""}>Audio</span>
+            <span className={renderHealth?.hasManifest || renderSucceeded ? "done" : ""}>Manifest</span>
+          </div>
+          {renderJob?.status === "failed" ? (
+            <button type="button" className="wideAction danger" onClick={onBackendRender} disabled={backendRendering}>
+              <RefreshCw size={16} />
+              Retry Render
+            </button>
+          ) : null}
         </div>
         <div className="doinkHandoffCard">
           <div>
@@ -473,6 +502,8 @@ export function SceneLibraryEditor({
           <div className={`renderJobCard ${renderJob.status === "failed" ? "failed" : ""}`}>
             <strong>Backend render: {renderJob.status}</strong>
             <small>{renderJob.output?.videoPath || "Waiting for artifact path."}</small>
+            <small>Target: {renderModel?.finishTarget?.label || finishTargetLabel}</small>
+            <small>Duration: {formatDuration(renderDurationMs)} / {renderClipCount || 1} clip{(renderClipCount || 1) === 1 ? "" : "s"}</small>
             <small>Audio: {audioStatus}</small>
             {renderJob.error ? <small>Issue: {renderJob.error}</small> : null}
             {audioMux?.separateTracks?.length ? (

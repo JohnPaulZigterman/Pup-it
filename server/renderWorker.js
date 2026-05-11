@@ -596,6 +596,15 @@ export async function renderWithHeadlessChromium(request, jobId) {
       hasVideo: Boolean(result.video)
     });
     const finalVideoPath = audioMux.finalVideoPath || (result.video ? `/renders/${jobId}/${videoFile}` : null);
+    const renderHealth = {
+      ok: Boolean(finalVideoPath && result.thumbnail),
+      hasVideo: Boolean(finalVideoPath),
+      hasThumbnail: Boolean(result.thumbnail),
+      hasManifest: true,
+      clipCount: renderModel.timelineSegments?.length || (renderModel.take ? 1 : 0),
+      durationMs: result.durationMs,
+      audioStatus: audioMux.status
+    };
 
     const output = {
       artifactId: `artifact-${jobId}`,
@@ -608,6 +617,7 @@ export async function renderWithHeadlessChromium(request, jobId) {
       durationMs: result.durationMs,
       rendererVersion,
       audioMux,
+      renderHealth,
       note: result.video
         ? "Rendered with backend headless Chromium canvas capture."
         : "Rendered thumbnail with backend headless Chromium; MediaRecorder video was unavailable.",
