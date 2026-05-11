@@ -8,6 +8,7 @@ import {
   Clapperboard,
   Circle,
   Copy,
+  FolderOpen,
   HelpCircle,
   Library,
   Mic,
@@ -19,6 +20,7 @@ import {
   Radio,
   RefreshCw,
   Shuffle,
+  Save,
   Square,
   Theater,
   Trash2,
@@ -27,8 +29,16 @@ import {
   X
 } from "lucide-react";
 import {
+  cameraShotCatalog,
+  createProjectExport,
+  createTimelineClip,
+  directorActionCatalog,
+  lightingPresetCatalog
+} from "../shared/production.js";
+import {
   characterCatalog,
   animationStyleCatalog,
+  backgroundThemeCatalog,
   bodyShapeCatalog,
   characterColorSwatches,
   expressionCatalog,
@@ -37,6 +47,7 @@ import {
   limbStyleCatalog,
   macroCatalog,
   mouthStyleCatalog,
+  objectStyleCatalog,
   originalNameParts,
   poseCatalog,
   sceneCatalog,
@@ -57,6 +68,7 @@ import { Puppet } from "./renderer/Puppet.jsx";
 import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
+const SHOW_STORAGE_KEY = "pup-it-shows-v1";
 
 const tutorialSteps = [
   {
@@ -149,14 +161,54 @@ function clonePerformers(performers) {
   }));
 }
 
-function createStoryboardPanel({ scene, performers, index }) {
+function makeShowId(showName) {
+  const slug = (showName || "untitled-show")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 42);
+  return slug || `show-${Date.now()}`;
+}
+
+function loadStoredShows() {
+  try {
+    const stored = window.localStorage.getItem(SHOW_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function writeStoredShows(shows) {
+  window.localStorage.setItem(SHOW_STORAGE_KEY, JSON.stringify(shows));
+}
+
+function summarizeTakeForShow(take) {
+  return {
+    id: take.id,
+    name: take.name,
+    scene: take.scene,
+    durationMs: take.durationMs,
+    performerCount: take.performerCount,
+    audioTrackCount: take.audioTrackCount,
+    motionEventCount: take.motionEventCount
+  };
+}
+
+function createStoryboardPanel({ scene, performers, index, backgroundTheme, objectStyle, texturePreset }) {
   return {
     id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
     title: `Panel ${index}`,
-    shot: "Wide",
+    shot: "wide",
+    lightingPreset: "scene",
     duration: "0:05",
     caption: "",
     scene,
+    backgroundTheme: backgroundTheme || "scene-native",
+    objectStyle: objectStyle || "match-character",
+    texturePreset: texturePreset || "paper-grain",
     performers: clonePerformers(performers)
   };
 }
@@ -170,6 +222,9 @@ function App() {
   const playbackTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
+  const [showName, setShowName] = useState("Untitled Show");
+  const [savedShows, setSavedShows] = useState([]);
+  const [selectedShowId, setSelectedShowId] = useState("");
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
   const [character, setCharacter] = useState(defaultCharacterId);
   const [scene, setScene] = useState(sceneCatalog[0].id);
@@ -179,18 +234,34 @@ function App() {
   const [micLive, setMicLive] = useState(false);
   const [mouthCameraActive, setMouthCameraActive] = useState(false);
   const [mode, setMode] = useState("perform");
+  const [cameraShot, setCameraShot] = useState("wide");
+  const [lightingPreset, setLightingPreset] = useState("scene");
+  const [backgroundTheme, setBackgroundTheme] = useState("painted-depth");
+  const [objectStyle, setObjectStyle] = useState("soft-material");
   const [takeLibrary, setTakeLibrary] = useState([]);
   const [selectedTake, setSelectedTake] = useState(null);
   const [previewPerformers, setPreviewPerformers] = useState(null);
   const [playbackActive, setPlaybackActive] = useState(false);
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
+  const [productionTimeline, setProductionTimeline] = useState([]);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
   const selectedScene = getCatalogItem(sceneCatalog, scene);
+  const selectedCameraShot = getCatalogItem(cameraShotCatalog, cameraShot);
+  const selectedLighting = getCatalogItem(lightingPresetCatalog, lightingPreset);
+  const selectedBackgroundTheme = getCatalogItem(backgroundThemeCatalog, backgroundTheme);
+  const selectedObjectStyle = getCatalogItem(objectStyleCatalog, objectStyle);
+  const selfCharacter = self
+    ? getCatalogItem(characterCatalog, self.character)
+    : getCatalogItem(characterCatalog, character);
+  const activeStylePreset = self?.state.stylePreset || selfCharacter.stylePreset;
+  const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
+  const activeTexturePreset = activeAnimationStyle.texturePreset || "paper-grain";
+  const stageTexturePreset = selectedBackgroundTheme.texturePreset || activeTexturePreset;
 
   useEffect(() => {
     const socket = io(SERVER_URL, { autoConnect: false });
@@ -212,6 +283,9 @@ function App() {
     });
     socket.on("performer:update", ({ id, state }) => {
       setPerformers((current) => updatePerformerState(current, id, state));
+    });
+    socket.on("performer:configured", (performer) => {
+      setPerformers((current) => upsertPerformer(current, performer));
     });
     socket.on("scene:set", setScene);
     socket.on("take:status", ({ recording: isRecording, savedTake }) => {
@@ -290,6 +364,15 @@ function App() {
 
   useEffect(() => {
     return () => clearPlayback();
+  }, []);
+
+  useEffect(() => {
+    const shows = loadStoredShows();
+    setSavedShows(shows);
+    if (shows[0]) {
+      setSelectedShowId(shows[0].id);
+      setShowName(shows[0].showName);
+    }
   }, []);
 
   useEffect(() => {
@@ -390,6 +473,32 @@ function App() {
     });
   };
 
+  const configureSelfFromShow = (performer) => {
+    if (!selfId || !performer) return;
+    const nextPerformer = {
+      id: selfId,
+      name: performer.name || name,
+      character: performer.character || character,
+      state: createPerformerState({
+        ...performer.state,
+        x: self?.state.x ?? performer.state?.x ?? 48,
+        y: self?.state.y ?? performer.state?.y ?? 60,
+        mouthOpen: 0,
+        speaking: false,
+        macro: null,
+        walking: false
+      })
+    };
+    setName(nextPerformer.name);
+    setCharacter(nextPerformer.character);
+    setPerformers((current) => upsertPerformer(current, nextPerformer));
+    socketRef.current.emit("performer:configure", {
+      name: nextPerformer.name,
+      character: nextPerformer.character,
+      state: nextPerformer.state
+    });
+  };
+
   const changeScene = (nextScene) => {
     setScene(nextScene);
     socketRef.current.emit("scene:set", nextScene);
@@ -400,6 +509,14 @@ function App() {
     socketRef.current.emit("macro:trigger", macro);
     flashMacro(selfId, macro);
     window.setTimeout(() => updateSelf({ macro: null }), 850);
+  };
+
+  const applyDirectorAction = (actionId) => {
+    const action = getCatalogItem(directorActionCatalog, actionId);
+    if (action.cameraShot) setCameraShot(action.cameraShot);
+    if (action.lightingPreset) setLightingPreset(action.lightingPreset);
+    if (action.selfState) updateSelf(action.selfState);
+    setStatus(`${action.name} setup applied.`);
   };
 
   const flashMacro = (performerId, macro) => {
@@ -599,6 +716,9 @@ function App() {
         if (event.type === "performer:joined") {
           setPreviewPerformers((current) => upsertPerformer(current || {}, event.performer));
         }
+        if (event.type === "performer:configured") {
+          setPreviewPerformers((current) => upsertPerformer(current || {}, event.performer));
+        }
         if (event.type === "performer:left") {
           setPreviewPerformers((current) => removePerformer(current || {}, event.performerId));
         }
@@ -632,8 +752,13 @@ function App() {
     const panel = createStoryboardPanel({
       scene,
       performers: activePerformers,
-      index: storyboardPanels.length + 1
+      index: storyboardPanels.length + 1,
+      backgroundTheme,
+      objectStyle,
+      texturePreset: stageTexturePreset
     });
+    panel.shot = cameraShot;
+    panel.lightingPreset = lightingPreset;
     setStoryboardPanels((current) => [...current, panel]);
     setSelectedStoryboardId(panel.id);
     setMode("storyboard");
@@ -644,7 +769,16 @@ function App() {
     setStoryboardPanels((current) =>
       current.map((panel) =>
         panel.id === selectedStoryboardId
-          ? { ...panel, scene, performers: clonePerformers(activePerformers) }
+          ? {
+              ...panel,
+              scene,
+              shot: cameraShot,
+              lightingPreset,
+              backgroundTheme,
+              objectStyle,
+              texturePreset: stageTexturePreset,
+              performers: clonePerformers(activePerformers)
+            }
           : panel
       )
     );
@@ -674,6 +808,150 @@ function App() {
     setStoryboardPanels((current) =>
       current.map((panel) => (panel.id === selectedStoryboardId ? { ...panel, ...patch } : panel))
     );
+  };
+
+  const addStoryboardPanelToTimeline = (panelId) => {
+    const panel = storyboardPanels.find((item) => item.id === panelId);
+    if (!panel) return;
+    setProductionTimeline((current) => [
+      ...current,
+      createTimelineClip({
+        source: { ...panel, sourceType: "storyboard" },
+        index: current.length + 1
+      })
+    ]);
+    setMode("edit");
+  };
+
+  const addTakeToTimeline = (take) => {
+    setProductionTimeline((current) => [
+      ...current,
+      createTimelineClip({
+        source: {
+          ...take,
+          sourceType: "take",
+          title: take.name,
+          duration: take.durationMs,
+          lightingPreset,
+          backgroundTheme,
+          objectStyle
+        },
+        index: current.length + 1
+      })
+    ]);
+  };
+
+  const removeTimelineClip = (clipId) => {
+    setProductionTimeline((current) => current.filter((clip) => clip.id !== clipId));
+  };
+
+  const performStoryboardPanel = (panelId) => {
+    const panel = storyboardPanels.find((item) => item.id === panelId);
+    if (!panel) return;
+    setScene(panel.scene);
+    setCameraShot(panel.shot || "wide");
+    setLightingPreset(panel.lightingPreset || "scene");
+    setBackgroundTheme(panel.backgroundTheme || "scene-native");
+    setObjectStyle(panel.objectStyle || "match-character");
+    setMode("perform");
+    setStatus(`Ready to perform "${panel.title}".`);
+  };
+
+  const exportProject = () => {
+    const project = createProjectExport({
+      roomId,
+      showName,
+      scene,
+      cameraShot,
+      lightingPreset,
+      backgroundTheme,
+      objectStyle,
+      storyboardPanels,
+      timeline: productionTimeline,
+      takes: takeLibrary
+    });
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pup-it-${roomId}-project.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const createShowSession = () => {
+    const cleanShowName = showName.trim() || "Untitled Show";
+    const selectedShow = savedShows.find((show) => show.id === selectedShowId);
+    const id =
+      selectedShow && selectedShow.showName === cleanShowName
+        ? selectedShow.id
+        : makeShowId(cleanShowName);
+    return {
+      schemaVersion: "pup-it.show.v1",
+      id,
+      showName: cleanShowName,
+      savedAt: new Date().toISOString(),
+      roomId,
+      scene,
+      cameraShot,
+      lightingPreset,
+      backgroundTheme,
+      objectStyle,
+      cast: clonePerformers(activePerformers),
+      storyboardPanels,
+      productionTimeline,
+      takes: takeLibrary.map(summarizeTakeForShow)
+    };
+  };
+
+  const saveShowSession = () => {
+    const session = createShowSession();
+    const nextShows = [
+      session,
+      ...savedShows.filter((show) => show.id !== session.id)
+    ].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+    try {
+      writeStoredShows(nextShows);
+      setSavedShows(nextShows);
+      setSelectedShowId(session.id);
+      setShowName(session.showName);
+      setStatus(`Saved show "${session.showName}".`);
+    } catch (_error) {
+      setStatus("This browser blocked show saving. Export the project as a backup.");
+    }
+  };
+
+  const loadShowSession = (showId = selectedShowId) => {
+    const session = savedShows.find((show) => show.id === showId);
+    if (!session) return;
+    clearPlayback();
+    setSelectedShowId(session.id);
+    setShowName(session.showName);
+    setCameraShot(session.cameraShot || "wide");
+    setLightingPreset(session.lightingPreset || "scene");
+    setBackgroundTheme(session.backgroundTheme || "painted-depth");
+    setObjectStyle(session.objectStyle || "soft-material");
+    setStoryboardPanels(session.storyboardPanels || []);
+    setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
+    setProductionTimeline(session.productionTimeline || session.timeline || []);
+    setPreviewPerformers(null);
+    changeScene(session.scene || sceneCatalog[0].id);
+    const castMember =
+      session.cast?.find((performer) => performer.name === name) ||
+      session.cast?.[0];
+    if (castMember) configureSelfFromShow(castMember);
+    setStatus(`Loaded show "${session.showName}".`);
+  };
+
+  const exportShowSession = () => {
+    const session = createShowSession();
+    const blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pup-it-${session.id}-show.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const showTutorialStep = (index) => {
@@ -763,7 +1041,11 @@ function App() {
       </header>
 
       <section
-        className={mode === "storyboard" ? "storyboardStage" : `stage ${selectedScene.className}`}
+        className={
+          mode === "storyboard"
+            ? "storyboardStage"
+            : `stage ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
+        }
         onPointerMove={handleStagePointerMove}
         onPointerLeave={handleStagePointerLeave}
       >
@@ -775,17 +1057,31 @@ function App() {
           />
         ) : (
           <>
-            <div className="stageLighting" />
-            <div className="horizonGuide" />
-            <div className="setFloor" />
-            {stagePerformers.map((performer) => (
-              <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
-            ))}
+            <div className="stageTexture" />
+            <div className="stageCamera">
+              <div className="stageLighting" />
+              <div className="horizonGuide" />
+              <div className="setFloor" />
+              {stagePerformers.map((performer) => (
+                <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
+              ))}
+            </div>
           </>
         )}
       </section>
 
       <aside className="controlDock">
+        <ShowSessionControls
+          showName={showName}
+          savedShows={savedShows}
+          selectedShowId={selectedShowId}
+          onShowNameChange={setShowName}
+          onSelectedShowChange={setSelectedShowId}
+          onSaveShow={saveShowSession}
+          onLoadShow={loadShowSession}
+          onExportShow={exportShowSession}
+        />
+
         {mode === "perform" && (
           <PerformControls
             scene={scene}
@@ -797,6 +1093,16 @@ function App() {
             onMouthControlChange={setMouthControl}
             mouthCameraActive={mouthCameraActive}
             onMacroTrigger={triggerMacro}
+            cameraShot={cameraShot}
+            lightingPreset={lightingPreset}
+            backgroundTheme={backgroundTheme}
+            objectStyle={objectStyle}
+            onCameraShotChange={setCameraShot}
+            onLightingPresetChange={setLightingPreset}
+            onBackgroundThemeChange={setBackgroundTheme}
+            onObjectStyleChange={setObjectStyle}
+            onDirectorAction={applyDirectorAction}
+            onStoryboardCapture={addStoryboardPanel}
           />
         )}
         {mode === "build" && (
@@ -817,6 +1123,10 @@ function App() {
             onSelectTake={selectTake}
             onPlay={playSelectedTake}
             onExport={downloadTake}
+            onAddTakeToTimeline={addTakeToTimeline}
+            timeline={productionTimeline}
+            onRemoveTimelineClip={removeTimelineClip}
+            onExportProject={exportProject}
           />
         )}
         {mode === "storyboard" && (
@@ -829,6 +1139,8 @@ function App() {
             onDeletePanel={deleteStoryboardPanel}
             onSelectPanel={setSelectedStoryboardId}
             onPanelMetaChange={updateStoryboardPanelMeta}
+            onAddPanelToTimeline={addStoryboardPanelToTimeline}
+            onPerformPanel={performStoryboardPanel}
           />
         )}
 
@@ -908,16 +1220,82 @@ function TutorialOverlay({ step, mode, onClose, onStepChange }) {
   );
 }
 
+function ShowSessionControls({
+  showName,
+  savedShows,
+  selectedShowId,
+  onShowNameChange,
+  onSelectedShowChange,
+  onSaveShow,
+  onLoadShow,
+  onExportShow
+}) {
+  return (
+    <div className="dockGroup showSessionPanel">
+      <h2>Show</h2>
+      <label>
+        Current Show
+        <input
+          value={showName}
+          maxLength={48}
+          onChange={(event) => onShowNameChange(event.target.value)}
+        />
+      </label>
+      <label>
+        Saved Shows
+        <select
+          value={selectedShowId}
+          onChange={(event) => onSelectedShowChange(event.target.value)}
+        >
+          <option value="">No saved show selected</option>
+          {savedShows.map((show) => (
+            <option key={show.id} value={show.id}>
+              {show.showName}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="libraryActions">
+        <button onClick={onSaveShow}>
+          <Save size={16} />
+          Save
+        </button>
+        <button onClick={() => onLoadShow()} disabled={!selectedShowId}>
+          <FolderOpen size={16} />
+          Load
+        </button>
+        <button onClick={onExportShow}>
+          <Copy size={16} />
+          Export
+        </button>
+      </div>
+      <small className="controlHint">
+        Saves the show look, cast customization, storyboard, timeline, and take list in this browser.
+      </small>
+    </div>
+  );
+}
+
 function PerformControls({
   scene,
   self,
+  cameraShot,
+  lightingPreset,
+  backgroundTheme,
+  objectStyle,
   onSceneChange,
+  onCameraShotChange,
+  onLightingPresetChange,
+  onBackgroundThemeChange,
+  onObjectStyleChange,
   onExpressionChange,
   onPoseChange,
   onIdleMotionChange,
   onMouthControlChange,
   mouthCameraActive,
-  onMacroTrigger
+  onMacroTrigger,
+  onDirectorAction,
+  onStoryboardCapture
 }) {
   return (
     <>
@@ -933,6 +1311,86 @@ function PerformControls({
               {item.name}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Shot</h2>
+        <div className="shotGrid">
+          {cameraShotCatalog.map((shot) => (
+            <button
+              key={shot.id}
+              className={cameraShot === shot.id ? "selected" : ""}
+              title={shot.description}
+              onClick={() => onCameraShotChange(shot.id)}
+            >
+              {shot.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Lighting</h2>
+        <div className="shotGrid">
+          {lightingPresetCatalog.map((light) => (
+            <button
+              key={light.id}
+              className={lightingPreset === light.id ? "selected" : ""}
+              title={light.description}
+              onClick={() => onLightingPresetChange(light.id)}
+            >
+              {light.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Background Theme</h2>
+        <div className="shotGrid">
+          {backgroundThemeCatalog.map((theme) => (
+            <button
+              key={theme.id}
+              className={backgroundTheme === theme.id ? "selected" : ""}
+              title={theme.description}
+              onClick={() => onBackgroundThemeChange(theme.id)}
+            >
+              {theme.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Object Style</h2>
+        <div className="shotGrid">
+          {objectStyleCatalog.map((style) => (
+            <button
+              key={style.id}
+              className={objectStyle === style.id ? "selected" : ""}
+              title={style.description}
+              onClick={() => onObjectStyleChange(style.id)}
+            >
+              {style.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Director</h2>
+        <div className="macroGrid">
+          {directorActionCatalog.map((action) => (
+            <button key={action.id} onClick={() => onDirectorAction(action.id)}>
+              <Wand2 size={16} />
+              {action.name}
+            </button>
+          ))}
+          <button onClick={onStoryboardCapture}>
+            <Clapperboard size={16} />
+            Mark Beat
+          </button>
         </div>
       </div>
 
@@ -1033,7 +1491,11 @@ function SceneLibraryEditor({
   onRefresh,
   onSelectTake,
   onPlay,
-  onExport
+  onExport,
+  onAddTakeToTimeline,
+  timeline,
+  onRemoveTimelineClip,
+  onExportProject
 }) {
   return (
     <div className="sceneEditor">
@@ -1119,6 +1581,10 @@ function SceneLibraryEditor({
               <Play size={16} />
               {playbackActive ? "Playing" : "Play Scene"}
             </button>
+            <button onClick={() => onAddTakeToTimeline(selectedTake)}>
+              <Plus size={16} />
+              Timeline
+            </button>
             <button onClick={() => onExport(selectedTake)}>
               <Video size={16} />
               Export
@@ -1126,8 +1592,51 @@ function SceneLibraryEditor({
           </div>
         </>
       )}
+
+      <ProductionTimeline
+        clips={timeline}
+        onRemoveClip={onRemoveTimelineClip}
+        onExportProject={onExportProject}
+      />
     </div>
   );
+}
+
+function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
+  return (
+    <div className="dockGroup">
+      <h2>Production Timeline</h2>
+      {clips.length ? (
+        <div className="timelineList">
+          {clips.map((clip, index) => (
+            <div className="timelineClip" key={clip.id}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{clip.title}</strong>
+                <small>
+                  {clip.sourceType} / {clip.shot} / {formatClipDuration(clip.duration)}
+                </small>
+              </div>
+              <button aria-label={`Remove ${clip.title}`} onClick={() => onRemoveClip(clip.id)}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="emptyState">No timeline clips yet.</div>
+      )}
+      <button className="wideAction" onClick={onExportProject}>
+        <Video size={16} />
+        Export Project
+      </button>
+    </div>
+  );
+}
+
+function formatClipDuration(duration) {
+  if (typeof duration === "number") return formatDuration(duration);
+  return duration || "0:05";
 }
 
 function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {
@@ -1151,7 +1660,7 @@ function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {
           <div className="panelLabel">
             <span>{index + 1}</span>
             <strong>{panel.title}</strong>
-            <small>{panel.shot}</small>
+            <small>{getCatalogItem(cameraShotCatalog, panel.shot).name}</small>
           </div>
           <PanelFrame panel={panel} />
           <p>{panel.caption || "..."}</p>
@@ -1163,10 +1672,20 @@ function StoryboardCanvas({ panels, selectedPanelId, onSelectPanel }) {
 
 function PanelFrame({ panel }) {
   const panelScene = getCatalogItem(sceneCatalog, panel.scene);
+  const panelShot = getCatalogItem(cameraShotCatalog, panel.shot);
+  const panelLighting = getCatalogItem(lightingPresetCatalog, panel.lightingPreset || "scene");
+  const panelBackgroundTheme = getCatalogItem(
+    backgroundThemeCatalog,
+    panel.backgroundTheme || "scene-native"
+  );
+  const panelObjectStyle = getCatalogItem(objectStyleCatalog, panel.objectStyle || "match-character");
 
   return (
-    <div className={`panelFrame ${panelScene.className}`}>
-      <div className="panelStageInner">
+    <div
+      className={`panelFrame ${panelScene.className} ${panelShot.className} ${panelLighting.className} ${panelBackgroundTheme.className} ${panelObjectStyle.className} texture-${panel.texturePreset || panelBackgroundTheme.texturePreset || "paper-grain"}`}
+    >
+      <div className="panelStageInner stageCamera">
+        <div className="stageTexture" />
         <div className="stageLighting" />
         <div className="horizonGuide" />
         <div className="setFloor" />
@@ -1186,7 +1705,9 @@ function StoryboardEditor({
   onDuplicatePanel,
   onDeletePanel,
   onSelectPanel,
-  onPanelMetaChange
+  onPanelMetaChange,
+  onAddPanelToTimeline,
+  onPerformPanel
 }) {
   return (
     <div className="storyboardEditor">
@@ -1228,11 +1749,56 @@ function StoryboardEditor({
                 value={selectedPanel.shot}
                 onChange={(event) => onPanelMetaChange({ shot: event.target.value })}
               >
-                <option>Wide</option>
-                <option>Medium</option>
-                <option>Close</option>
-                <option>Reaction</option>
-                <option>Insert</option>
+                {cameraShotCatalog.map((shot) => (
+                  <option key={shot.id} value={shot.id}>
+                    {shot.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Lighting
+              <select
+                value={selectedPanel.lightingPreset || "scene"}
+                onChange={(event) => onPanelMetaChange({ lightingPreset: event.target.value })}
+              >
+                {lightingPresetCatalog.map((light) => (
+                  <option key={light.id} value={light.id}>
+                    {light.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Background Theme
+              <select
+                value={selectedPanel.backgroundTheme || "scene-native"}
+                onChange={(event) => {
+                  const nextTheme = getCatalogItem(backgroundThemeCatalog, event.target.value);
+                  onPanelMetaChange({
+                    backgroundTheme: event.target.value,
+                    texturePreset: nextTheme.texturePreset || selectedPanel.texturePreset
+                  });
+                }}
+              >
+                {backgroundThemeCatalog.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Object Style
+              <select
+                value={selectedPanel.objectStyle || "match-character"}
+                onChange={(event) => onPanelMetaChange({ objectStyle: event.target.value })}
+              >
+                {objectStyleCatalog.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -1253,6 +1819,14 @@ function StoryboardEditor({
           </div>
 
           <div className="libraryActions">
+            <button onClick={() => onPerformPanel(selectedPanel.id)}>
+              <Radio size={16} />
+              Perform
+            </button>
+            <button onClick={() => onAddPanelToTimeline(selectedPanel.id)}>
+              <Plus size={16} />
+              Timeline
+            </button>
             <button onClick={onDuplicatePanel}>
               <Copy size={16} />
               Duplicate
@@ -1279,7 +1853,7 @@ function StoryboardEditor({
                   {index + 1}. {panel.title}
                 </span>
                 <small>
-                  {panel.shot} / {panel.duration}
+                  {getCatalogItem(cameraShotCatalog, panel.shot).name} / {panel.duration}
                 </small>
               </button>
             ))}
@@ -1348,7 +1922,9 @@ function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange
         <h2>Animation Style</h2>
         <div className="styleSummary">
           <strong>{selectedStyle.family}</strong>
-          <small>{selectedStyle.theme}</small>
+          <small>
+            {selectedStyle.theme} / {selectedStyle.texturePreset}
+          </small>
         </div>
         <div className="styleGrid">
           {animationStyleCatalog.map((style) => (

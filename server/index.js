@@ -11,6 +11,7 @@ import {
   createPerformer,
   createRoom,
   roomSnapshot,
+  sanitizePerformerName,
   sanitizeRoomId
 } from "../shared/schema.js";
 
@@ -75,6 +76,19 @@ io.on("connection", (socket) => {
       performerId: socket.id,
       state: performer.state
     });
+  });
+
+  socket.on("performer:configure", ({ name, character, state }) => {
+    if (!activeRoomId) return;
+    const room = getRoom(activeRoomId);
+    const performer = room.performers.get(socket.id);
+    if (!performer) return;
+
+    performer.name = sanitizePerformerName(name || performer.name);
+    performer.character = character || performer.character;
+    performer.state = { ...performer.state, ...state };
+    io.to(activeRoomId).emit("performer:configured", performer);
+    recordEvent(room, { type: "performer:configured", performer });
   });
 
   socket.on("scene:set", (scene) => {

@@ -17,6 +17,7 @@ export function Puppet({ performer, isSelf }) {
   const rig = { ...character.rigConfig, ...state.rigConfig };
   const stylePreset = state.stylePreset || character.stylePreset;
   const adapter = getCatalogItem(styleAdapterCatalog, stylePreset);
+  const lineWidth = adapter.lineWidth || 0;
   const scale = getDepthScale(state.y, state.scale);
   const isWalking = state.walking && rig.walkCycle !== "none";
   const canIdle = state.idleMotion !== "held" && !isWalking && !state.macro;
@@ -35,6 +36,8 @@ export function Puppet({ performer, isSelf }) {
         `archetype-${character.archetype || character.id}`,
         `limbs-${rig.limbs}`,
         `style-${stylePreset}`,
+        `texture-${adapter.texturePreset || "paper-grain"}`,
+        adapter.borderless ? "style-borderless" : "",
         `idle-${state.idleMotion}`,
         `mouth-${mouthLevel}`,
         canIdle ? "idle-breathing" : "",
@@ -52,7 +55,8 @@ export function Puppet({ performer, isSelf }) {
         "--accent": design.accent || character.accent,
         "--outline": adapter.outline,
         "--facing": state.facing < 0 ? -1 : 1,
-        "--line-width": `${adapter.lineWidth}px`,
+        "--line-width": `${lineWidth}px`,
+        "--detail-line-width": `${Math.max(0, lineWidth - 1)}px`,
         "--body-scale-x": adapter.bodyScaleX,
         "--body-scale-y": adapter.bodyScaleY,
         "--body-corner": adapter.corner,
