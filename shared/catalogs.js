@@ -1,11 +1,11 @@
 export const characterCatalog = [
   {
     id: "bean",
-    name: "Bean",
+    name: "Pebble",
     rig: "full-body",
-    stylePreset: "trash-cutout",
-    color: "#d64d2f",
-    accent: "#f0d642",
+    stylePreset: "simple-doodle",
+    color: "#f6a6b2",
+    accent: "#fff2a8",
     rigConfig: {
       body: "round",
       limbs: "rubber-hose",
@@ -19,11 +19,11 @@ export const characterCatalog = [
   },
   {
     id: "noodle",
-    name: "Noodle",
+    name: "Sprout",
     rig: "full-body",
-    stylePreset: "xerox-grime",
-    color: "#7bb051",
-    accent: "#efe0b0",
+    stylePreset: "storybook-pastel",
+    color: "#8fd8b5",
+    accent: "#fff6d7",
     rigConfig: {
       body: "tall",
       limbs: "noodle",
@@ -37,11 +37,11 @@ export const characterCatalog = [
   },
   {
     id: "square",
-    name: "Square",
+    name: "Pocket",
     rig: "full-body",
     stylePreset: "paper-cutout",
-    color: "#4f78c8",
-    accent: "#f08ba2",
+    color: "#8db7ff",
+    accent: "#ffd2df",
     rigConfig: {
       body: "block",
       limbs: "hinged",
@@ -55,11 +55,11 @@ export const characterCatalog = [
   },
   {
     id: "moon",
-    name: "Moon",
+    name: "Mote",
     rig: "full-body",
-    stylePreset: "ink-line",
-    color: "#b884de",
-    accent: "#151720",
+    stylePreset: "soft-ink",
+    color: "#c7a8ff",
+    accent: "#2b2d42",
     rigConfig: {
       body: "round",
       limbs: "stick",
@@ -74,9 +74,9 @@ export const characterCatalog = [
 ];
 
 export const sceneCatalog = [
-  { id: "studio", name: "Basement", className: "sceneStudio", horizon: 20, foreground: 82 },
-  { id: "street", name: "Ditch", className: "sceneStreet", horizon: 20, foreground: 82 },
-  { id: "space", name: "Bad TV", className: "sceneSpace", horizon: 20, foreground: 82 }
+  { id: "studio", name: "Kitchen Moon", className: "sceneStudio", horizon: 20, foreground: 82 },
+  { id: "street", name: "Soft Alley", className: "sceneStreet", horizon: 20, foreground: 82 },
+  { id: "space", name: "Dream Static", className: "sceneSpace", horizon: 20, foreground: 82 }
 ];
 
 export const macroCatalog = [
@@ -169,10 +169,10 @@ export const expressionCatalog = [
 ];
 
 export const animationStyleCatalog = [
-  { id: "trash-cutout", name: "Trash Cutout" },
-  { id: "xerox-grime", name: "Xerox Grime" },
+  { id: "simple-doodle", name: "Simple Doodle" },
+  { id: "storybook-pastel", name: "Storybook Pastel" },
   { id: "paper-cutout", name: "Paper Cutout" },
-  { id: "ink-line", name: "Bad Ink" }
+  { id: "soft-ink", name: "Soft Ink" }
 ];
 
 export const bodyShapeCatalog = [
@@ -202,19 +202,19 @@ export const mouthStyleCatalog = [
 ];
 
 export const characterColorSwatches = [
-  "#d64d2f",
-  "#efcf55",
-  "#7bb051",
-  "#4f78c8",
-  "#b884de",
-  "#e6ded1",
-  "#2a2118",
-  "#d48a37"
+  "#f6a6b2",
+  "#fff2a8",
+  "#8fd8b5",
+  "#8db7ff",
+  "#c7a8ff",
+  "#fff6d7",
+  "#2b2d42",
+  "#ffbf8f"
 ];
 
 export const originalNameParts = {
-  first: ["Moldy", "Uncle", "Trash", "Panic", "Drippy", "Legal", "Basement", "Tiny"],
-  second: ["Biscuit", "Thing", "Steve", "Receipt", "Wound", "Lunch", "Cousin", "Signal"]
+  first: ["Sleepy", "Tiny", "Cloud", "Pocket", "Moon", "Toast", "Secret", "Mochi"],
+  second: ["Dot", "Errand", "Soup", "Bug", "Planet", "Friend", "Button", "Wish"]
 };
 
 export function getCatalogItem(catalog, id, fallbackIndex = 0) {
