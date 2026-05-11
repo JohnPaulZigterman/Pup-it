@@ -399,6 +399,7 @@ input[type="color"] {
   --shot-y: 0%;
   --camera-pan-x: 0%;
   --camera-pan-y: 0%;
+  --camera-punch-scale: 1;
   --camera-shake-x: 0%;
   --camera-shake-y: 0%;
   --scene-horizon: 56%;
@@ -410,12 +411,17 @@ input[type="color"] {
 .stageCamera {
   position: absolute;
   inset: 0;
+  --camera-pan-x: 0%;
+  --camera-pan-y: 0%;
+  --camera-punch-scale: 1;
+  --camera-shake-x: 0%;
+  --camera-shake-y: 0%;
   transform:
     translate(
       calc(var(--shot-x) + var(--camera-pan-x) + var(--camera-shake-x)),
       calc(var(--shot-y) + var(--camera-pan-y) + var(--camera-shake-y))
     )
-    scale(var(--shot-scale));
+    scale(calc(var(--shot-scale) * var(--camera-punch-scale)));
   transform-origin: center 70%;
   transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }

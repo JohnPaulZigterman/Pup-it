@@ -137,11 +137,12 @@ io.on("connection", (socket) => {
     recordEvent(room, { type: "macro:trigger", performerId: socket.id, macro });
   });
 
-  socket.on("take:start", () => {
+  socket.on("take:start", (viewContext = {}) => {
     if (!activeRoomId) return;
     const room = getRoom(activeRoomId);
     room.recording = true;
     room.takeStartedAt = Date.now();
+    room.takeViewContext = viewContext;
     room.events = [];
     room.audio = [];
     io.to(activeRoomId).emit("take:status", {

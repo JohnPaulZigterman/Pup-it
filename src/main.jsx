@@ -798,6 +798,7 @@ function App() {
   const mouthSensitivityRef = useRef(1);
   const mouthSmoothingRef = useRef(0.58);
   const playbackTimersRef = useRef([]);
+  const cameraTimersRef = useRef([]);
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
   const [showName, setShowName] = useState("Untitled Show");
@@ -817,6 +818,9 @@ function App() {
   const [experienceMode, setExperienceMode] = useState("beginner");
   const [commandQuery, setCommandQuery] = useState("");
   const [cameraShot, setCameraShot] = useState("wide");
+  const [cameraFollow, setCameraFollow] = useState(false);
+  const [cameraPunchScale, setCameraPunchScale] = useState(1);
+  const [cameraShakeOffset, setCameraShakeOffset] = useState({ x: 0, y: 0 });
   const [lightingPreset, setLightingPreset] = useState("scene");
   const [backgroundTheme, setBackgroundTheme] = useState("painted-depth");
   const [objectStyle, setObjectStyle] = useState("soft-material");
@@ -1011,6 +1015,13 @@ function App() {
 
   useEffect(() => {
     return () => clearPlayback();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cameraTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      cameraTimersRef.current = [];
+    };
   }, []);
 
   useEffect(() => {
@@ -1541,9 +1552,40 @@ function App() {
     setStatus(`${preset.name} performance feel loaded.`);
   };
 
+  const queueCameraTimer = (callback, delay) => {
+    const timer = window.setTimeout(() => {
+      callback();
+      cameraTimersRef.current = cameraTimersRef.current.filter((item) => item !== timer);
+    }, delay);
+    cameraTimersRef.current.push(timer);
+  };
+
+  const triggerCameraPunch = () => {
+    setCameraPunchScale(1.08);
+    queueCameraTimer(() => setCameraPunchScale(1), 260);
+  };
+
+  const triggerCameraShake = () => {
+    setCameraShakeOffset({ x: 0.8, y: -0.55 });
+    queueCameraTimer(() => setCameraShakeOffset({ x: -0.55, y: 0.35 }), 70);
+    queueCameraTimer(() => setCameraShakeOffset({ x: 0.32, y: 0.2 }), 140);
+    queueCameraTimer(() => setCameraShakeOffset({ x: 0, y: 0 }), 230);
+  };
+
+  const resetDirectorCamera = () => {
+    setCameraFollow(false);
+    setCameraPunchScale(1);
+    setCameraShakeOffset({ x: 0, y: 0 });
+    setCameraShot("wide");
+    setStatus("Director camera reset to a wide stage view.");
+  };
+
   const applyDirectorAction = (actionId) => {
     const action = getCatalogItem(directorActionCatalog, actionId);
-    if (action.cameraShot) setCameraShot(action.cameraShot);
+    if (action.cameraShot) {
+      setCameraShot(action.cameraShot);
+      if (action.cameraShot !== "wide") triggerCameraPunch();
+    }
     if (action.lightingPreset) setLightingPreset(action.lightingPreset);
     if (action.selfState) updateSelf(action.selfState);
     if (action.propCue === "reveal") {
@@ -1560,7 +1602,10 @@ function App() {
         setSelectedSceneObjectId(target.id);
       }
     }
-    if (action.soundSting) playSoundSting(action.soundSting);
+    if (action.soundSting) {
+      playSoundSting(action.soundSting);
+      if (["thump", "zap", "drop"].includes(action.soundSting)) triggerCameraShake();
+    }
     setStatus(`${action.name} setup applied.`);
   };
 
@@ -1758,7 +1803,21 @@ function App() {
   };
 
   const toggleTake = () => {
-    socketRef.current.emit(recording ? "take:stop" : "take:start");
+    if (recording) {
+      socketRef.current.emit("take:stop");
+      return;
+    }
+    socketRef.current.emit("take:start", {
+      cameraShot,
+      lightingPreset,
+      backgroundTheme,
+      objectStyle,
+      directorCamera: {
+        follow: cameraFollow,
+        pan: directorCameraPan,
+        punchScale: cameraPunchScale
+      }
+    });
   };
 
   const exportTake = async () => {
@@ -1798,6 +1857,11 @@ function App() {
       setSelectedTake(take);
       setPreviewPerformers(makePreviewPerformers(take));
       setScene(take.scene);
+      setCameraShot(take.cameraShot || "wide");
+      setLightingPreset(take.lightingPreset || "scene");
+      setCameraFollow(Boolean(take.directorCamera?.follow));
+      setCameraPunchScale(take.directorCamera?.punchScale || 1);
+      setCameraShakeOffset({ x: 0, y: 0 });
       if (review) setMode("edit");
     }
     return take;
@@ -1860,6 +1924,16 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
+  const cameraTarget = useMemo(
+    () => (cameraFollow ? stagePerformers.find((performer) => performer.id === selfId) || stagePerformers[0] || null : null),
+    [cameraFollow, selfId, stagePerformers]
+  );
+  const directorCameraPan = cameraTarget
+    ? {
+        x: clamp((50 - cameraTarget.state.x) * 0.34, -12, 12),
+        y: clamp((62 - cameraTarget.state.y) * 0.28, -9, 9)
+      }
+    : { x: 0, y: 0 };
   const selectedStoryboardPanel = useMemo(
     () => storyboardPanels.find((panel) => panel.id === selectedStoryboardId) || null,
     [selectedStoryboardId, storyboardPanels]
@@ -1878,6 +1952,7 @@ function App() {
     });
     panel.shot = cameraShot;
     panel.lightingPreset = lightingPreset;
+    panel.cameraFraming = { follow: cameraFollow, pan: directorCameraPan, punchScale: cameraPunchScale };
     setStoryboardPanels((current) => [...current, panel]);
     setSelectedStoryboardId(panel.id);
     setMode("storyboard");
@@ -1893,6 +1968,7 @@ function App() {
               scene,
               shot: cameraShot,
               lightingPreset,
+              cameraFraming: { follow: cameraFollow, pan: directorCameraPan, punchScale: cameraPunchScale },
               backgroundTheme,
               objectStyle,
               texturePreset: stageTexturePreset,
@@ -2022,6 +2098,11 @@ function App() {
       scene,
       perspective: selectedScene.perspective,
       cameraShot,
+      directorCamera: {
+        follow: cameraFollow,
+        pan: directorCameraPan,
+        punchScale: cameraPunchScale
+      },
       lightingPreset,
       backgroundTheme,
       objectStyle,
@@ -2106,6 +2187,7 @@ function App() {
       return;
     }
     setCameraShot("reaction");
+    triggerCameraPunch();
     setLightingPreset("dramatic");
     setStatus("Applied a punchier camera and reaction setup.");
   };
@@ -2201,6 +2283,9 @@ function App() {
     setShowName(session.showName);
     setRoomId(session.roomId || roomId);
     setCameraShot(session.cameraShot || "wide");
+    setCameraFollow(Boolean(session.directorCamera?.follow));
+    setCameraPunchScale(session.directorCamera?.punchScale || 1);
+    setCameraShakeOffset({ x: 0, y: 0 });
     setLightingPreset(session.lightingPreset || "scene");
     setBackgroundTheme(session.backgroundTheme || "painted-depth");
     setObjectStyle(session.objectStyle || "soft-material");
@@ -2361,7 +2446,12 @@ function App() {
                 "--scene-horizon": `${selectedScene.horizon}%`,
                 "--scene-foreground": `${selectedScene.foreground}%`,
                 "--scene-focus-x": `${selectedScene.vanishingX || 50}%`,
-                "--scene-focus-y": `${selectedScene.focusY || selectedScene.horizon}%`
+                "--scene-focus-y": `${selectedScene.focusY || selectedScene.horizon}%`,
+                "--camera-pan-x": `${directorCameraPan.x}%`,
+                "--camera-pan-y": `${directorCameraPan.y}%`,
+                "--camera-punch-scale": cameraPunchScale,
+                "--camera-shake-x": `${cameraShakeOffset.x}%`,
+                "--camera-shake-y": `${cameraShakeOffset.y}%`
               }
         }
         onPointerMove={handleStagePointerMove}
@@ -2484,12 +2574,18 @@ function App() {
             performancePresets={performancePresetCatalog}
             onPerformancePreset={applyPerformancePreset}
             cameraShot={cameraShot}
+            cameraFollow={cameraFollow}
+            cameraTargetName={cameraTarget?.name || self?.name || "Selected rig"}
             lightingPreset={lightingPreset}
             backgroundTheme={backgroundTheme}
             objectStyle={objectStyle}
             floorMarks={floorMarks}
             shotTemplates={shotTemplateCatalog}
             onCameraShotChange={setCameraShot}
+            onCameraFollowChange={setCameraFollow}
+            onCameraPunch={triggerCameraPunch}
+            onCameraShake={triggerCameraShake}
+            onCameraReset={resetDirectorCamera}
             onLightingPresetChange={setLightingPreset}
             onBackgroundThemeChange={setBackgroundTheme}
             onObjectStyleChange={setObjectStyle}
@@ -3191,6 +3287,8 @@ function PerformControls({
   selectedPerspective,
   self,
   cameraShot,
+  cameraFollow,
+  cameraTargetName,
   lightingPreset,
   backgroundTheme,
   objectStyle,
@@ -3198,6 +3296,10 @@ function PerformControls({
   shotTemplates,
   onSceneChange,
   onCameraShotChange,
+  onCameraFollowChange,
+  onCameraPunch,
+  onCameraShake,
+  onCameraReset,
   onLightingPresetChange,
   onBackgroundThemeChange,
   onObjectStyleChange,
@@ -3294,6 +3396,34 @@ function PerformControls({
               <span>{template.description}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="dockGroup directorCameraPanel">
+        <h2>Director Camera</h2>
+        <small className="controlHint">Lightweight framing for performance: follow a rig, punch in, or add a quick impact shake.</small>
+        <label className="toggleRow">
+          <input
+            type="checkbox"
+            checked={cameraFollow}
+            onChange={(event) => onCameraFollowChange(event.target.checked)}
+            disabled={!self}
+          />
+          Follow {cameraTargetName}
+        </label>
+        <div className="macroGrid">
+          <button type="button" onClick={onCameraPunch}>
+            <Camera size={16} />
+            Punch In
+          </button>
+          <button type="button" onClick={onCameraShake}>
+            <Wand2 size={16} />
+            Shake
+          </button>
+          <button type="button" onClick={onCameraReset}>
+            <RefreshCw size={16} />
+            Reset
+          </button>
         </div>
       </div>
 
@@ -3486,7 +3616,7 @@ function PerformControls({
           ))}
         </div>
         <small className="controlHint">
-          Smooth is the beginner default. Direct hits marks faster; Loose keeps more handmade drift.
+          Smooth TV is the beginner default. Snappy Cutout hits marks faster; Loose Puppet keeps more handmade drift.
         </small>
       </div>
 
