@@ -5522,6 +5522,54 @@ function SceneLibraryEditor({
   const readiness = projectExport?.publishingPackage?.packageReadiness || {};
   const reviewTarget = projectExport?.publishingPackage?.reviewTarget;
   const readyCount = packageChecklist.filter((item) => item.done).length;
+  const finalVideoPath = renderJob?.output?.videoPath || "";
+  const finalVideoUrl = finalVideoPath ? `${SERVER_URL}${finalVideoPath}` : "";
+  const audioMux = renderJob?.output?.audioMux || null;
+  const audioTrackCount = audioMux?.trackCount ?? selectedTake?.tracks?.audio?.length ?? 0;
+  const audioStatus =
+    audioMux?.status === "muxed"
+      ? `${audioTrackCount} character track${audioTrackCount === 1 ? "" : "s"} mixed, separate tracks saved`
+      : audioMux?.status === "skipped_no_audio"
+        ? "No recorded character audio yet"
+        : audioMux?.status === "skipped_ffmpeg_missing"
+          ? "Separate tracks saved; FFmpeg not configured"
+          : audioMux?.status === "failed"
+            ? "Audio tracks saved, final mux needs attention"
+            : audioTrackCount
+              ? `${audioTrackCount} character audio track${audioTrackCount === 1 ? "" : "s"} ready`
+              : "No audio tracks recorded";
+  const finishSteps = [
+    {
+      label: "Best take",
+      done: Boolean(selectedTake?.best || takes.some((take) => take.best)),
+      detail: selectedTake?.best ? selectedTake.name || "Selected take" : "Pick or mark the keeper"
+    },
+    {
+      label: "Trim",
+      done: Boolean(selectedTake?.trim?.startMs || selectedTake?.trim?.endMs),
+      detail: selectedTake?.trim ? "Rough edges set" : "Optional, but useful"
+    },
+    {
+      label: "Backend render",
+      done: Boolean(finalVideoPath),
+      detail: backendRendering ? "Rendering now" : finalVideoPath || "Create review WEBM"
+    },
+    {
+      label: "Audio",
+      done: audioMux?.status === "muxed" || audioMux?.status === "skipped_no_audio",
+      detail: audioStatus
+    },
+    {
+      label: "Package",
+      done: readiness.readyForSubmission,
+      detail: `${readyCount}/${packageChecklist.length || 1} checklist items`
+    },
+    {
+      label: "Submit",
+      done: episodeStatus === "submitted",
+      detail: "Send to DoinkTV review"
+    }
+  ];
   return (
     <div className="sceneEditor">
       <div className="dockGroup">
@@ -5537,19 +5585,40 @@ function SceneLibraryEditor({
           <RefreshCw size={16} />
           Refresh
         </button>
+        <div className="finishedShortPanel">
+          <div className="finishedShortHeader">
+            <span className="eyebrow">Finished Short Flow</span>
+            <strong>{finalVideoPath ? "Final preview is ready." : "Render one clean review copy."}</strong>
+            <small>
+              Best take, trim, render, package, submit. Everything needed for DoinkTV lives here.
+            </small>
+          </div>
+          {finalVideoUrl ? (
+            <video className="finalPreviewVideo" src={finalVideoUrl} controls muted playsInline />
+          ) : (
+            <div className="finalPreviewEmpty">
+              <Video size={28} />
+              <span>Backend render preview will appear here.</span>
+            </div>
+          )}
+          <div className="finishStepGrid">
+            {finishSteps.map((step) => (
+              <div className={`finishStep ${step.done ? "done" : ""}`} key={step.label}>
+                <strong>{step.label}</strong>
+                <small>{step.detail}</small>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="finishActionBar" aria-label="Finish actions">
-          <button onClick={onExportVideo} disabled={!selectedTake || videoExporting}>
-            <Video size={16} />
-            {videoExporting ? "Rendering" : "Export WEBM"}
-          </button>
-          <button onClick={onExportThumbnail} disabled={!selectedTake}>
-            <Camera size={16} />
-            Thumbnail
-          </button>
           <button onClick={onBackendRender} disabled={backendRendering || !hasSubmissionSource}>
             <RefreshCw size={16} />
-            {backendRendering ? "Rendering" : "Backend Render"}
+            {backendRendering ? "Rendering" : "Render Final"}
           </button>
+          <a className={`buttonLike ${finalVideoUrl ? "" : "disabled"}`} href={finalVideoUrl || undefined} download>
+            <Video size={16} />
+            Download WEBM
+          </a>
           <button onClick={onExportProject}>
             <Save size={16} />
             Package
@@ -5557,6 +5626,14 @@ function SceneLibraryEditor({
           <button onClick={onSubmitToDoinkTv} disabled={!hasSubmissionSource || doinkSubmitting}>
             <ExternalLink size={16} />
             DoinkTV
+          </button>
+          <button onClick={onExportVideo} disabled={!selectedTake || videoExporting}>
+            <Video size={16} />
+            {videoExporting ? "Browser Render" : "Browser WEBM"}
+          </button>
+          <button onClick={onExportThumbnail} disabled={!selectedTake}>
+            <Camera size={16} />
+            Thumbnail
           </button>
         </div>
       </div>
@@ -5711,16 +5788,13 @@ function SceneLibraryEditor({
           <div className="renderJobCard">
             <strong>Backend render: {renderJob.status}</strong>
             <small>{renderJob.output?.videoPath || "Waiting for artifact path."}</small>
-            <small>
-              Audio:{" "}
-              {renderJob.output?.audioMux?.status === "muxed"
-                ? "mixed into final render, with separate tracks saved"
-                : renderJob.output?.audioMux?.status === "skipped_ffmpeg_missing"
-                  ? "separate tracks saved; install FFmpeg for final mux"
-                  : renderJob.output?.audioMux?.status === "skipped_no_audio"
-                    ? "no recorded character tracks"
-                    : renderJob.output?.audioMux?.status || "waiting"}
-            </small>
+            <small>Audio: {audioStatus}</small>
+            {audioMux?.separateTracks?.length ? (
+              <small>
+                Separate tracks:{" "}
+                {audioMux.separateTracks.map((track) => track.performerName || track.character || "Track").join(", ")}
+              </small>
+            ) : null}
           </div>
         )}
       </div>

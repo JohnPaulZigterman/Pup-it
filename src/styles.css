@@ -3837,6 +3837,84 @@ input[type="color"] {
   overflow-wrap: anywhere;
 }
 
+.finishedShortPanel {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(227, 189, 69, 0.2), transparent 48%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.finishedShortHeader {
+  display: grid;
+  gap: 2px;
+}
+
+.finishedShortHeader strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.finishedShortHeader small {
+  color: #4b4e68;
+}
+
+.finalPreviewVideo,
+.finalPreviewEmpty {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--ink);
+  background: #262936;
+}
+
+.finalPreviewVideo {
+  display: block;
+  object-fit: contain;
+}
+
+.finalPreviewEmpty {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  color: var(--rail);
+  text-align: center;
+}
+
+.finishStepGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.finishStep {
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 6px;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+}
+
+.finishStep.done {
+  background: var(--pond);
+}
+
+.finishStep strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.finishStep small {
+  color: #4b4e68;
+  font-size: 10px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .doinkSubmissionPanel {
   background:
     var(--surface-grain),
@@ -3926,7 +4004,8 @@ input[type="color"] {
   background: var(--rail);
 }
 
-.finishActionBar button {
+.finishActionBar button,
+.finishActionBar .buttonLike {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
@@ -3937,6 +4016,14 @@ input[type="color"] {
   color: var(--ink);
   font-size: 10px;
   font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+}
+
+.finishActionBar .buttonLike.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .buildToolStrip {
@@ -4173,7 +4260,8 @@ input[type="color"] {
     var(--rail);
 }
 
-.mode-edit .finishActionBar button {
+.mode-edit .finishActionBar button,
+.mode-edit .finishActionBar .buttonLike {
   min-height: 42px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 55%),

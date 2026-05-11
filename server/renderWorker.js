@@ -2,13 +2,14 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ffmpegStaticPath from "ffmpeg-static";
 import { chromium } from "playwright";
 import { createRenderModel } from "../shared/renderModel.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const renderRoot = path.resolve(__dirname, "../renders");
 const rendererVersion = "pup-it-headless-chromium-v2";
-const ffmpegCommand = process.env.FFMPEG_PATH || "ffmpeg";
+const ffmpegCommand = process.env.FFMPEG_PATH || ffmpegStaticPath || "ffmpeg";
 
 function sanitizeFilePart(value, fallback = "track") {
   return String(value || fallback)
