@@ -467,7 +467,7 @@ app.post("/api/doinktv/submissions", (req, res) => {
       })
     : {
         ...submission,
-        schemaVersion: submission.schemaVersion || "pup-it.doinktv-submission.v1",
+        schemaVersion: submission.schemaVersion || "pup-it.doinktv-submission.v2",
         targetChannel: "DoinkTV",
         hostSite: "chillnet.me",
         status: "submitted_for_review",

@@ -99,6 +99,18 @@ export function SceneLibraryEditor({
             : audioTrackCount
               ? `${audioTrackCount} character audio track${audioTrackCount === 1 ? "" : "s"} ready`
               : "No audio tracks recorded";
+  const submissionTitle = doinkSubmission.title.trim() || selectedTake?.name || `${projectExport?.showName || "Untitled Show"} Short`;
+  const submissionDurationMs = selectedTake?.durationMs || timeline.reduce((total, clip) => total + (Number(clip.duration) || 0), 0);
+  const doinkReviewChecklist = [
+    { id: "title", label: "Title", done: Boolean(submissionTitle.trim()), detail: submissionTitle },
+    { id: "creator", label: "Creator", done: Boolean(doinkSubmission.creatorName.trim()), detail: doinkSubmission.creatorName || "Add credit name" },
+    { id: "target", label: "Target", done: hasSubmissionSource, detail: finishTargetLabel },
+    { id: "video", label: "Video", done: Boolean(finalVideoPath), detail: finalVideoPath || "Render final WEBM" },
+    { id: "package", label: "Package", done: readiness.readyForSubmission, detail: `${readyCount}/${packageChecklist.length || 1} package checks` },
+    { id: "rights", label: "Rights", done: Boolean(doinkSubmission.rightsNotes.trim()), detail: doinkSubmission.rightsNotes ? "Included" : "Add note" }
+  ];
+  const doinkReadyCount = doinkReviewChecklist.filter((item) => item.done).length;
+  const doinkMissing = doinkReviewChecklist.filter((item) => !item.done);
   const finishSteps = [
     {
       label: "Best take",
@@ -206,6 +218,45 @@ export function SceneLibraryEditor({
               </div>
             ))}
           </div>
+        </div>
+        <div className="doinkHandoffCard">
+          <div>
+            <span className="eyebrow">DoinkTV Handoff</span>
+            <strong>{doinkReadyCount}/{doinkReviewChecklist.length} review pieces ready</strong>
+            <small>
+              Admins get the video path, project package, runtime, credits, audio track metadata, and your notes in one intake record.
+            </small>
+          </div>
+          <div className="doinkManifestGrid">
+            <span>
+              <strong>{submissionTitle}</strong>
+              Title
+            </span>
+            <span>
+              <strong>{formatDuration(submissionDurationMs)}</strong>
+              Runtime
+            </span>
+            <span>
+              <strong>{audioTrackCount}</strong>
+              Audio
+            </span>
+            <span>
+              <strong>{doinkSubmission.preferredBlock}</strong>
+              Block
+            </span>
+          </div>
+          <div className="submissionChecklist compactChecklist">
+            {doinkReviewChecklist.map((item) => (
+              <span className={item.done ? "done" : ""} key={item.id} title={item.detail}>
+                {item.label}
+              </span>
+            ))}
+          </div>
+          {doinkMissing.length ? (
+            <small className="controlHint">Still useful to send, but better with: {doinkMissing.map((item) => item.label).join(", ")}.</small>
+          ) : (
+            <small className="controlHint">This is enough for a clean DoinkTV review pass.</small>
+          )}
         </div>
         <div className="finishActionBar" aria-label="Finish actions">
           <button onClick={onBackendRender} disabled={backendRendering || !hasSubmissionSource}>
@@ -533,4 +584,3 @@ export function SceneLibraryEditor({
     </div>
   );
 }
-

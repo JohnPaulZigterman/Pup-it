@@ -377,9 +377,31 @@ export function createDoinkTvSubmissionPackage({
   }, 0);
   const durationMs = selectedTake?.durationMs || timelineDuration || 0;
   const credits = project.publishingPackage?.credits || [];
+  const hasReviewTarget = Boolean(selectedTake || project.publishingPackage?.reviewTarget || (project.timeline || []).length);
+  const hasPreviewVideo = Boolean(previewVideoFileName);
+  const hasProjectPackage = Boolean(projectPackageFileName);
+  const hasCreator = Boolean((submission.creatorName || "").trim());
+  const hasRights = Boolean((submission.rightsNotes || "").trim());
+  const hasTitle = Boolean((submission.title || "").trim());
+  const reviewChecklist = [
+    { id: "title", label: "Title for schedule", done: hasTitle },
+    { id: "creator", label: "Creator credit", done: hasCreator },
+    { id: "target", label: "Take or cut selected", done: hasReviewTarget },
+    { id: "preview-video", label: "Review video", done: hasPreviewVideo },
+    { id: "project-package", label: "Project package", done: hasProjectPackage },
+    { id: "rights", label: "Rights note", done: hasRights },
+    { id: "credits", label: "Credits metadata", done: credits.length > 0 },
+    { id: "captions", label: "Captions attached", done: Boolean(project.publishingPackage?.captions?.length) }
+  ];
+  const missingForReview = reviewChecklist.filter((item) => !item.done).map((item) => item.label);
+  const audioTracks = (project.takes || []).map((take) => ({
+    takeId: take.id,
+    takeName: take.name,
+    audioTrackCount: take.audioTrackCount || 0
+  }));
 
   return {
-    schemaVersion: "pup-it.doinktv-submission.v1",
+    schemaVersion: "pup-it.doinktv-submission.v2",
     source: "pup-it",
     targetChannel: "DoinkTV",
     hostSite: "chillnet.me",
@@ -401,15 +423,30 @@ export function createDoinkTvSubmissionPackage({
     durationMs,
     previewVideoFileName,
     projectPackageFileName,
+    adminSummary: {
+      reviewTitle: submission.title || `${project.showName || "Untitled Show"} Short`,
+      format: submission.preferredBlock || "short",
+      runtimeSeconds: Math.round(durationMs / 1000),
+      showName: project.showName,
+      hasPreviewVideo,
+      hasProjectPackage,
+      missingForReview
+    },
+    deliveryManifest: {
+      video: previewVideoFileName ? { filename: previewVideoFileName, purpose: "review-video" } : null,
+      projectPackage: projectPackageFileName ? { filename: projectPackageFileName, purpose: "source-package" } : null,
+      thumbnail: project.publishingPackage?.thumbnail || null,
+      captions: project.publishingPackage?.captions || [],
+      credits,
+      audioTracks
+    },
+    reviewChecklist,
+    missingForReview,
     thumbnail: project.publishingPackage?.thumbnail || null,
     captions: project.publishingPackage?.captions || [],
     credits,
     licenseMetadata: project.publishingPackage?.licenseMetadata || credits,
-    audioTracks: (project.takes || []).map((take) => ({
-      takeId: take.id,
-      takeName: take.name,
-      audioTrackCount: take.audioTrackCount || 0
-    })),
+    audioTracks,
     adminReview: {
       approved: false,
       requestedChanges: "",

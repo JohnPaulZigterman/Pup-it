@@ -4195,6 +4195,60 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.doinkHandoffCard {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(151, 218, 161, 0.22), transparent 48%),
+    rgba(255, 255, 255, 0.3);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.doinkHandoffCard strong {
+  color: var(--ink);
+}
+
+.doinkHandoffCard small {
+  color: #4b4e68;
+  line-height: 1.3;
+}
+
+.doinkManifestGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.doinkManifestGrid span {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px;
+  border: 1px solid var(--ink);
+  background: rgba(255, 255, 255, 0.34);
+  color: #4b4e68;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.doinkManifestGrid strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactChecklist {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .finishReadinessPanel {
   padding: 10px;
   border: 2px solid var(--ink);
