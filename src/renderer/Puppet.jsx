@@ -12,6 +12,7 @@ export function Puppet({ performer, isSelf }) {
   const expression = getCatalogItem(expressionCatalog, performer.state.expression);
   const pose = getCatalogItem(poseCatalog, performer.state.pose);
   const { state } = performer;
+  const design = state.characterDesign || {};
   const rig = { ...character.rigConfig, ...state.rigConfig };
   const stylePreset = state.stylePreset || character.stylePreset;
   const scale = getDepthScale(state.y, state.scale);
@@ -39,8 +40,8 @@ export function Puppet({ performer, isSelf }) {
         top: `${state.y}%`,
         zIndex: Math.round(state.y * 10),
         transform: `translate(-50%, -100%) scale(${scale})`,
-        "--puppet": character.color,
-        "--accent": character.accent,
+        "--puppet": design.color || character.color,
+        "--accent": design.accent || character.accent,
         "--facing": state.facing < 0 ? -1 : 1,
         "--arm-length": `${rig.armLength}px`,
         "--leg-length": `${rig.legLength}px`,

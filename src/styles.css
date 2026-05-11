@@ -116,7 +116,8 @@ select {
 }
 
 input[type="checkbox"],
-input[type="range"] {
+input[type="range"],
+input[type="color"] {
   width: auto;
 }
 
@@ -423,6 +424,21 @@ input[type="range"] {
   gap: 16px;
 }
 
+.originalPanel {
+  padding: 12px;
+  border: 3px dashed var(--ink);
+  background:
+    linear-gradient(135deg, rgba(239, 207, 85, 0.13), transparent 40%),
+    #2b2319;
+  transform: rotate(-0.35deg);
+}
+
+.wideAction {
+  min-height: 42px;
+  color: var(--ink);
+  background: var(--nicotine);
+}
+
 .editorHeader {
   display: flex;
   align-items: center;
@@ -462,6 +478,38 @@ input[type="range"] {
 
 input[type="range"] {
   accent-color: #fee17a;
+}
+
+input[type="color"] {
+  height: 38px;
+  min-width: 72px;
+  padding: 3px;
+  border: 2px solid var(--ink);
+  background: #15110d;
+  cursor: pointer;
+}
+
+.colorPicker {
+  display: grid;
+  gap: 8px;
+}
+
+.swatchGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.swatchGrid button {
+  min-height: 32px;
+  border: 3px solid var(--ink);
+  border-radius: 2px 7px 3px 5px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.68);
+}
+
+.swatchGrid button.selected {
+  outline: 3px solid var(--nicotine);
+  transform: rotate(-2deg) scale(1.04);
 }
 
 .puppet {

@@ -201,6 +201,22 @@ export const mouthStyleCatalog = [
   { id: "minimal", name: "Minimal" }
 ];
 
+export const characterColorSwatches = [
+  "#d64d2f",
+  "#efcf55",
+  "#7bb051",
+  "#4f78c8",
+  "#b884de",
+  "#e6ded1",
+  "#2a2118",
+  "#d48a37"
+];
+
+export const originalNameParts = {
+  first: ["Moldy", "Uncle", "Trash", "Panic", "Drippy", "Legal", "Basement", "Tiny"],
+  second: ["Biscuit", "Thing", "Steve", "Receipt", "Wound", "Lunch", "Cousin", "Signal"]
+};
+
 export function getCatalogItem(catalog, id, fallbackIndex = 0) {
   return catalog.find((item) => item.id === id) || catalog[fallbackIndex];
 }

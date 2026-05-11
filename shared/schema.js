@@ -29,6 +29,7 @@ export function createPerformerState(overrides = {}) {
     macro: null,
     rigConfig: null,
     stylePreset: null,
+    characterDesign: null,
     ...overrides
   };
 }

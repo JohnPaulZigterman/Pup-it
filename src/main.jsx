@@ -9,6 +9,7 @@ import {
   MousePointer2,
   Palette,
   Radio,
+  Shuffle,
   Square,
   Theater,
   Video,
@@ -18,12 +19,14 @@ import {
   characterCatalog,
   animationStyleCatalog,
   bodyShapeCatalog,
+  characterColorSwatches,
   expressionCatalog,
   getCatalogItem,
   idleMotionCatalog,
   limbStyleCatalog,
   macroCatalog,
   mouthStyleCatalog,
+  originalNameParts,
   poseCatalog,
   sceneCatalog,
   walkCycleCatalog
@@ -46,6 +49,36 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function pickRandom(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function makeOriginalDesign() {
+  const name = `${pickRandom(originalNameParts.first)} ${pickRandom(originalNameParts.second)}`;
+  const color = pickRandom(characterColorSwatches);
+  let accent = pickRandom(characterColorSwatches);
+  if (accent === color) accent = "#efcf55";
+
+  return {
+    name,
+    color,
+    accent
+  };
+}
+
+function makeOriginalRig() {
+  return {
+    body: pickRandom(bodyShapeCatalog).id,
+    limbs: pickRandom(limbStyleCatalog).id,
+    arms: Math.random() > 0.12,
+    legs: Math.random() > 0.24,
+    armLength: Math.floor(24 + Math.random() * 36),
+    legLength: Math.floor(18 + Math.random() * 34),
+    walkCycle: pickRandom(walkCycleCatalog).id,
+    mouthStyle: pickRandom(mouthStyleCatalog).id
+  };
 }
 
 function App() {
@@ -210,6 +243,25 @@ function App() {
   };
 
   const updateCharacterStyle = (stylePreset) => updateSelf({ stylePreset });
+  const updateCharacterDesign = (patch) => {
+    if (!self) return;
+    const baseCharacter = getCatalogItem(characterCatalog, self.character);
+    updateSelf({
+      characterDesign: {
+        name: self.state.characterDesign?.name || `${baseCharacter.name} Original`,
+        color: self.state.characterDesign?.color || baseCharacter.color,
+        accent: self.state.characterDesign?.accent || baseCharacter.accent,
+        ...patch
+      }
+    });
+  };
+  const randomizeCharacterDesign = () => {
+    updateSelf({
+      characterDesign: makeOriginalDesign(),
+      rigConfig: makeOriginalRig(),
+      stylePreset: pickRandom(animationStyleCatalog).id
+    });
+  };
 
   const changeScene = (nextScene) => {
     setScene(nextScene);
@@ -472,6 +524,8 @@ function App() {
             performer={self}
             onRigChange={updateCharacterRig}
             onStyleChange={updateCharacterStyle}
+            onDesignChange={updateCharacterDesign}
+            onRandomize={randomizeCharacterDesign}
           />
         )}
 
@@ -480,7 +534,10 @@ function App() {
           {activePerformers.map((performer) => (
             <div className="performerRow" key={performer.id}>
               <span>{performer.name}</span>
-              <small>{getCatalogItem(characterCatalog, performer.character).name}</small>
+              <small>
+                {performer.state.characterDesign?.name ||
+                  getCatalogItem(characterCatalog, performer.character).name}
+              </small>
             </div>
           ))}
         </div>
@@ -613,12 +670,17 @@ function PerformControls({
   );
 }
 
-function CharacterEditor({ performer, onRigChange, onStyleChange }) {
+function CharacterEditor({ performer, onRigChange, onStyleChange, onDesignChange, onRandomize }) {
   if (!performer) return null;
 
   const baseCharacter = getCatalogItem(characterCatalog, performer.character);
   const rig = { ...baseCharacter.rigConfig, ...performer.state.rigConfig };
   const stylePreset = performer.state.stylePreset || baseCharacter.stylePreset;
+  const design = {
+    name: performer.state.characterDesign?.name || `${baseCharacter.name} Original`,
+    color: performer.state.characterDesign?.color || baseCharacter.color,
+    accent: performer.state.characterDesign?.accent || baseCharacter.accent
+  };
 
   return (
     <div className="characterEditor">
@@ -627,10 +689,36 @@ function CharacterEditor({ performer, onRigChange, onStyleChange }) {
         <div className="editorHeader">
           <Palette size={18} />
           <div>
-            <strong>{baseCharacter.name}</strong>
-            <small>Live rig overrides for this performer</small>
+            <strong>{design.name}</strong>
+            <small>Make the preset weirder, then make it yours.</small>
           </div>
         </div>
+      </div>
+
+      <div className="dockGroup originalPanel">
+        <h2>Make Original</h2>
+        <button className="wideAction" onClick={onRandomize}>
+          <Shuffle size={16} />
+          Weird Starter
+        </button>
+        <label>
+          Character Name
+          <input
+            value={design.name}
+            maxLength={32}
+            onChange={(event) => onDesignChange({ name: event.target.value })}
+          />
+        </label>
+        <ColorPicker
+          label="Body Color"
+          value={design.color}
+          onChange={(color) => onDesignChange({ color })}
+        />
+        <ColorPicker
+          label="Face / Accent"
+          value={design.accent}
+          onChange={(accent) => onDesignChange({ accent })}
+        />
       </div>
 
       <div className="dockGroup">
@@ -723,6 +811,29 @@ function EditorSelect({ label, value, options, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function ColorPicker({ label, value, onChange }) {
+  return (
+    <div className="colorPicker">
+      <span className="rangeLabel">
+        {label}
+        <small>{value}</small>
+      </span>
+      <div className="swatchGrid">
+        {characterColorSwatches.map((color) => (
+          <button
+            key={color}
+            className={value === color ? "selected" : ""}
+            style={{ background: color }}
+            aria-label={color}
+            onClick={() => onChange(color)}
+          />
+        ))}
+      </div>
+      <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
   );
 }
 

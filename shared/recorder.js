@@ -53,7 +53,8 @@ export function createTakeExport(room, exportedAt = new Date().toISOString()) {
       idleMotion: performer.state.idleMotion,
       mouthControl: performer.state.mouthControl,
       rigConfig: performer.state.rigConfig,
-      stylePreset: performer.state.stylePreset
+      stylePreset: performer.state.stylePreset,
+      characterDesign: performer.state.characterDesign
     })),
     tracks: {
       motion: room.events,
