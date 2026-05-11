@@ -559,7 +559,7 @@ input[type="color"] {
   width: 88px;
   height: 118px;
   border: var(--line-width) solid var(--outline);
-  border-radius: 47% 53% 38% 45%;
+  border-radius: var(--body-corner);
   background:
     radial-gradient(circle at 47% 17%, var(--accent) 0 19px, transparent 20px),
     radial-gradient(circle at 30% 68%, rgba(255, 255, 255, 0.22) 0 16px, transparent 17px),
@@ -567,7 +567,7 @@ input[type="color"] {
   box-shadow:
     inset -10px -12px rgba(43, 45, 66, 0.08),
     inset 5px 5px rgba(255, 255, 255, 0.2);
-  transform: rotate(var(--body-lean)) scaleY(var(--body-squash));
+  transform: rotate(var(--body-lean)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
   transform-origin: bottom center;
 }
 
@@ -597,7 +597,7 @@ input[type="color"] {
 }
 
 .style-simple-doodle .puppetBody {
-  transform: rotate(calc(var(--body-lean) - 0.6deg)) scaleY(var(--body-squash));
+  transform: rotate(calc(var(--body-lean) - 0.6deg)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
 }
 
 .style-storybook-pastel .puppetBody,
@@ -640,6 +640,27 @@ input[type="color"] {
 
 .style-soft-ink .puppetBody {
   border-radius: 48% 52% 43% 40%;
+}
+
+.style-chibi-pop .puppetBody {
+  box-shadow:
+    inset -8px -10px rgba(43, 45, 66, 0.06),
+    0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.style-sitcom-line .puppetBody,
+.style-sitcom-line .limb {
+  background-image: none;
+}
+
+.style-minimal-comic .puppetBody,
+.style-minimal-comic .limb {
+  box-shadow: none;
+}
+
+.style-flat-paper .puppetBody,
+.style-flat-paper .limb {
+  box-shadow: 4px 5px 0 rgba(43, 45, 66, 0.14);
 }
 
 .limb {
@@ -711,7 +732,7 @@ input[type="color"] {
   top: 36px;
   width: 18px;
   font-size: 25px;
-  transform: rotate(-2deg);
+  transform: rotate(-2deg) scale(var(--eye-scale));
 }
 
 .eye.left {
@@ -841,10 +862,10 @@ input[type="color"] {
 @keyframes breathe {
   0%,
   100% {
-    transform: rotate(var(--body-lean)) scaleY(var(--body-squash)) translateY(0);
+    transform: rotate(var(--body-lean)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y))) translateY(0);
   }
   50% {
-    transform: rotate(var(--body-lean)) scaleY(calc(var(--body-squash) * 1.025)) translateY(-2px);
+    transform: rotate(var(--body-lean)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y) * 1.025)) translateY(-2px);
   }
 }
 

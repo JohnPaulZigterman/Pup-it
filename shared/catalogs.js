@@ -172,7 +172,86 @@ export const animationStyleCatalog = [
   { id: "simple-doodle", name: "Simple Doodle" },
   { id: "storybook-pastel", name: "Storybook Pastel" },
   { id: "paper-cutout", name: "Paper Cutout" },
-  { id: "soft-ink", name: "Soft Ink" }
+  { id: "soft-ink", name: "Soft Ink" },
+  { id: "chibi-pop", name: "Chibi Pop" },
+  { id: "sitcom-line", name: "Sitcom Line" },
+  { id: "minimal-comic", name: "Minimal Comic" },
+  { id: "flat-paper", name: "Flat Paper" }
+];
+
+export const styleAdapterCatalog = [
+  {
+    id: "simple-doodle",
+    bodyScaleX: 1,
+    bodyScaleY: 1,
+    limbScale: 1,
+    eyeScale: 1,
+    lineWidth: 4,
+    corner: "47% 53% 38% 45%"
+  },
+  {
+    id: "storybook-pastel",
+    bodyScaleX: 1.02,
+    bodyScaleY: 1.06,
+    limbScale: 1.05,
+    eyeScale: 1.04,
+    lineWidth: 4,
+    corner: "50% 50% 40% 42%"
+  },
+  {
+    id: "paper-cutout",
+    bodyScaleX: 1.04,
+    bodyScaleY: 0.96,
+    limbScale: 0.92,
+    eyeScale: 0.92,
+    lineWidth: 4,
+    corner: "12px 18px 10px 16px"
+  },
+  {
+    id: "soft-ink",
+    bodyScaleX: 0.98,
+    bodyScaleY: 1.03,
+    limbScale: 0.96,
+    eyeScale: 0.98,
+    lineWidth: 5,
+    corner: "48% 52% 43% 40%"
+  },
+  {
+    id: "chibi-pop",
+    bodyScaleX: 1.08,
+    bodyScaleY: 0.86,
+    limbScale: 0.72,
+    eyeScale: 1.36,
+    lineWidth: 4,
+    corner: "54% 46% 45% 48%"
+  },
+  {
+    id: "sitcom-line",
+    bodyScaleX: 0.92,
+    bodyScaleY: 1.18,
+    limbScale: 0.86,
+    eyeScale: 0.86,
+    lineWidth: 3,
+    corner: "36% 40% 28% 32%"
+  },
+  {
+    id: "minimal-comic",
+    bodyScaleX: 0.96,
+    bodyScaleY: 0.98,
+    limbScale: 0.78,
+    eyeScale: 0.72,
+    lineWidth: 4,
+    corner: "44% 50% 42% 44%"
+  },
+  {
+    id: "flat-paper",
+    bodyScaleX: 1.05,
+    bodyScaleY: 0.92,
+    limbScale: 0.84,
+    eyeScale: 0.82,
+    lineWidth: 5,
+    corner: "8px 12px 7px 11px"
+  }
 ];
 
 export const bodyShapeCatalog = [

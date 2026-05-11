@@ -14,6 +14,7 @@ The current visual direction favors bright handmade cartoons: simple shapes, coz
 - Use pose presets and idle modes to add acting beats, blinking, and breathing without hand-animating.
 - Drive body movement with the keyboard and mouth movement with either mouse position or webcam capture.
 - Switch to Build mode to name, color, randomize, and reshape an original character.
+- Style presets act as adapters, so the same character design can translate across simple doodle, chibi, sitcom-line, minimal comic, and flat paper looks.
 - Start a take to record movement events and relayed audio chunks.
 - Export the take as JSON with separate audio tracks for each character/performer.
 

@@ -3,7 +3,8 @@ import {
   characterCatalog,
   expressionCatalog,
   getCatalogItem,
-  poseCatalog
+  poseCatalog,
+  styleAdapterCatalog
 } from "../../shared/catalogs.js";
 import { getDepthScale } from "../../shared/depth.js";
 
@@ -15,6 +16,7 @@ export function Puppet({ performer, isSelf }) {
   const design = state.characterDesign || {};
   const rig = { ...character.rigConfig, ...state.rigConfig };
   const stylePreset = state.stylePreset || character.stylePreset;
+  const adapter = getCatalogItem(styleAdapterCatalog, stylePreset);
   const scale = getDepthScale(state.y, state.scale);
   const isWalking = state.walking && rig.walkCycle !== "none";
   const canIdle = state.idleMotion !== "held" && !isWalking && !state.macro;
@@ -43,8 +45,13 @@ export function Puppet({ performer, isSelf }) {
         "--puppet": design.color || character.color,
         "--accent": design.accent || character.accent,
         "--facing": state.facing < 0 ? -1 : 1,
-        "--arm-length": `${rig.armLength}px`,
-        "--leg-length": `${rig.legLength}px`,
+        "--line-width": `${adapter.lineWidth}px`,
+        "--body-scale-x": adapter.bodyScaleX,
+        "--body-scale-y": adapter.bodyScaleY,
+        "--body-corner": adapter.corner,
+        "--eye-scale": adapter.eyeScale,
+        "--arm-length": `${rig.armLength * adapter.limbScale}px`,
+        "--leg-length": `${rig.legLength * adapter.limbScale}px`,
         "--body-lean": `${pose.bodyLean}deg`,
         "--body-squash": pose.bodySquash,
         "--arm-left": `${pose.armLeft}deg`,
