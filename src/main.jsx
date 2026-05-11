@@ -239,6 +239,17 @@ const showStarterTemplates = [
     backgroundTheme: "wood-panel",
     objectStyle: "soft-material",
     assetSearch: "furniture"
+  },
+  {
+    id: "news-desk",
+    name: "News Desk",
+    description: "A direct-to-camera setup for fake headlines, desk bits, and recurring segments.",
+    scene: "studio",
+    cameraShot: "reaction",
+    lightingPreset: "flat-tv",
+    backgroundTheme: "broadcast-flat",
+    objectStyle: "thin-ink",
+    assetSearch: "desk sign microphone"
   }
 ];
 
@@ -285,6 +296,28 @@ const shortFormatTemplates = [
     styleMutation: "collage",
     prop: { name: "Desk Mic", shape: "circle", tint: "#2b2d42", texturePreset: "paper-grain" },
     assetSearch: "desk microphone room",
+    nextMode: "perform"
+  },
+  {
+    id: "news-desk",
+    name: "News Desk",
+    description: "A fake headline, desk prop, and camera-ready rig for a recurring segment.",
+    showSuffix: "News",
+    starterTemplate: "news-desk",
+    styleMutation: "thin-lines",
+    prop: { name: "Headline Card", shape: "block", tint: "#fff2a8", texturePreset: "paper-grain" },
+    assetSearch: "desk sign city background",
+    nextMode: "perform"
+  },
+  {
+    id: "street-bit",
+    name: "Street Bit",
+    description: "A walk-up setup for interviews, arguments, or weird field reporting.",
+    showSuffix: "Street",
+    starterTemplate: "street-bit",
+    styleMutation: "collage",
+    prop: { name: "Street Sign", shape: "triangle", tint: "#8fd8b5", texturePreset: "stucco" },
+    assetSearch: "street sign exterior prop",
     nextMode: "perform"
   }
 ];
@@ -788,7 +821,8 @@ function App() {
     hasRehearsed: mode === "perform" || takeLibrary.length > 0 || selectedTake,
     hasTake: takeLibrary.length > 0 || selectedTake,
     hasCut: productionTimeline.length > 0,
-    readyToExport: productionTimeline.length > 0 || selectedTake
+    readyToExport: productionTimeline.length > 0 || selectedTake,
+    exported: status.toLowerCase().includes("export")
   };
   const activeStylePreset = self?.state.stylePreset || selfCharacter.stylePreset;
   const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
@@ -2243,6 +2277,7 @@ function App() {
             onApplyTemplate={applyShowTemplate}
             onModeChange={setMode}
             onAssetSearch={openAssetSearch}
+            onExport={exportProject}
             onLoadShow={loadShowSession}
           />
         ) : mode === "storyboard" ? (
@@ -2305,6 +2340,7 @@ function App() {
           onReplay={playSelectedTake}
           onSaveScene={saveSelectedTakeAsScene}
           onExport={exportProject}
+          onAddToCut={() => selectedTake && addTakeToTimeline(selectedTake)}
         />
 
         <ShowBiblePanel
@@ -2573,8 +2609,10 @@ function ShowDashboard({
   onApplyTemplate,
   onModeChange,
   onAssetSearch,
+  onExport,
   onLoadShow
 }) {
+  const canFinish = progress.readyToExport;
   return (
     <div className="showDashboard">
       <section className="dashboardHero">
@@ -2589,6 +2627,26 @@ function ShowDashboard({
           <span className={progress.hasTake ? "done" : ""}>Record</span>
           <span className={progress.readyToExport ? "done" : ""}>Export</span>
         </div>
+      </section>
+
+      <section className="dashboardPriority" aria-label="Primary show actions">
+        {savedShows[0] && (
+          <button onClick={() => onLoadShow(savedShows[0].id)}>
+            <FolderOpen size={17} />
+            <span>Continue</span>
+            <strong>{savedShows[0].showName}</strong>
+          </button>
+        )}
+        <button onClick={() => onStartQuickShort("argument")}>
+          <Sparkles size={17} />
+          <span>Start</span>
+          <strong>Make a New Short</strong>
+        </button>
+        <button onClick={canFinish ? onExport : () => onModeChange("edit")}>
+          <Video size={17} />
+          <span>Finish</span>
+          <strong>{canFinish ? "Export Package" : "Review the Cut"}</strong>
+        </button>
       </section>
 
       <section className="makeShortPanel" aria-label="Make a short">
@@ -2749,12 +2807,15 @@ function BeginnerRoadmap({
   onRecordToggle,
   onReplay,
   onSaveScene,
-  onExport
+  onExport,
+  onAddToCut
 }) {
   const steps = [
     {
       id: "short",
       label: "Start a short",
+      body: "Pick a rough launch pad so the blank page disappears.",
+      complete: "Short started. Now make it unmistakably yours.",
       done: progress.hasRig || progress.hasSet,
       action: onStartQuickShort,
       actionLabel: "Make a Short"
@@ -2762,6 +2823,8 @@ function BeginnerRoadmap({
     {
       id: "rig",
       label: "Make the rig yours",
+      body: "Doodle, shape, color, or mutate the rig enough that it belongs to the show.",
+      complete: "The rig has its own little personality now.",
       done: progress.hasRig,
       action: () => onModeChange("build"),
       actionLabel: "Build Rig"
@@ -2769,6 +2832,8 @@ function BeginnerRoadmap({
     {
       id: "set",
       label: "Build the space",
+      body: "Drop in a prop or material so the scene has somewhere to happen.",
+      complete: "The stage has something to play against.",
       done: progress.hasSet,
       action: () => onModeChange("assets"),
       actionLabel: "Build Set"
@@ -2776,6 +2841,8 @@ function BeginnerRoadmap({
     {
       id: "perform",
       label: "Rehearse and record",
+      body: "Walk around, try the mouth, then grab a take before the bit gets stale.",
+      complete: "A take exists. That is the first real cartoon moment.",
       done: progress.hasTake,
       action: progress.hasRehearsed ? onRecordToggle : () => onModeChange("perform"),
       actionLabel: recording ? "Stop Take" : progress.hasRehearsed ? "Record Take" : "Rehearse"
@@ -2783,6 +2850,8 @@ function BeginnerRoadmap({
     {
       id: "replay",
       label: "Replay and save scene",
+      body: "Watch it back, trim the mess, and save the good version as a scene.",
+      complete: "The short is in the cut shelf.",
       done: progress.hasCut,
       action: selectedTake ? onReplay : () => onModeChange("edit"),
       actionLabel: selectedTake ? "Replay" : "Review"
@@ -2790,20 +2859,32 @@ function BeginnerRoadmap({
     {
       id: "export",
       label: "Export package",
-      done: false,
+      body: "Bundle the cut, captions, credits, and license notes for the outside world.",
+      complete: "Export started. Make another bit while the idea is warm.",
+      done: progress.exported,
       action: progress.readyToExport ? onExport : () => onModeChange("edit"),
       actionLabel: progress.readyToExport ? "Export" : "Finish"
     }
   ];
+  const nextStep = steps.find((step) => !step.done) || steps[steps.length - 1];
 
   return (
     <div className="dockGroup beginnerRoadmap">
       <h2>Make A Short</h2>
+      <div className="nextBestStep">
+        <span>Next Best Step</span>
+        <strong>{nextStep.label}</strong>
+        <p>{nextStep.body}</p>
+        <button onClick={nextStep.action}>{nextStep.actionLabel}</button>
+      </div>
       <div className="roadmapList">
         {steps.map((step, index) => (
-          <div className={`roadmapStep ${step.done ? "done" : ""}`} key={step.id}>
+          <div className={`roadmapStep ${step.done ? "done" : ""} ${step.id === nextStep.id ? "current" : ""}`} key={step.id}>
             <span>{index + 1}</span>
-            <strong>{step.label}</strong>
+            <div>
+              <strong>{step.label}</strong>
+              <small>{step.done ? step.complete : step.body}</small>
+            </div>
             <button onClick={step.action}>{step.actionLabel}</button>
           </div>
         ))}
@@ -2811,10 +2892,15 @@ function BeginnerRoadmap({
       {selectedTake && (
         <div className="roadmapReward">
           <strong>That is a cartoon now.</strong>
+          <small>Replay it while the timing is fresh, then save it into the show.</small>
           <div className="libraryActions">
             <button onClick={onReplay}>
               <Play size={16} />
               Replay
+            </button>
+            <button onClick={onAddToCut}>
+              <Plus size={16} />
+              Add Cut
             </button>
             <button onClick={onSaveScene}>
               <Clapperboard size={16} />
@@ -2935,9 +3021,10 @@ function ShowBiblePanel({
 }) {
   return (
     <div className="dockGroup showBiblePanel">
-      <h2>Show Bible</h2>
+      <h2>Show Toolbox</h2>
       <div className="bibleHeader">
         <strong>{showName}</strong>
+        <small>Cast, sets, props, style, credits, and export rules for this show.</small>
         <small>{activeStyle.family} / {activeStyle.theme}</small>
       </div>
       <div className="bibleGrid">
@@ -3183,7 +3270,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Marks</h2>
         <div className="markList">
           {floorMarks.map((mark) => (
@@ -3534,7 +3621,7 @@ function AssetLibraryPanel({
             ))}
           </select>
         </label>
-        <label>
+        <label className="advancedControl">
           Texture
           <select value={propTexture} onChange={(event) => setPropTexture(event.target.value)}>
             {texturePresetOptions.map((texture) => (
@@ -3671,7 +3758,7 @@ function AssetLibraryPanel({
                     onChange={(event) => onUpdateSceneObject(object.id, { tint: event.target.value })}
                   />
                 </label>
-                <label>
+                <label className="advancedControl">
                   Texture
                   <select
                     value={object.texturePreset || "paper-grain"}
@@ -3837,6 +3924,34 @@ function SceneLibraryEditor({
 
       {selectedTake && (
         <>
+          <div className="dockGroup postTakeReward">
+            <span className="eyebrow">Fresh Take</span>
+            <strong>That is a cartoon now.</strong>
+            <small>Play it back, trim the rough edges, save the scene, or push it straight into the cut.</small>
+            <div className="libraryActions">
+              <button className={playbackActive ? "active" : ""} onClick={onPlay}>
+                <Play size={16} />
+                {playbackActive ? "Replaying" : "Replay"}
+              </button>
+              <button onClick={() => onQuickTrim("start")}>
+                <ChevronLeft size={16} />
+                Trim In
+              </button>
+              <button onClick={() => onQuickTrim("end")}>
+                <ChevronRight size={16} />
+                Trim Out
+              </button>
+              <button onClick={onSaveTakeAsScene}>
+                <Clapperboard size={16} />
+                Save Scene
+              </button>
+              <button onClick={() => onAddTakeToTimeline(selectedTake)}>
+                <Plus size={16} />
+                Add Cut
+              </button>
+            </div>
+          </div>
+
           <div className="dockGroup">
             <h2>Take Lanes</h2>
             <div className="editorStats">
@@ -4365,7 +4480,7 @@ function CharacterEditor({
         <small className="controlHint">Tiny built-in systems give a character personality before you animate.</small>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Character Style Remix</h2>
         <div className="styleSummary">
           <strong>{selectedStyle.family}</strong>
