@@ -34,6 +34,7 @@ export function SceneLibraryEditor({
   onMarkBestTake,
   onQuickTrim,
   onSaveTakeAsScene,
+  onKeepTake,
   onExportProject,
   onExportVideo,
   onExportThumbnail,
@@ -317,7 +318,21 @@ export function SceneLibraryEditor({
           <div className="dockGroup postTakeReward">
             <span className="eyebrow">Fresh Take</span>
             <strong>That is a cartoon now.</strong>
-            <small>Play it back, trim the rough edges, save the scene, or push it straight into the cut.</small>
+            <small>Keep the good one, replay the laugh, or turn it into a cut before the bit cools off.</small>
+            <div className="rewardScoreboard">
+              <span>
+                <strong>{formatDuration(selectedTake.durationMs)}</strong>
+                Runtime
+              </span>
+              <span>
+                <strong>{takeLaneSummary.filter((lane) => lane.count).length}/6</strong>
+                Lanes
+              </span>
+              <span>
+                <strong>{selectedTake.performers.length}</strong>
+                Cast
+              </span>
+            </div>
             <label className="takeNameField">
               Take Name
               <input
@@ -326,6 +341,10 @@ export function SceneLibraryEditor({
                 onChange={(event) => onTakeMetaChange({ name: event.target.value })}
               />
             </label>
+            <button className="wideAction keepTakeButton" onClick={onKeepTake}>
+              <Sparkles size={16} />
+              Keep This Take
+            </button>
             <div className="libraryActions">
               <button className={playbackActive ? "active" : ""} onClick={onPlay}>
                 <Play size={16} />

@@ -2540,6 +2540,37 @@ function App() {
     setStatus(`Added "${take.name || "take"}" to the cut. Export the short when it feels good enough.`);
   };
 
+  const keepSelectedTake = () => {
+    if (!selectedTake) return;
+    const keeperName = selectedTake.name?.trim() || `Keeper ${takeLibrary.length || 1}`;
+    const keeperTake = { ...selectedTake, name: keeperName, best: true };
+    setSelectedTake(keeperTake);
+    setTakeLibrary((current) =>
+      current.map((take) => (take.id === keeperTake.id ? keeperTake : { ...take, best: false }))
+    );
+    setProductionTimeline((current) => {
+      if (current.some((clip) => clip.sourceType === "take" && clip.sourceId === keeperTake.id)) return current;
+      return [
+        ...current,
+        createTimelineClip({
+          source: {
+            ...keeperTake,
+            sourceType: "take",
+            title: keeperTake.name,
+            duration: keeperTake.durationMs,
+            lightingPreset,
+            backgroundTheme,
+            objectStyle
+          },
+          index: current.length + 1
+        })
+      ];
+    });
+    setFinishTarget("rough-cut");
+    setEpisodeStatus((current) => (current === "draft" ? "rough_cut" : current));
+    setStatus(`Kept "${keeperName}" as the best take and added it to the rough cut.`);
+  };
+
   const removeTimelineClip = (clipId) => {
     setProductionTimeline((current) => current.filter((clip) => clip.id !== clipId));
   };
@@ -3552,7 +3583,7 @@ function App() {
           onSaveScene={saveSelectedTakeAsScene}
           onExport={exportProject}
           onSubmitToDoinkTv={submitToDoinkTv}
-          onAddToCut={() => selectedTake && addTakeToTimeline(selectedTake)}
+          onAddToCut={keepSelectedTake}
         />
 
         <ContextActionStrip
@@ -3709,6 +3740,7 @@ function App() {
             onMarkBestTake={markSelectedTakeBest}
             onQuickTrim={quickTrimSelectedTake}
             onSaveTakeAsScene={saveSelectedTakeAsScene}
+            onKeepTake={keepSelectedTake}
             onExportProject={exportProject}
             onExportVideo={exportSelectedTakeVideo}
             onExportThumbnail={exportSelectedTakeThumbnail}
@@ -4284,15 +4316,15 @@ function BeginnerRoadmap({
       {selectedTake && mode !== "edit" && (
         <div className="roadmapReward">
           <strong>That is a cartoon now.</strong>
-          <small>Replay it while the timing is fresh, then save it into the show.</small>
+          <small>Keep it as the best take, replay the timing, or save it into the show.</small>
           <div className="libraryActions">
+            <button onClick={onAddToCut}>
+              <Sparkles size={16} />
+              Keep Take
+            </button>
             <button onClick={onReplay}>
               <Play size={16} />
               Replay
-            </button>
-            <button onClick={onAddToCut}>
-              <Plus size={16} />
-              Add Cut
             </button>
             <button onClick={onSaveScene}>
               <Clapperboard size={16} />
