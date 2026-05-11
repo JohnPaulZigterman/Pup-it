@@ -22,6 +22,16 @@ npm run dev
 The client runs on Vite's default port, usually `http://localhost:5173`.
 The realtime server runs on `http://localhost:4111`.
 
+## Architecture Direction
+
+- `shared/` contains data contracts and reusable logic used by both browser and server.
+- `src/engine/` owns performance state changes such as movement and local performer updates.
+- `src/renderer/` owns visual puppet rendering so new looks can be swapped in later.
+- `src/modules/` is the early registry for workflow modes and future plug-in style tools.
+- `server/` owns realtime rooms, recording sessions, and export endpoints.
+
+The intended growth pattern is to add capabilities as modules around stable schemas, not to keep expanding one large app file.
+
 ## Near-Term Roadmap
 
 - Timeline playback and editable motion curves.

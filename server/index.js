@@ -1,6 +1,13 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import { createTakeExport, recordEvent } from "../shared/recorder.js";
+import {
+  createPerformer,
+  createRoom,
+  roomSnapshot,
+  sanitizeRoomId
+} from "../shared/schema.js";
 
 const PORT = Number(process.env.PORT || 4111);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
@@ -19,99 +26,29 @@ const rooms = new Map();
 
 function getRoom(roomId) {
   if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      id: roomId,
-      scene: "studio",
-      performers: new Map(),
-      recording: false,
-      takeStartedAt: null,
-      events: [],
-      audio: []
-    });
+    rooms.set(roomId, createRoom({ id: roomId }));
   }
   return rooms.get(roomId);
-}
-
-function roomSnapshot(room) {
-  return {
-    id: room.id,
-    scene: room.scene,
-    recording: room.recording,
-    takeStartedAt: room.takeStartedAt,
-    performers: [...room.performers.values()].map((performer) => ({
-      id: performer.id,
-      name: performer.name,
-      character: performer.character,
-      state: performer.state
-    }))
-  };
-}
-
-function record(room, event) {
-  if (!room.recording) return;
-  room.events.push({
-    ...event,
-    at: Date.now() - room.takeStartedAt
-  });
-}
-
-function buildAudioTracks(audioChunks) {
-  const tracks = new Map();
-
-  for (const chunk of audioChunks) {
-    const trackId = `${chunk.performerId}:${chunk.character || "unknown"}`;
-    if (!tracks.has(trackId)) {
-      tracks.set(trackId, {
-        id: trackId,
-        performerId: chunk.performerId,
-        performerName: chunk.performerName,
-        character: chunk.character || "unknown",
-        mimeType: chunk.mimeType,
-        chunks: []
-      });
-    }
-
-    const track = tracks.get(trackId);
-    track.chunks.push({
-      sequence: chunk.sequence,
-      at: chunk.at,
-      data: chunk.data
-    });
-  }
-
-  return [...tracks.values()].map((track) => ({
-    ...track,
-    chunks: track.chunks.sort((a, b) => a.sequence - b.sequence)
-  }));
 }
 
 io.on("connection", (socket) => {
   let activeRoomId = null;
 
   socket.on("room:join", ({ roomId, name, character }) => {
-    activeRoomId = (roomId || "demo").trim().slice(0, 40) || "demo";
+    activeRoomId = sanitizeRoomId(roomId);
     const room = getRoom(activeRoomId);
 
-    const performer = {
+    const performer = createPerformer({
       id: socket.id,
-      name: (name || "Performer").trim().slice(0, 32),
-      character: character || "bean",
-      state: {
-        x: 48,
-        y: 60,
-        scale: 1,
-        facing: 1,
-        expression: "neutral",
-        speaking: false,
-        macro: null
-      }
-    };
+      name,
+      character
+    });
 
     room.performers.set(socket.id, performer);
     socket.join(activeRoomId);
     socket.emit("room:snapshot", roomSnapshot(room));
     socket.to(activeRoomId).emit("performer:joined", performer);
-    record(room, { type: "performer:joined", performer });
+    recordEvent(room, { type: "performer:joined", performer });
   });
 
   socket.on("performer:update", (state) => {
@@ -125,7 +62,7 @@ io.on("connection", (socket) => {
       id: socket.id,
       state: performer.state
     });
-    record(room, {
+    recordEvent(room, {
       type: "performer:update",
       performerId: socket.id,
       state: performer.state
@@ -137,7 +74,7 @@ io.on("connection", (socket) => {
     const room = getRoom(activeRoomId);
     room.scene = scene;
     io.to(activeRoomId).emit("scene:set", scene);
-    record(room, { type: "scene:set", scene });
+    recordEvent(room, { type: "scene:set", scene });
   });
 
   socket.on("macro:trigger", (macro) => {
@@ -147,7 +84,7 @@ io.on("connection", (socket) => {
       performerId: socket.id,
       macro
     });
-    record(room, { type: "macro:trigger", performerId: socket.id, macro });
+    recordEvent(room, { type: "macro:trigger", performerId: socket.id, macro });
   });
 
   socket.on("take:start", () => {
@@ -195,7 +132,7 @@ io.on("connection", (socket) => {
     const room = getRoom(activeRoomId);
     room.performers.delete(socket.id);
     socket.to(activeRoomId).emit("performer:left", socket.id);
-    record(room, { type: "performer:left", performerId: socket.id });
+    recordEvent(room, { type: "performer:left", performerId: socket.id });
   });
 });
 
@@ -206,15 +143,7 @@ app.get("/api/rooms/:roomId/take", (req, res) => {
     return;
   }
 
-  res.json({
-    roomId: room.id,
-    scene: room.scene,
-    takeStartedAt: room.takeStartedAt,
-    exportedAt: new Date().toISOString(),
-    events: room.events,
-    audioTracks: buildAudioTracks(room.audio),
-    audio: room.audio
-  });
+  res.json(createTakeExport(room));
 });
 
 app.get("/health", (_req, res) => {

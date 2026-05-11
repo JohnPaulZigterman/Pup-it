@@ -11,55 +11,37 @@ import {
   Video,
   Wand2
 } from "lucide-react";
+import {
+  characterCatalog,
+  expressionCatalog,
+  getCatalogItem,
+  macroCatalog,
+  sceneCatalog
+} from "../shared/catalogs.js";
+import { defaultCharacterId, defaultRoomId } from "../shared/schema.js";
+import {
+  hasInput,
+  indexPerformers,
+  inputFromPressedKeys,
+  movePerformerFromInput,
+  performerList,
+  removePerformer,
+  updatePerformerState,
+  upsertPerformer
+} from "./engine/performanceState.js";
+import { Puppet } from "./renderer/Puppet.jsx";
 import "./styles.css";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
-
-const characters = [
-  { id: "bean", name: "Bean", color: "#f76f53", accent: "#fee17a" },
-  { id: "noodle", name: "Noodle", color: "#57a773", accent: "#f7f1d1" },
-  { id: "square", name: "Square", color: "#5d8bf4", accent: "#ffb7c3" },
-  { id: "moon", name: "Moon", color: "#d4a5ff", accent: "#1f2030" }
-];
-
-const scenes = [
-  { id: "studio", name: "Studio", className: "sceneStudio" },
-  { id: "street", name: "Street", className: "sceneStreet" },
-  { id: "space", name: "Space", className: "sceneSpace" }
-];
-
-const macros = [
-  { id: "wave", name: "Wave" },
-  { id: "hop", name: "Hop" },
-  { id: "squash", name: "Squash" },
-  { id: "panic", name: "Panic" }
-];
-
-const depth = {
-  horizon: 20,
-  foreground: 82,
-  minScale: 0.42,
-  maxScale: 1.46
-};
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getDepthScale(y, trim = 1) {
-  const progress = clamp((y - depth.horizon) / (depth.foreground - depth.horizon), 0, 1);
-  const eased = Math.pow(progress, 1.18);
-  return (depth.minScale + (depth.maxScale - depth.minScale) * eased) * trim;
-}
 
 function App() {
   const socketRef = useRef(null);
   const audioRef = useRef({ context: null, sequence: 0, recorder: null, stream: null });
   const [joined, setJoined] = useState(false);
-  const [roomId, setRoomId] = useState("demo");
+  const [roomId, setRoomId] = useState(defaultRoomId);
   const [name, setName] = useState(`Performer ${Math.ceil(Math.random() * 99)}`);
-  const [character, setCharacter] = useState(characters[0].id);
-  const [scene, setScene] = useState(scenes[0].id);
+  const [character, setCharacter] = useState(defaultCharacterId);
+  const [scene, setScene] = useState(sceneCatalog[0].id);
   const [performers, setPerformers] = useState({});
   const [selfId, setSelfId] = useState(null);
   const [recording, setRecording] = useState(false);
@@ -67,7 +49,7 @@ function App() {
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
-  const selectedScene = scenes.find((item) => item.id === scene) || scenes[0];
+  const selectedScene = getCatalogItem(sceneCatalog, scene);
 
   useEffect(() => {
     const socket = io(SERVER_URL, { autoConnect: false });
@@ -77,25 +59,18 @@ function App() {
     socket.on("room:snapshot", (snapshot) => {
       setScene(snapshot.scene);
       setRecording(snapshot.recording);
-      setPerformers(Object.fromEntries(snapshot.performers.map((p) => [p.id, p])));
+      setPerformers(indexPerformers(snapshot.performers));
       setJoined(true);
       setStatus(`Live in room "${snapshot.id}". Open another tab to test multiplayer.`);
     });
     socket.on("performer:joined", (performer) => {
-      setPerformers((current) => ({ ...current, [performer.id]: performer }));
+      setPerformers((current) => upsertPerformer(current, performer));
     });
     socket.on("performer:left", (id) => {
-      setPerformers((current) => {
-        const next = { ...current };
-        delete next[id];
-        return next;
-      });
+      setPerformers((current) => removePerformer(current, id));
     });
     socket.on("performer:update", ({ id, state }) => {
-      setPerformers((current) => ({
-        ...current,
-        [id]: current[id] ? { ...current[id], state } : current[id]
-      }));
+      setPerformers((current) => updatePerformerState(current, id, state));
     });
     socket.on("scene:set", setScene);
     socket.on("take:status", ({ recording: isRecording }) => {
@@ -121,33 +96,13 @@ function App() {
         const performer = current[selfId];
         if (!performer) return current;
 
-        const state = performer.state;
-        let dx = 0;
-        let dy = 0;
-        let scale = state.scale;
+        const input = inputFromPressedKeys(pressed);
+        if (!hasInput(input)) return current;
 
-        if (pressed.has("ArrowLeft") || pressed.has("a")) dx -= 1.2;
-        if (pressed.has("ArrowRight") || pressed.has("d")) dx += 1.2;
-        if (pressed.has("ArrowUp") || pressed.has("w")) dy -= 1.2;
-        if (pressed.has("ArrowDown") || pressed.has("s")) dy += 1.2;
-        if (pressed.has("q")) scale -= 0.005;
-        if (pressed.has("e")) scale += 0.005;
-
-        if (!dx && !dy && scale === state.scale) return current;
-
-        const nextState = {
-          ...state,
-          x: clamp(state.x + dx, 5, 92),
-          y: clamp(state.y + dy, depth.horizon, depth.foreground),
-          scale: clamp(scale, 0.82, 1.18),
-          facing: dx === 0 ? state.facing : dx > 0 ? 1 : -1
-        };
-
+        const nextPerformer = movePerformerFromInput(performer, input);
+        const nextState = nextPerformer.state;
         socketRef.current.emit("performer:update", nextState);
-        return {
-          ...current,
-          [selfId]: { ...performer, state: nextState }
-        };
+        return upsertPerformer(current, nextPerformer);
       });
 
       frame = requestAnimationFrame(update);
@@ -182,10 +137,7 @@ function App() {
       const performer = current[selfId];
       const nextState = { ...performer.state, ...statePatch };
       socketRef.current.emit("performer:update", nextState);
-      return {
-        ...current,
-        [selfId]: { ...performer, state: nextState }
-      };
+      return upsertPerformer(current, { ...performer, state: nextState });
     });
   };
 
@@ -207,19 +159,13 @@ function App() {
     setPerformers((current) => {
       const performer = current[performerId];
       if (!performer) return current;
-      return {
-        ...current,
-        [performerId]: { ...performer, state: { ...performer.state, macro } }
-      };
+      return updatePerformerState(current, performerId, { macro });
     });
     window.setTimeout(() => {
       setPerformers((current) => {
         const performer = current[performerId];
         if (!performer) return current;
-        return {
-          ...current,
-          [performerId]: { ...performer, state: { ...performer.state, macro: null } }
-        };
+        return updatePerformerState(current, performerId, { macro: null });
       });
     }, 850);
   };
@@ -277,7 +223,7 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const performerList = useMemo(() => Object.values(performers), [performers]);
+  const activePerformers = useMemo(() => performerList(performers), [performers]);
 
   if (!joined) {
     return (
@@ -302,7 +248,7 @@ function App() {
             <label>
               Character
               <select value={character} onChange={(event) => setCharacter(event.target.value)}>
-                {characters.map((item) => (
+                {characterCatalog.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
@@ -346,7 +292,7 @@ function App() {
       <section className={`stage ${selectedScene.className}`}>
         <div className="horizonGuide" />
         <div className="setFloor" />
-        {performerList.map((performer) => (
+            {activePerformers.map((performer) => (
           <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
         ))}
       </section>
@@ -355,7 +301,7 @@ function App() {
         <div className="dockGroup">
           <h2>Scene</h2>
           <div className="segmented">
-            {scenes.map((item) => (
+            {sceneCatalog.map((item) => (
               <button
                 key={item.id}
                 className={scene === item.id ? "selected" : ""}
@@ -370,13 +316,13 @@ function App() {
         <div className="dockGroup">
           <h2>Expression</h2>
           <div className="segmented">
-            {["neutral", "happy", "mad", "weird"].map((expression) => (
+            {expressionCatalog.map((expression) => (
               <button
-                key={expression}
-                className={self?.state.expression === expression ? "selected" : ""}
-                onClick={() => setExpression(expression)}
+                key={expression.id}
+                className={self?.state.expression === expression.id ? "selected" : ""}
+                onClick={() => setExpression(expression.id)}
               >
-                {expression}
+                {expression.name}
               </button>
             ))}
           </div>
@@ -385,7 +331,7 @@ function App() {
         <div className="dockGroup">
           <h2>Macros</h2>
           <div className="macroGrid">
-            {macros.map((macro) => (
+            {macroCatalog.map((macro) => (
               <button key={macro.id} onClick={() => triggerMacro(macro.id)}>
                 <Wand2 size={16} />
                 {macro.name}
@@ -396,54 +342,15 @@ function App() {
 
         <div className="dockGroup performerGroup">
           <h2>Performers</h2>
-          {performerList.map((performer) => (
+          {activePerformers.map((performer) => (
             <div className="performerRow" key={performer.id}>
               <span>{performer.name}</span>
-              <small>{characters.find((item) => item.id === performer.character)?.name}</small>
+              <small>{getCatalogItem(characterCatalog, performer.character).name}</small>
             </div>
           ))}
         </div>
       </aside>
     </main>
-  );
-}
-
-function Puppet({ performer, isSelf }) {
-  const character = characters.find((item) => item.id === performer.character) || characters[0];
-  const { state } = performer;
-  const scale = getDepthScale(state.y, state.scale);
-  const face = {
-    neutral: ["•", "•", "—"],
-    happy: ["^", "^", "⌣"],
-    mad: [">", "<", "—"],
-    weird: ["o", "O", "~"]
-  }[state.expression || "neutral"];
-
-  return (
-    <div
-      className={`puppet ${state.macro ? `macro-${state.macro}` : ""} ${isSelf ? "self" : ""}`}
-      style={{
-        left: `${state.x}%`,
-        top: `${state.y}%`,
-        zIndex: Math.round(state.y * 10),
-        transform: `translate(-50%, -100%) scale(${scale})`
-      }}
-    >
-      <div className="nameTag">{performer.name}</div>
-      <div
-        className="puppetBody"
-        style={{
-          "--puppet": character.color,
-          "--accent": character.accent,
-          "--facing": state.facing
-        }}
-      >
-        <div className={`mouth ${state.speaking ? "talking" : ""}`}>{face[2]}</div>
-        <span className="eye left">{face[0]}</span>
-        <span className="eye right">{face[1]}</span>
-      </div>
-      <div className="shadow" />
-    </div>
   );
 }
 
