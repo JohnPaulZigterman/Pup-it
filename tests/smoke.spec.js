@@ -16,6 +16,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pick a tiny format, then make it yours." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Make A Short" })).toBeVisible();
+  await expect(page.getByText("kit ready")).toHaveCount(1);
+  await expect(page.getByText("Beginner: One obvious next button.")).toHaveCount(1);
   await expect(page.locator("header").getByRole("button", { name: "Finish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Creator" }).first().click();

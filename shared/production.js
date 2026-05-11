@@ -283,17 +283,64 @@ export function createShowToolbox({
   episodeStatus = "draft",
   doinkSubmission = {}
 }) {
+  const castItems = cast.map((performer) => ({
+    id: performer.id,
+    name: performer.name,
+    character: performer.character,
+    stylePreset: performer.state?.stylePreset || null,
+    partCount: Object.values(performer.state?.characterParts || {}).filter(Boolean).length
+  }));
+  const setItems = sceneSets.map((set) => ({ id: set.id, name: set.name, objectCount: set.sceneObjects?.length || set.objects?.length || 0 }));
+  const propItems = sceneObjects.map((object) => ({
+    id: object.id,
+    name: object.name,
+    shape: object.shape,
+    texturePreset: object.texturePreset,
+    sourceUrl: object.sourceUrl || null
+  }));
+  const creditItems = assetReferences.map((asset) => ({
+    name: asset.name,
+    sourceUrl: asset.sourceUrl,
+    license: asset.license,
+    attribution: asset.attribution || asset.license || "Check source before publishing."
+  }));
+  const boardItems = storyboardPanels.map((panel) => ({ id: panel.id, title: panel.title, scene: panel.scene, shot: panel.shot }));
+  const cutItems = timeline.map((clip) => ({ id: clip.id, title: clip.title, sourceType: clip.sourceType, duration: clip.duration }));
+  const takeItems = takes.map((take) => ({
+    id: take.id,
+    name: take.name,
+    durationMs: take.durationMs,
+    audioTrackCount: take.audioTrackCount || take.tracks?.audio?.length || 0,
+    best: Boolean(take.best)
+  }));
+  const submittedStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
+  const readinessSteps = [
+    { id: "show", label: "Name the show", done: Boolean((showName || "").trim()), beginnerAction: "Name it", proUnlock: "Series metadata" },
+    { id: "cast", label: "Build a rig", done: castItems.some((item) => item.partCount > 0) || castItems.length > 0, beginnerAction: "Pick a rig", proUnlock: "Advanced rig parts" },
+    { id: "world", label: "Build the space", done: setItems.length > 0 || propItems.length > 0, beginnerAction: "Place one prop", proUnlock: "Reusable sets" },
+    { id: "perform", label: "Record a take", done: takeItems.length > 0, beginnerAction: "Record", proUnlock: "Separate lanes" },
+    { id: "cut", label: "Choose a cut", done: cutItems.length > 0 || takeItems.some((take) => take.best), beginnerAction: "Pick best", proUnlock: "Rough cut timeline" },
+    { id: "publish", label: "Ready for review", done: submittedStatuses.includes(episodeStatus), beginnerAction: "Submit", proUnlock: "DoinkTV package" }
+  ];
+  const missingSteps = readinessSteps.filter((step) => !step.done);
+
   return {
-    schemaVersion: "pup-it.show-toolbox.v1",
+    schemaVersion: "pup-it.show-toolbox.v2",
     showName: showName || "Untitled Show",
     status: episodeStatus,
-    cast: cast.map((performer) => ({
-      id: performer.id,
-      name: performer.name,
-      character: performer.character,
-      stylePreset: performer.state?.stylePreset || null,
-      partCount: Object.values(performer.state?.characterParts || {}).filter(Boolean).length
-    })),
+    readiness: {
+      completeCount: readinessSteps.length - missingSteps.length,
+      totalCount: readinessSteps.length,
+      percent: Math.round(((readinessSteps.length - missingSteps.length) / readinessSteps.length) * 100),
+      nextStep: missingSteps[0] || null,
+      steps: readinessSteps
+    },
+    productRule: {
+      beginner: "One obvious next button.",
+      experienced: "Pro controls stay nearby, not in the way.",
+      home: "Reusable results live in this Show Kit."
+    },
+    cast: castItems,
     styleGuide: {
       family: style.family || "Flexible",
       theme: style.theme || "Show Native",
@@ -301,29 +348,12 @@ export function createShowToolbox({
       backgroundTheme: style.backgroundTheme || null,
       objectStyle: style.objectStyle || null
     },
-    sets: sceneSets.map((set) => ({ id: set.id, name: set.name, objectCount: set.sceneObjects?.length || set.objects?.length || 0 })),
-    props: sceneObjects.map((object) => ({
-      id: object.id,
-      name: object.name,
-      shape: object.shape,
-      texturePreset: object.texturePreset,
-      sourceUrl: object.sourceUrl || null
-    })),
-    credits: assetReferences.map((asset) => ({
-      name: asset.name,
-      sourceUrl: asset.sourceUrl,
-      license: asset.license,
-      attribution: asset.attribution || asset.license || "Check source before publishing."
-    })),
-    boards: storyboardPanels.map((panel) => ({ id: panel.id, title: panel.title, scene: panel.scene, shot: panel.shot })),
-    cuts: timeline.map((clip) => ({ id: clip.id, title: clip.title, sourceType: clip.sourceType, duration: clip.duration })),
-    takes: takes.map((take) => ({
-      id: take.id,
-      name: take.name,
-      durationMs: take.durationMs,
-      audioTrackCount: take.audioTrackCount || take.tracks?.audio?.length || 0,
-      best: Boolean(take.best)
-    })),
+    sets: setItems,
+    props: propItems,
+    credits: creditItems,
+    boards: boardItems,
+    cuts: cutItems,
+    takes: takeItems,
     submission: {
       targetChannel: "DoinkTV",
       preferredBlock: doinkSubmission.preferredBlock || "short",

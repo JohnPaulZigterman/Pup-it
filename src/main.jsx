@@ -4603,6 +4603,8 @@ function ShowBiblePanel({
   onSaveShow,
   onModeChange
 }) {
+  const readiness = toolbox?.readiness || { completeCount: 0, totalCount: 6, percent: 0, steps: [], nextStep: null };
+  const nextStep = readiness.nextStep;
   return (
     <div className="dockGroup showBiblePanel">
       <h2>Show Kit</h2>
@@ -4610,6 +4612,16 @@ function ShowBiblePanel({
         <strong>Your Show's Stuff</strong>
         <small>{showName}: reusable cast, sets, props, style, boards, and cuts.</small>
         <small>{activeStyle.family} / {activeStyle.theme}</small>
+      </div>
+      <div className="showKitReadiness">
+        <div className="showKitMeterHeader">
+          <strong>{readiness.percent}% kit ready</strong>
+          <span>{readiness.completeCount}/{readiness.totalCount}</span>
+        </div>
+        <div className="showKitMeter">
+          <span style={{ width: `${readiness.percent}%` }} />
+        </div>
+        <small>{nextStep ? `Next: ${nextStep.label}` : "Ready to finish and make another one faster."}</small>
       </div>
       <div className="bibleGrid">
         <span>
@@ -4656,23 +4668,31 @@ function ShowBiblePanel({
         <span>{toolbox?.submission?.targetChannel || "DoinkTV"}</span>
         <span>{toolbox?.takes?.filter((take) => take.best).length || 0} best takes</span>
       </div>
+      <div className="showKitRule">
+        <strong>Feature Rule</strong>
+        <span>Beginner: {toolbox?.productRule?.beginner || "One obvious next button."}</span>
+        <span>Pro: {toolbox?.productRule?.experienced || "Deeper controls stay nearby."}</span>
+        <span>Home: {toolbox?.productRule?.home || "Reusable results live here."}</span>
+      </div>
       <div className="reusableShelf">
         <strong>Reusable Kit</strong>
         <span>{toolbox?.cast?.slice(0, 2).map((item) => item.name).join(", ") || "Build cast"}</span>
         <span>{toolbox?.props?.slice(0, 2).map((item) => item.name).join(", ") || "Add props"}</span>
         <span>{toolbox?.sets?.slice(0, 2).map((item) => item.name).join(", ") || "Save a set"}</span>
       </div>
-      <div className="publicReadinessList">
-        <span className={castCount ? "done" : ""}>Cast</span>
-        <span className={sceneSetCount || propCount ? "done" : ""}>World</span>
-        <span className={boardCount ? "done" : ""}>Board</span>
-        <span className={timelineCount ? "done" : ""}>Cut</span>
-        <span className={referenceCount ? "done" : ""}>Credits</span>
-        <span className={["submitted", "ready_for_review", "approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>Review</span>
+      <div className="showKitSteps">
+        {readiness.steps.map((step) => (
+          <span key={step.id} className={step.done ? "done" : ""} title={`Beginner: ${step.beginnerAction}. Pro: ${step.proUnlock}.`}>
+            {step.label}
+          </span>
+        ))}
       </div>
       <div className="libraryActions">
+        <button onClick={() => onModeChange(nextStep?.id === "world" ? "assets" : "build")}>
+          {nextStep?.beginnerAction || "Make Another"}
+        </button>
         <button onClick={() => onModeChange("build")}>Rigs</button>
-        <button onClick={() => onModeChange("assets")}>Props</button>
+        <button onClick={() => onModeChange("assets")}>World</button>
         <button onClick={onSaveShow}>
           <Save size={16} />
           Save Toolbox
