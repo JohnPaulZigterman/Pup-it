@@ -193,7 +193,7 @@ export function createProjectExport({
       };
   const bestTake = takes.find((take) => take.best) || takes[0] || null;
   const packageReadiness = {
-    hasVideoPlaceholder: true,
+    hasRenderPlan: true,
     hasReviewTarget: Boolean(bestTake || timeline.length || storyboardPanels.length),
     hasThumbnail: Boolean(thumbnail),
     hasCaptions: captions.some((caption) => caption.text),

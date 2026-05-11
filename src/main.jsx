@@ -2836,11 +2836,6 @@ function App() {
     }
   };
 
-  const queueVideoExport = () => {
-    setMode("edit");
-    setStatus("Use 720p WEBM for a quick review video. The next render milestone is matching the full live stage more exactly.");
-  };
-
   const exportSelectedTakeVideo = async () => {
     const targetTake = resolveFinishTake();
     if (!targetTake || videoExporting) return;
@@ -2982,7 +2977,6 @@ function App() {
     { id: "undo", label: "Undo last creative edit", keywords: "undo revert back history", action: undoLastAction, disabled: !historyPast.length },
     { id: "redo", label: "Redo creative edit", keywords: "redo forward history", action: redoLastAction, disabled: !historyFuture.length },
     { id: "export", label: "Export short package", keywords: "finish export publish package video project", action: exportProject },
-    { id: "video-export", label: "Prepare video export", keywords: "finish render video webm mp4 export movie", action: queueVideoExport },
     { id: "submit-doinktv", label: "Submit to DoinkTV", keywords: "finish submit doinktv publish review package", action: submitToDoinkTv },
     { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
     { id: "texture-polish", label: "Add mixed-media texture", keywords: "texture paper pattern style weird", action: () => applyPolishPass("texture") },
@@ -5878,7 +5872,7 @@ function SceneLibraryEditor({
               </span>
             </div>
             <small className="controlHint">
-              Next pass: movement, mouth, camera, prop cues, and audio become separate editable lanes.
+              Motion, mouth, camera, prop cues, and audio are kept as separate review lanes.
             </small>
           </div>
 
@@ -5920,7 +5914,7 @@ function SceneLibraryEditor({
               {item.label}
             </span>
           ))}
-          <span className={readiness.hasVideoPlaceholder ? "done" : ""}>WEBM path planned</span>
+          <span className={finalVideoPath ? "done" : ""}>WEBM rendered</span>
           <span className={reviewReadyStatuses.includes(episodeStatus) ? "done" : ""}>Review status set</span>
         </div>
         <small className="controlHint">
@@ -5946,7 +5940,7 @@ function SceneLibraryEditor({
         <h2>Submit to DoinkTV</h2>
         <small className="controlHint">
           Send admins a review package with project data, credits, captions, take info, and broadcast notes.
-          {doinkEndpointConfigured ? " Direct intake is configured." : " For now this downloads a handoff JSON."}
+          {doinkEndpointConfigured ? " Direct intake is configured." : " Local handoff uses the Pup-It intake endpoint."}
         </small>
         <div className="submissionGrid">
           <label>
