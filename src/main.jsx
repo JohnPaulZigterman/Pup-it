@@ -1112,6 +1112,7 @@ function App() {
   const [historyPast, setHistoryPast] = useState([]);
   const [historyFuture, setHistoryFuture] = useState([]);
   const [lastAutosaveAt, setLastAutosaveAt] = useState("");
+  const [lastManualSave, setLastManualSave] = useState(null);
   const [exportHistory, setExportHistory] = useState([]);
   const [doinkSubmitting, setDoinkSubmitting] = useState(false);
   const [doinkSubmission, setDoinkSubmission] = useState({
@@ -2455,6 +2456,29 @@ function App() {
       doinkSubmission
     ]
   );
+  const showSaveManifest = useMemo(
+    () => [
+      { id: "cast", label: "Cast", count: activePerformers.length },
+      { id: "sets", label: "Sets", count: sceneSets.length },
+      { id: "props", label: "Props", count: sceneObjects.length },
+      { id: "boards", label: "Boards", count: storyboardPanels.length },
+      { id: "takes", label: "Takes", count: takeLibrary.length },
+      { id: "cuts", label: "Cuts", count: productionTimeline.length },
+      { id: "credits", label: "Credits", count: assetReferences.length },
+      { id: "exports", label: "Exports", count: exportHistory.length }
+    ],
+    [activePerformers.length, sceneSets.length, sceneObjects.length, storyboardPanels.length, takeLibrary.length, productionTimeline.length, assetReferences.length, exportHistory.length]
+  );
+  const showSaveSummary = useMemo(
+    () => ({
+      totalItems: showSaveManifest.reduce((total, item) => total + item.count, 0),
+      lastAutosaveAt,
+      lastManualSave,
+      selectedShowName: savedShows.find((show) => show.id === selectedShowId)?.showName || "",
+      destination: lastManualSave?.destination || (selectedShowId ? "Saved show" : "New show")
+    }),
+    [showSaveManifest, lastAutosaveAt, lastManualSave, savedShows, selectedShowId]
+  );
   const cameraTarget = useMemo(
     () => (cameraFollow ? stagePerformers.find((performer) => performer.id === selfId) || stagePerformers[0] || null : null),
     [cameraFollow, selfId, stagePerformers]
@@ -3210,6 +3234,12 @@ function App() {
       setSavedShows(nextShows);
       setSelectedShowId(persistedSession.id);
       setShowName(persistedSession.showName);
+      setLastManualSave({
+        at: new Date().toISOString(),
+        destination: "Postgres",
+        showName: persistedSession.showName,
+        id: persistedSession.id
+      });
       setStatus(`Saved show "${persistedSession.showName}" and episode status to Postgres.`);
     } catch (_databaseError) {
       const nextShows = [
@@ -3220,6 +3250,12 @@ function App() {
       setSavedShows(nextShows);
       setSelectedShowId(session.id);
       setShowName(session.showName);
+      setLastManualSave({
+        at: new Date().toISOString(),
+        destination: "Local browser",
+        showName: session.showName,
+        id: session.id
+      });
       setStatus(`Saved show "${session.showName}" locally. Set DATABASE_URL to enable Postgres persistence.`);
     }
   };
@@ -3254,6 +3290,12 @@ function App() {
       session.cast?.find((performer) => performer.name === name) ||
       session.cast?.[0];
     if (castMember) configureSelfFromShow(castMember);
+    setLastManualSave({
+      at: session.savedAt || new Date().toISOString(),
+      destination: session.databaseId ? "Postgres" : "Saved show",
+      showName: session.showName,
+      id: session.id
+    });
     setStatus(`Loaded show "${session.showName}".`);
   };
 
@@ -3301,6 +3343,12 @@ function App() {
       setCharacter(castMember.character || character);
       setName(castMember.name || name);
     }
+    setLastManualSave({
+      at: session.savedAt || new Date().toISOString(),
+      destination: sourceLabel,
+      showName: session.showName,
+      id: session.id
+    });
     setStatus(`Loaded ${sourceLabel} "${session.showName}". Join when you want to enter the stage.`);
   };
 
@@ -3604,6 +3652,8 @@ function App() {
           showName={showName}
           savedShows={savedShows}
             selectedShowId={selectedShowId}
+            saveManifest={showSaveManifest}
+            saveSummary={showSaveSummary}
             onShowNameChange={setShowName}
             onSelectedShowChange={setSelectedShowId}
             onSaveShow={saveShowSession}
@@ -3682,6 +3732,7 @@ function App() {
           boardCount={storyboardPanels.length}
           timelineCount={productionTimeline.length}
           toolbox={activeShowToolbox}
+          saveSummary={showSaveSummary}
           activeStyle={activeAnimationStyle}
           episodeStatus={episodeStatus}
           onSaveShow={saveShowSession}
@@ -4432,15 +4483,25 @@ function ShowSessionControls({
   showName,
   savedShows,
   selectedShowId,
+  saveManifest,
+  saveSummary,
   onShowNameChange,
   onSelectedShowChange,
   onSaveShow,
   onLoadShow,
   onExportShow
 }) {
+  const savedLabel = saveSummary?.lastManualSave
+    ? `${saveSummary.lastManualSave.destination} ${new Date(saveSummary.lastManualSave.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : "Not manually saved yet";
   return (
     <div className="dockGroup showSessionPanel">
       <h2>Show</h2>
+      <div className="saveConfidenceCard">
+        <strong>{saveSummary?.selectedShowName || showName}</strong>
+        <span>{savedLabel}</span>
+        <small>{saveSummary?.lastAutosaveAt ? `Autosaved ${saveSummary.lastAutosaveAt}` : "Autosave starts after joining the stage."}</small>
+      </div>
       <label>
         Current Show
         <input
@@ -4477,8 +4538,16 @@ function ShowSessionControls({
           Export
         </button>
       </div>
+      <div className="saveManifestGrid" aria-label="Show save manifest">
+        {saveManifest.map((item) => (
+          <span className={item.count ? "done" : ""} key={item.id}>
+            <strong>{item.count}</strong>
+            {item.label}
+          </span>
+        ))}
+      </div>
       <small className="controlHint">
-        Saves the show look, cast customization, storyboard, timeline, and take list in this browser.
+        Saves the show look, cast customization, sets, boards, cuts, takes, credits, and DoinkTV notes.
       </small>
     </div>
   );
@@ -4691,6 +4760,7 @@ function ShowBiblePanel({
   boardCount,
   timelineCount,
   toolbox,
+  saveSummary,
   activeStyle,
   episodeStatus,
   onSaveShow,
@@ -4715,6 +4785,11 @@ function ShowBiblePanel({
           <span style={{ width: `${readiness.percent}%` }} />
         </div>
         <small>{nextStep ? `Next: ${nextStep.label}` : "Ready to finish and make another one faster."}</small>
+      </div>
+      <div className="showKitPersistence">
+        <strong>Persistence</strong>
+        <span>{saveSummary?.lastManualSave ? `Saved to ${saveSummary.lastManualSave.destination}` : "Manual save pending"}</span>
+        <span>{saveSummary?.lastAutosaveAt ? `Autosaved ${saveSummary.lastAutosaveAt}` : "Autosave ready after join"}</span>
       </div>
       <div className="bibleGrid">
         <span>
