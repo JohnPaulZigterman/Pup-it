@@ -18,9 +18,11 @@ import {
   bodyShapeCatalog,
   expressionCatalog,
   getCatalogItem,
+  idleMotionCatalog,
   limbStyleCatalog,
   macroCatalog,
   mouthStyleCatalog,
+  poseCatalog,
   sceneCatalog,
   walkCycleCatalog
 } from "../shared/catalogs.js";
@@ -157,6 +159,11 @@ function App() {
   };
 
   const setExpression = (expression) => updateSelf({ expression });
+  const setPose = (poseId) => {
+    const pose = getCatalogItem(poseCatalog, poseId);
+    updateSelf({ pose: pose.id, expression: pose.expression });
+  };
+  const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
 
   const updateCharacterRig = (patch) => {
     if (!self) return;
@@ -344,6 +351,8 @@ function App() {
             self={self}
             onSceneChange={changeScene}
             onExpressionChange={setExpression}
+            onPoseChange={setPose}
+            onIdleMotionChange={setIdleMotion}
             onMacroTrigger={triggerMacro}
           />
         ) : (
@@ -368,7 +377,15 @@ function App() {
   );
 }
 
-function PerformControls({ scene, self, onSceneChange, onExpressionChange, onMacroTrigger }) {
+function PerformControls({
+  scene,
+  self,
+  onSceneChange,
+  onExpressionChange,
+  onPoseChange,
+  onIdleMotionChange,
+  onMacroTrigger
+}) {
   return (
     <>
       <div className="dockGroup">
@@ -396,6 +413,36 @@ function PerformControls({ scene, self, onSceneChange, onExpressionChange, onMac
               onClick={() => onExpressionChange(expression.id)}
             >
               {expression.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Poses</h2>
+        <div className="poseGrid">
+          {poseCatalog.map((pose) => (
+            <button
+              key={pose.id}
+              className={self?.state.pose === pose.id ? "selected" : ""}
+              onClick={() => onPoseChange(pose.id)}
+            >
+              {pose.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Idle</h2>
+        <div className="segmented">
+          {idleMotionCatalog.map((idle) => (
+            <button
+              key={idle.id}
+              className={self?.state.idleMotion === idle.id ? "selected" : ""}
+              onClick={() => onIdleMotionChange(idle.id)}
+            >
+              {idle.name}
             </button>
           ))}
         </div>

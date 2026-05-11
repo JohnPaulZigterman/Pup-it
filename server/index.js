@@ -41,7 +41,10 @@ io.on("connection", (socket) => {
     const performer = createPerformer({
       id: socket.id,
       name,
-      character
+      character,
+      state: {
+        blinkSeed: Math.floor(Math.random() * 2400)
+      }
     });
 
     room.performers.set(socket.id, performer);

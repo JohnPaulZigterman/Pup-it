@@ -248,19 +248,22 @@ input[type="range"] {
 }
 
 .segmented,
-.macroGrid {
+.macroGrid,
+.poseGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.segmented button {
+.segmented button,
+.poseGrid button {
   min-height: 36px;
   color: #e7e0d2;
   background: #30303a;
 }
 
-.segmented button.selected {
+.segmented button.selected,
+.poseGrid button.selected {
   color: #16161a;
   background: #f7f1d1;
 }
@@ -375,6 +378,8 @@ input[type="range"] {
     radial-gradient(circle at 50% 18%, var(--accent) 0 19px, transparent 20px),
     var(--puppet);
   box-shadow: inset -12px -16px rgba(0, 0, 0, 0.14);
+  transform: rotate(var(--body-lean)) scaleY(var(--body-squash));
+  transform-origin: bottom center;
 }
 
 .body-tall .puppetBody {
@@ -393,6 +398,13 @@ input[type="range"] {
     inset -10px -10px rgba(255, 255, 255, 0.08);
 }
 
+.style-paper-cutout .puppetBody {
+  background:
+    radial-gradient(circle at 50% 18%, var(--accent) 0 19px, transparent 20px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 38%),
+    var(--puppet);
+}
+
 .style-ink-line {
   --line-width: 6px;
 }
@@ -400,6 +412,10 @@ input[type="range"] {
 .style-ink-line .puppetBody,
 .style-ink-line .limb {
   filter: contrast(1.08);
+}
+
+.style-ink-line .puppetBody {
+  border-radius: 48% 52% 43% 40%;
 }
 
 .limb {
@@ -419,12 +435,12 @@ input[type="range"] {
 
 .armLeft {
   left: 16px;
-  transform: rotate(calc(-34deg * var(--facing)));
+  transform: rotate(var(--arm-left));
 }
 
 .armRight {
   right: 16px;
-  transform: rotate(calc(34deg * var(--facing)));
+  transform: rotate(var(--arm-right));
 }
 
 .leg {
@@ -435,12 +451,12 @@ input[type="range"] {
 
 .legLeft {
   left: 52px;
-  transform: rotate(-8deg);
+  transform: rotate(var(--leg-left));
 }
 
 .legRight {
   right: 52px;
-  transform: rotate(8deg);
+  transform: rotate(var(--leg-right));
 }
 
 .limbs-hinged .limb {
@@ -479,6 +495,20 @@ input[type="range"] {
 
 .eye.right {
   right: 21px;
+}
+
+.eyeBlink {
+  opacity: 0;
+}
+
+.auto-blink .eyeOpen {
+  animation: eyeOpenBlink 5200ms steps(1, end) infinite;
+  animation-delay: var(--blink-delay);
+}
+
+.auto-blink .eyeBlink {
+  animation: eyeClosedBlink 5200ms steps(1, end) infinite;
+  animation-delay: var(--blink-delay);
 }
 
 .mouth {
@@ -572,6 +602,64 @@ input[type="range"] {
   }
   to {
     transform: translateX(-50%) scaleY(1.35);
+  }
+}
+
+.idle-breathing .puppetBody {
+  animation: breathe 2800ms ease-in-out infinite;
+}
+
+.idle-subtle .puppetBody {
+  animation-duration: 4200ms;
+}
+
+.idle-alive .armLeft,
+.idle-alive .armRight {
+  animation: idleHands 3600ms ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: rotate(var(--body-lean)) scaleY(var(--body-squash)) translateY(0);
+  }
+  50% {
+    transform: rotate(var(--body-lean)) scaleY(calc(var(--body-squash) * 1.025)) translateY(-2px);
+  }
+}
+
+@keyframes idleHands {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 4px;
+  }
+}
+
+@keyframes eyeOpenBlink {
+  0%,
+  89%,
+  94%,
+  100% {
+    opacity: 1;
+  }
+  90%,
+  93% {
+    opacity: 0;
+  }
+}
+
+@keyframes eyeClosedBlink {
+  0%,
+  89%,
+  94%,
+  100% {
+    opacity: 0;
+  }
+  90%,
+  93% {
+    opacity: 1;
   }
 }
 

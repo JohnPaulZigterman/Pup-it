@@ -9,6 +9,7 @@ Pup-It is a browser-based prototype for collaborative live puppet animation. The
 - Move toward the horizon to automatically shrink the puppet, or toward camera to enlarge it.
 - Use `Q` and `E` for small scale-trim adjustments when a shot needs a cheat.
 - Change expressions, scenes, and macros from the control dock.
+- Use pose presets and idle modes to add acting beats, blinking, and breathing without hand-animating.
 - Switch to Build mode to edit the active character's body, limbs, mouth style, walk cycle, and visual style.
 - Start a take to record movement events and relayed audio chunks.
 - Export the take as JSON with separate audio tracks for each character/performer.

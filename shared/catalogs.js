@@ -86,11 +86,86 @@ export const macroCatalog = [
   { id: "panic", name: "Panic", kind: "emotion", durationMs: 850 }
 ];
 
+export const poseCatalog = [
+  {
+    id: "neutral",
+    name: "Neutral",
+    expression: "neutral",
+    bodyLean: 0,
+    bodySquash: 1,
+    armLeft: -34,
+    armRight: 34,
+    legLeft: -8,
+    legRight: 8
+  },
+  {
+    id: "listen",
+    name: "Listen",
+    expression: "neutral",
+    bodyLean: -4,
+    bodySquash: 1,
+    armLeft: -12,
+    armRight: 18,
+    legLeft: -4,
+    legRight: 5
+  },
+  {
+    id: "point",
+    name: "Point",
+    expression: "mad",
+    bodyLean: 3,
+    bodySquash: 1,
+    armLeft: -18,
+    armRight: -78,
+    legLeft: -10,
+    legRight: 14
+  },
+  {
+    id: "shrug",
+    name: "Shrug",
+    expression: "weird",
+    bodyLean: 0,
+    bodySquash: 0.96,
+    armLeft: -76,
+    armRight: 76,
+    legLeft: -5,
+    legRight: 5
+  },
+  {
+    id: "surprise",
+    name: "Surprise",
+    expression: "weird",
+    bodyLean: 0,
+    bodySquash: 1.08,
+    armLeft: -96,
+    armRight: 96,
+    legLeft: -14,
+    legRight: 14
+  },
+  {
+    id: "deadpan",
+    name: "Deadpan",
+    expression: "neutral",
+    bodyLean: 0,
+    bodySquash: 0.98,
+    armLeft: 4,
+    armRight: -4,
+    legLeft: 0,
+    legRight: 0
+  }
+];
+
+export const idleMotionCatalog = [
+  { id: "alive", name: "Alive" },
+  { id: "subtle", name: "Subtle" },
+  { id: "held", name: "Held" }
+];
+
 export const expressionCatalog = [
-  { id: "neutral", name: "neutral", face: ["*", "*", "-"] },
-  { id: "happy", name: "happy", face: ["^", "^", "u"] },
-  { id: "mad", name: "mad", face: [">", "<", "-"] },
-  { id: "weird", name: "weird", face: ["o", "O", "~"] }
+  { id: "neutral", name: "neutral", face: ["*", "*", "-"], blinkFace: ["-", "-", "-"] },
+  { id: "happy", name: "happy", face: ["^", "^", "u"], blinkFace: ["-", "-", "u"] },
+  { id: "mad", name: "mad", face: [">", "<", "-"], blinkFace: ["-", "-", "-"] },
+  { id: "weird", name: "weird", face: ["o", "O", "~"], blinkFace: ["-", "-", "~"] }
 ];
 
 export const animationStyleCatalog = [
