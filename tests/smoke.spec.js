@@ -8,7 +8,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByRole("button", { name: "Join Stage" }).click();
 
   await expect(page.getByRole("heading", { name: "Untitled Show" })).toBeVisible();
-  await expect(page.getByText("Rehearse", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pick a tiny format, then make it yours." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Make A Short" })).toBeVisible();
 
   await page.getByRole("button", { name: "Rigs" }).first().click();
   await expect(page.getByRole("heading", { name: "Build The Space" })).toBeVisible();
@@ -16,6 +17,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.locator(".partBuilderRow").filter({ hasText: "Head" }).getByRole("button", { name: "Doodle" }).click();
   await expect(page.getByRole("heading", { name: "Playground Lab" })).toBeVisible();
   await page.getByRole("button", { name: "Odd Body Push the silhouette first, then keep whatever feels funny." }).click();
+  await expect(page.locator(".partTopAccessory, .partLeftAccessory, .partRightAccessory, .partBackAppendage")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Behavior" })).toBeVisible();
 
   await page.getByRole("button", { name: "Materials" }).first().click();

@@ -11,12 +11,26 @@ export const defaultDepthModel = {
   perspective: "front-stage",
   horizonSource: "focus-point",
   vanishingX: 50,
-  focusY: 56
+  focusY: 56,
+  floor: {
+    backY: 58,
+    frontY: 84,
+    backLeft: 22,
+    backRight: 78,
+    frontLeft: 8,
+    frontRight: 92
+  }
 };
 
 export const perspectiveProfiles = {
   "front-stage": {
     id: "front-stage",
+    floor: {
+      backLeft: 20,
+      backRight: 80,
+      frontLeft: 7,
+      frontRight: 93
+    },
     lateralFar: 0.56,
     lateralNear: 1,
     verticalFar: 0.72,
@@ -28,6 +42,12 @@ export const perspectiveProfiles = {
   },
   "street-depth": {
     id: "street-depth",
+    floor: {
+      backLeft: 40,
+      backRight: 67,
+      frontLeft: 5,
+      frontRight: 96
+    },
     lateralFar: 0.38,
     lateralNear: 0.98,
     verticalFar: 0.6,
@@ -39,6 +59,12 @@ export const perspectiveProfiles = {
   },
   "side-view": {
     id: "side-view",
+    floor: {
+      backLeft: 7,
+      backRight: 93,
+      frontLeft: 5,
+      frontRight: 95
+    },
     lateralFar: 0.86,
     lateralNear: 0.96,
     verticalFar: 0.34,
@@ -50,6 +76,12 @@ export const perspectiveProfiles = {
   },
   "surreal-float": {
     id: "surreal-float",
+    floor: {
+      backLeft: 14,
+      backRight: 86,
+      frontLeft: 9,
+      frontRight: 91
+    },
     lateralFar: 0.72,
     lateralNear: 0.86,
     verticalFar: 0.64,
@@ -68,18 +100,36 @@ export function clamp(value, min, max) {
 export function resolveDepthModel(depthModel = defaultDepthModel) {
   const perspective = depthModel.perspective || defaultDepthModel.perspective;
   const profile = perspectiveProfiles[perspective] || perspectiveProfiles[defaultDepthModel.perspective];
+  const walkableTop =
+    depthModel.movementModel?.floor?.backY ??
+    depthModel.floor?.backY ??
+    depthModel.horizon + (depthModel.performerHorizonBuffer ?? defaultDepthModel.performerHorizonBuffer);
+  const walkableBottom =
+    depthModel.movementModel?.floor?.frontY ??
+    depthModel.floor?.frontY ??
+    depthModel.foreground ??
+    defaultDepthModel.foreground;
+  const floor = {
+    ...defaultDepthModel.floor,
+    ...profile.floor,
+    backY: walkableTop,
+    frontY: walkableBottom,
+    ...(depthModel.floor || {}),
+    ...(depthModel.movementModel?.floor || {})
+  };
   return {
     ...defaultDepthModel,
     ...profile,
     ...depthModel,
-    perspective
+    ...(depthModel.movementModel || {}),
+    perspective,
+    floor
   };
 }
 
 export function getDepthProgress(y, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
-  const walkableTop = model.horizon + (model.performerHorizonBuffer ?? 0);
-  return clamp((y - walkableTop) / (model.foreground - walkableTop), 0, 1);
+  return clamp((y - model.floor.backY) / (model.floor.frontY - model.floor.backY), 0, 1);
 }
 
 function mix(from, to, progress) {
@@ -98,6 +148,36 @@ export function hasResidualMotion(state, threshold = 0.035) {
   return Math.hypot(state.motionVx || 0, state.motionVy || 0) > threshold;
 }
 
+export function getFloorAtY(y, depthModel = defaultDepthModel) {
+  const model = resolveDepthModel(depthModel);
+  const clampedY = clamp(y, model.floor.backY, model.floor.frontY);
+  const progress = getDepthProgress(clampedY, model);
+  return {
+    y: clampedY,
+    progress,
+    left: mix(model.floor.backLeft, model.floor.frontLeft, progress),
+    right: mix(model.floor.backRight, model.floor.frontRight, progress)
+  };
+}
+
+export function clampPointToFloor(point, depthModel = defaultDepthModel) {
+  const floor = getFloorAtY(point.y, depthModel);
+  return {
+    x: clamp(point.x, floor.left, floor.right),
+    y: floor.y,
+    floor
+  };
+}
+
+function getFloorRatio(x, floor) {
+  const width = Math.max(1, floor.right - floor.left);
+  return clamp((x - floor.left) / width, 0, 1);
+}
+
+function projectFloorRatio(ratio, floor) {
+  return floor.left + (floor.right - floor.left) * ratio;
+}
+
 function easeVelocity(current, target, amount, frameScale) {
   const adjustedAmount = 1 - Math.pow(1 - amount, frameScale);
   return current + (target - current) * adjustedAmount;
@@ -114,7 +194,8 @@ export function getDepthScale(y, trim = 1, depthModel = defaultDepthModel) {
 
 export function movePerformerState(state, input, depthModel = defaultDepthModel) {
   const model = resolveDepthModel(depthModel);
-  const progress = getDepthProgress(state.y, model);
+  const currentPoint = clampPointToFloor({ x: state.x, y: state.y }, model);
+  const progress = currentPoint.floor.progress;
   const softenedProgress = clamp(progress + model.horizonSoftness, 0, 1);
   const profile = getMotionProfile(state.motionFeel);
   const frameScale = clamp(input.deltaMs ?? 16.67, 8, 48) / 16.67;
@@ -135,30 +216,32 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
   }
 
   const dx = motionVx * frameScale;
-  const dy = motionVy * frameScale;
-  const movingThroughDepth = Math.abs(motionVy) > Math.abs(motionVx) * 0.28;
-  const away = motionVy < -0.02;
-  const toward = motionVy > 0.02;
-  const focusPull = model.vanishingX - state.x;
-  const convergenceStrength = movingThroughDepth
-    ? away
-      ? model.convergence
-      : toward
-        ? model.convergence * 0.32
-        : 0
-    : 0;
-  const convergenceX = focusPull * Math.abs(motionVy) * convergenceStrength * frameScale;
-  const nextX = clamp(state.x + dx + convergenceX, 5, 92);
-  const minY = model.horizon + (model.performerHorizonBuffer ?? 0);
-  const nextY = clamp(state.y + dy, minY, model.foreground);
+  const hitBack = currentPoint.y <= model.floor.backY + 0.001 && motionVy < 0;
+  const hitFront = currentPoint.y >= model.floor.frontY - 0.001 && motionVy > 0;
+  if (hitBack || hitFront) {
+    motionVy = 0;
+  }
+
+  const floorRatio = getFloorRatio(currentPoint.x, currentPoint.floor);
+  const proposedY = currentPoint.y + motionVy * frameScale;
+  const nextFloor = getFloorAtY(proposedY, model);
+  const depthProjectedX = projectFloorRatio(floorRatio, nextFloor);
+  const nextXBeforeClamp = depthProjectedX + dx;
+  const nextPoint = clampPointToFloor({ x: nextXBeforeClamp, y: nextFloor.y }, model);
+  const hitLeft = nextPoint.x <= nextPoint.floor.left + 0.001 && motionVx < 0;
+  const hitRight = nextPoint.x >= nextPoint.floor.right - 0.001 && motionVx > 0;
+  if (hitLeft || hitRight) {
+    motionVx = 0;
+  }
+
   const nextScale = clamp(state.scale + input.dScale * frameScale, model.minTrim, model.maxTrim);
   const groundSpeed = Math.hypot(motionVx, motionVy);
   const travelLean = clamp(motionVx * profile.lean, -profile.maxLean, profile.maxLean);
 
   return {
     ...state,
-    x: nextX,
-    y: nextY,
+    x: nextPoint.x,
+    y: nextPoint.y,
     scale: nextScale,
     facing: Math.abs(motionVx) < 0.08 ? state.facing : motionVx > 0 ? 1 : -1,
     walking: groundSpeed > 0.03,
@@ -166,6 +249,6 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     motionVy,
     groundSpeed,
     travelLean,
-    depthProgress: getDepthProgress(nextY, model)
+    depthProgress: nextPoint.floor.progress
   };
 }

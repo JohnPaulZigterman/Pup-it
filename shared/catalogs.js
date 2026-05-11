@@ -185,7 +185,15 @@ export const sceneCatalog = [
     foreground: 84,
     performerHorizonBuffer: 2,
     vanishingX: 50,
-    focusY: 56
+    focusY: 56,
+    movementModel: {
+      floor: {
+        backLeft: 22,
+        backRight: 78,
+        frontLeft: 8,
+        frontRight: 92
+      }
+    }
   },
   {
     id: "street",
@@ -199,7 +207,15 @@ export const sceneCatalog = [
     foreground: 84,
     performerHorizonBuffer: 2,
     vanishingX: 55,
-    focusY: 48
+    focusY: 48,
+    movementModel: {
+      floor: {
+        backLeft: 42,
+        backRight: 66,
+        frontLeft: 5,
+        frontRight: 96
+      }
+    }
   },
   {
     id: "space",
@@ -213,7 +229,18 @@ export const sceneCatalog = [
     foreground: 84,
     performerHorizonBuffer: 1,
     vanishingX: 50,
-    focusY: 57
+    focusY: 57,
+    movementModel: {
+      floor: {
+        backLeft: 16,
+        backRight: 84,
+        frontLeft: 9,
+        frontRight: 91
+      },
+      verticalFar: 0.52,
+      verticalNear: 0.72,
+      scaleDepthStrength: 0.64
+    }
   }
 ];
 
@@ -445,10 +472,10 @@ export const characterPartCatalog = [
   { id: "rightArm", name: "Right Arm", label: "R ARM" },
   { id: "leftLeg", name: "Left Leg", label: "L LEG" },
   { id: "rightLeg", name: "Right Leg", label: "R LEG" },
-  { id: "topAccessory", name: "Top Accessory", label: "HAT" },
-  { id: "leftAccessory", name: "Left Accessory", label: "PROP" },
-  { id: "rightAccessory", name: "Right Accessory", label: "PROP" },
-  { id: "backAppendage", name: "Weird Appendage", label: "??" }
+  { id: "topAccessory", name: "Top Add-On", label: "ADD" },
+  { id: "leftAccessory", name: "Left Add-On", label: "ADD" },
+  { id: "rightAccessory", name: "Right Add-On", label: "ADD" },
+  { id: "backAppendage", name: "Weird Add-On", label: "??" }
 ];
 
 export const partShapeCatalog = [

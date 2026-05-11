@@ -72,6 +72,7 @@ import {
   sceneCatalog,
   walkCycleCatalog
 } from "../shared/catalogs.js";
+import { clampPointToFloor } from "../shared/depth.js";
 import { createPerformerState, defaultCharacterId, defaultRoomId } from "../shared/schema.js";
 import {
   hasInput,
@@ -97,6 +98,7 @@ const partSwapTargets = {
   leftAccessory: "rightAccessory",
   rightAccessory: "leftAccessory"
 };
+const corePartSlots = ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"];
 const extraPartSlots = ["topAccessory", "leftAccessory", "rightAccessory", "backAppendage"];
 const texturePresetOptions = [
   { id: "paper-grain", name: "Paper Grain" },
@@ -237,6 +239,53 @@ const showStarterTemplates = [
     backgroundTheme: "wood-panel",
     objectStyle: "soft-material",
     assetSearch: "furniture"
+  }
+];
+
+const shortFormatTemplates = [
+  {
+    id: "argument",
+    name: "Weird Argument",
+    description: "Two rigs, fast blocking, one prop, and a punch-in ready for a 30-second fight.",
+    showSuffix: "Argument",
+    starterTemplate: "two-hander",
+    styleMutation: "roughen",
+    prop: { name: "Important Object", shape: "star", tint: "#fff2a8", texturePreset: "photocopy" },
+    assetSearch: "room furniture prop",
+    nextMode: "build"
+  },
+  {
+    id: "fake-ad",
+    name: "Fake Commercial",
+    description: "A product on stage, bright TV lighting, and a simple sell-the-bit performance setup.",
+    showSuffix: "Commercial",
+    starterTemplate: "desk-show",
+    styleMutation: "thin-lines",
+    prop: { name: "Bad Product", shape: "block", tint: "#8db7ff", texturePreset: "static-pattern" },
+    assetSearch: "sign product furniture",
+    nextMode: "assets"
+  },
+  {
+    id: "public-access",
+    name: "Public Access Bumper",
+    description: "Copy grit, strange texture, and a quick reaction setup for a weird short interstitial.",
+    showSuffix: "Bumper",
+    starterTemplate: "late-bump",
+    styleMutation: "photocopy",
+    prop: { name: "Floating Thing", shape: "bean", tint: "#e96f4c", texturePreset: "photocopy" },
+    assetSearch: "space texture abstract",
+    nextMode: "perform"
+  },
+  {
+    id: "podcast-bit",
+    name: "Podcast Bit",
+    description: "A desk-show format for animated clips, recurring voices, and low-friction replay.",
+    showSuffix: "Podcast",
+    starterTemplate: "desk-show",
+    styleMutation: "collage",
+    prop: { name: "Desk Mic", shape: "circle", tint: "#2b2d42", texturePreset: "paper-grain" },
+    assetSearch: "desk microphone room",
+    nextMode: "perform"
   }
 ];
 
@@ -725,6 +774,22 @@ function App() {
   const selfCharacter = self
     ? getCatalogItem(characterCatalog, self.character)
     : getCatalogItem(characterCatalog, character);
+  const hasCustomRigParts = Boolean(
+    self?.state.characterParts &&
+      corePartSlots.some((slot) => {
+        const part = self.state.characterParts?.[slot];
+        return part?.source || part?.shape || part?.mode === "drawn";
+      })
+  );
+  const beginnerProgress = {
+    hasShow: Boolean(showName.trim()),
+    hasRig: hasCustomRigParts,
+    hasSet: sceneObjects.length > 0 || sceneSets.length > 0,
+    hasRehearsed: mode === "perform" || takeLibrary.length > 0 || selectedTake,
+    hasTake: takeLibrary.length > 0 || selectedTake,
+    hasCut: productionTimeline.length > 0,
+    readyToExport: productionTimeline.length > 0 || selectedTake
+  };
   const activeStylePreset = self?.state.stylePreset || selfCharacter.stylePreset;
   const activeAnimationStyle = getCatalogItem(animationStyleCatalog, activeStylePreset);
   const activeTexturePreset = activeAnimationStyle.texturePreset || "paper-grain";
@@ -935,10 +1000,10 @@ function App() {
   const moveSelfToMark = (markId) => {
     const mark = floorMarks.find((item) => item.id === markId);
     if (!mark) return;
-    const walkableTop = selectedScene.horizon + (selectedScene.performerHorizonBuffer || 0);
+    const floorPoint = clampPointToFloor({ x: mark.x, y: mark.y }, selectedScene);
     updateSelf({
-      x: clamp(mark.x, 5, 92),
-      y: clamp(mark.y, walkableTop, selectedScene.foreground),
+      x: floorPoint.x,
+      y: floorPoint.y,
       walking: false,
       motionVx: 0,
       motionVy: 0,
@@ -1080,7 +1145,7 @@ function App() {
       behaviorPreset: pickRandom(behaviorPresetCatalog).id,
       motionFeel: pickRandom(motionFeelCatalog).id,
       characterParts: Object.fromEntries(
-        characterPartCatalog.map((part) => [
+        characterPartCatalog.filter((part) => corePartSlots.includes(part.id)).map((part) => [
           part.id,
           {
             mode: "shape",
@@ -1127,6 +1192,32 @@ function App() {
     if (mutation.behaviorPreset) updateSelf({ behaviorPreset: mutation.behaviorPreset });
     if (mutation.motionFeel) updateSelf({ motionFeel: mutation.motionFeel });
     setStatus(`${mutation.name} style mutation applied. Remix it until it feels like your show.`);
+  };
+
+  const startQuickShort = (formatId) => {
+    const format = getCatalogItem(shortFormatTemplates, formatId);
+    const template = getCatalogItem(showStarterTemplates, format.starterTemplate);
+    changeScene(template.scene);
+    setCameraShot(template.cameraShot);
+    setLightingPreset(template.lightingPreset);
+    setBackgroundTheme(template.backgroundTheme);
+    setObjectStyle(template.objectStyle);
+    setAssetTarget("object");
+    setAssetSearch(format.assetSearch);
+    if (showName.trim() === "Untitled Show") {
+      setShowName(`${format.name} Show`);
+    }
+    if (self) {
+      randomizeCharacterDesign();
+    }
+    if (format.styleMutation) {
+      window.setTimeout(() => applyStyleMutation(format.styleMutation), 0);
+    }
+    const sceneObject = createSceneObjectFromShape(format.prop, sceneObjects.length);
+    setSceneObjects((current) => [...current, sceneObject]);
+    setSelectedSceneObjectId(sceneObject.id);
+    setMode(format.nextMode);
+    setStatus(`${format.name} started. Customize the rig, tweak the prop, then record the bit.`);
   };
 
   const addSceneObjectFromAsset = (asset) => {
@@ -1837,10 +1928,13 @@ function App() {
     setFloorMarks(template.marks.map((mark) => ({ ...mark })));
     if (template.marks[0] && self) {
       const templateScene = getCatalogItem(sceneCatalog, template.scene);
-      const walkableTop = templateScene.horizon + (templateScene.performerHorizonBuffer || 0);
+      const floorPoint = clampPointToFloor(
+        { x: template.marks[0].x, y: template.marks[0].y },
+        templateScene
+      );
       updateSelf({
-        x: clamp(template.marks[0].x, 5, 92),
-        y: clamp(template.marks[0].y, walkableTop, templateScene.foreground),
+        x: floorPoint.x,
+        y: floorPoint.y,
         walking: false,
         motionVx: 0,
         motionVy: 0,
@@ -2140,9 +2234,12 @@ function App() {
             showName={showName}
             savedShows={savedShows}
             templates={showStarterTemplates}
+            shortFormats={shortFormatTemplates}
+            progress={beginnerProgress}
             takeCount={takeLibrary.length}
             panelCount={storyboardPanels.length}
             timelineCount={productionTimeline.length}
+            onStartQuickShort={startQuickShort}
             onApplyTemplate={applyShowTemplate}
             onModeChange={setMode}
             onAssetSearch={openAssetSearch}
@@ -2196,6 +2293,18 @@ function App() {
           onSaveShow={saveShowSession}
           onLoadShow={loadShowSession}
           onExportShow={exportShowSession}
+        />
+
+        <BeginnerRoadmap
+          progress={beginnerProgress}
+          selectedTake={selectedTake}
+          onModeChange={setMode}
+          onStartQuickShort={() => startQuickShort("argument")}
+          onRecordToggle={toggleTake}
+          recording={recording}
+          onReplay={playSelectedTake}
+          onSaveScene={saveSelectedTakeAsScene}
+          onExport={exportProject}
         />
 
         <ShowBiblePanel
@@ -2308,6 +2417,7 @@ function App() {
             onEpisodeStatusChange={setEpisodeStatus}
             onRemoveTimelineClip={removeTimelineClip}
             onExportProject={exportProject}
+            onModeChange={setMode}
           />
         )}
         {mode === "storyboard" && (
@@ -2454,9 +2564,12 @@ function ShowDashboard({
   showName,
   savedShows,
   templates,
+  shortFormats,
+  progress,
   takeCount,
   panelCount,
   timelineCount,
+  onStartQuickShort,
   onApplyTemplate,
   onModeChange,
   onAssetSearch,
@@ -2468,13 +2581,29 @@ function ShowDashboard({
         <div>
           <span className="eyebrow">Production Home</span>
           <h1>{showName}</h1>
-          <p>Make a weird thing, perform it live, then turn it into a reusable show.</p>
+          <p>Make a weird thing, perform it live, replay it, and export a short without leaving the app.</p>
         </div>
         <div className="recordFlow">
-          <span>Rehearse</span>
-          <span>Record</span>
-          <span>Review</span>
-          <span>Export</span>
+          <span className={progress.hasRig ? "done" : ""}>Build</span>
+          <span className={progress.hasSet ? "done" : ""}>Stage</span>
+          <span className={progress.hasTake ? "done" : ""}>Record</span>
+          <span className={progress.readyToExport ? "done" : ""}>Export</span>
+        </div>
+      </section>
+
+      <section className="makeShortPanel" aria-label="Make a short">
+        <div>
+          <span className="eyebrow">Make Something Fast</span>
+          <h2>Pick a tiny format, then make it yours.</h2>
+          <p>These are not stock shows. They are rough launch pads with a rig, set direction, prop, and performance goal.</p>
+        </div>
+        <div className="shortFormatGrid">
+          {shortFormats.map((format) => (
+            <button key={format.id} onClick={() => onStartQuickShort(format.id)}>
+              <strong>{format.name}</strong>
+              <span>{format.description}</span>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -2493,13 +2622,13 @@ function ShowDashboard({
         </div>
         <div>
           <strong>{timelineCount}</strong>
-          <span>timeline</span>
+          <span>cuts</span>
         </div>
       </section>
 
       <section className="dashboardGrid">
         <div className="dashboardPanel">
-          <h2>Start Fast</h2>
+          <h2>Reusable Formats</h2>
           <div className="templateGrid">
             {templates.map((template) => (
               <button key={template.id} onClick={() => onApplyTemplate(template.id)}>
@@ -2511,23 +2640,23 @@ function ShowDashboard({
         </div>
 
         <div className="dashboardPanel">
-          <h2>Jump To</h2>
+          <h2>Keep Going</h2>
           <div className="dashboardActions">
             <button onClick={() => onModeChange("build")}>
               <Sparkles size={16} />
-              Playground
+              Build Rig
             </button>
             <button onClick={() => onAssetSearch("furniture", "object")}>
               <Library size={16} />
-              Find Props
+              Build Set
             </button>
             <button onClick={() => onModeChange("perform")}>
               <Circle size={16} />
-              Perform
+              Rehearse
             </button>
             <button onClick={() => onModeChange("edit")}>
               <ListChecks size={16} />
-              Review Takes
+              Finish Short
             </button>
           </div>
           {savedShows[0] && (
@@ -2607,6 +2736,93 @@ function ContextualInspector({
         <button onClick={() => onAssetSearch("furniture", "object")}>Find Props</button>
         <button onClick={() => onModeChange("edit")}>Review</button>
       </div>
+    </div>
+  );
+}
+
+function BeginnerRoadmap({
+  progress,
+  selectedTake,
+  recording,
+  onModeChange,
+  onStartQuickShort,
+  onRecordToggle,
+  onReplay,
+  onSaveScene,
+  onExport
+}) {
+  const steps = [
+    {
+      id: "short",
+      label: "Start a short",
+      done: progress.hasRig || progress.hasSet,
+      action: onStartQuickShort,
+      actionLabel: "Make a Short"
+    },
+    {
+      id: "rig",
+      label: "Make the rig yours",
+      done: progress.hasRig,
+      action: () => onModeChange("build"),
+      actionLabel: "Build Rig"
+    },
+    {
+      id: "set",
+      label: "Build the space",
+      done: progress.hasSet,
+      action: () => onModeChange("assets"),
+      actionLabel: "Build Set"
+    },
+    {
+      id: "perform",
+      label: "Rehearse and record",
+      done: progress.hasTake,
+      action: progress.hasRehearsed ? onRecordToggle : () => onModeChange("perform"),
+      actionLabel: recording ? "Stop Take" : progress.hasRehearsed ? "Record Take" : "Rehearse"
+    },
+    {
+      id: "replay",
+      label: "Replay and save scene",
+      done: progress.hasCut,
+      action: selectedTake ? onReplay : () => onModeChange("edit"),
+      actionLabel: selectedTake ? "Replay" : "Review"
+    },
+    {
+      id: "export",
+      label: "Export package",
+      done: false,
+      action: progress.readyToExport ? onExport : () => onModeChange("edit"),
+      actionLabel: progress.readyToExport ? "Export" : "Finish"
+    }
+  ];
+
+  return (
+    <div className="dockGroup beginnerRoadmap">
+      <h2>Make A Short</h2>
+      <div className="roadmapList">
+        {steps.map((step, index) => (
+          <div className={`roadmapStep ${step.done ? "done" : ""}`} key={step.id}>
+            <span>{index + 1}</span>
+            <strong>{step.label}</strong>
+            <button onClick={step.action}>{step.actionLabel}</button>
+          </div>
+        ))}
+      </div>
+      {selectedTake && (
+        <div className="roadmapReward">
+          <strong>That is a cartoon now.</strong>
+          <div className="libraryActions">
+            <button onClick={onReplay}>
+              <Play size={16} />
+              Replay
+            </button>
+            <button onClick={onSaveScene}>
+              <Clapperboard size={16} />
+              Save Scene
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2755,8 +2971,17 @@ function ShowBiblePanel({
         </span>
       </div>
       <small className="controlHint">Status: {episodeStatus.replaceAll("_", " ")}</small>
+      <div className="showObjectMap">
+        <span>Show</span>
+        <span>Rig</span>
+        <span>Set</span>
+        <span>Scene</span>
+        <span>Take</span>
+        <span>Cut</span>
+        <span>Export</span>
+      </div>
       <div className="libraryActions">
-        <button onClick={() => onModeChange("build")}>Cast</button>
+        <button onClick={() => onModeChange("build")}>Rigs</button>
         <button onClick={() => onModeChange("assets")}>Props</button>
         <button onClick={onSaveShow}>
           <Save size={16} />
@@ -3564,7 +3789,8 @@ function SceneLibraryEditor({
   episodeStatus,
   onEpisodeStatusChange,
   onRemoveTimelineClip,
-  onExportProject
+  onExportProject,
+  onModeChange
 }) {
   return (
     <div className="sceneEditor">
@@ -3601,7 +3827,11 @@ function SceneLibraryEditor({
             ))}
           </div>
         ) : (
-          <div className="emptyState">No recorded takes yet.</div>
+          <div className="emptyState actionEmpty">
+            <strong>No recorded takes yet.</strong>
+            <span>Rehearse the scene, then record one short performance.</span>
+            <button onClick={() => onModeChange("perform")}>Go Perform</button>
+          </div>
         )}
       </div>
 
@@ -3736,7 +3966,7 @@ function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">No episode clips yet.</div>
+        <div className="emptyState">Add a take or storyboard panel to create the rough cut.</div>
       )}
       <button className="wideAction" onClick={onExportProject}>
         <Video size={16} />
@@ -4013,7 +4243,12 @@ function CharacterEditor({
   const selectedStyle = getCatalogItem(animationStyleCatalog, stylePreset);
   const behaviorPreset = performer.state.behaviorPreset || "none";
   const characterParts = performer.state.characterParts || {};
-  const hasParts = Object.values(characterParts).some((part) => part?.source || part?.shape || part?.mode === "drawn");
+  const coreParts = characterPartCatalog.filter((part) => corePartSlots.includes(part.id));
+  const addOnParts = characterPartCatalog.filter((part) => extraPartSlots.includes(part.id));
+  const hasParts = corePartSlots.some((slot) => {
+    const part = characterParts[slot];
+    return part?.source || part?.shape || part?.mode === "drawn";
+  });
   const design = {
     name: performer.state.characterDesign?.name || `${baseCharacter.name} Puppet`,
     color: performer.state.characterDesign?.color || baseCharacter.color,
@@ -4043,7 +4278,28 @@ function CharacterEditor({
           Start with simple shapes, mark a rough drawn part, or import your own image for each body piece.
         </small>
         <div className="partBuilderList">
-          {characterPartCatalog.map((part) => (
+          {coreParts.map((part) => (
+            <PartBuilderRow
+              key={part.id}
+              part={part}
+              value={characterParts[part.id]}
+              onChange={(patch) => onPartChange(part.id, { label: part.label, ...patch })}
+              onDuplicate={() => onPartDuplicate(part.id)}
+              onSwap={partSwapTargets[part.id] ? () => onPartSwap(part.id) : null}
+              swapName={partSwapTargets[part.id] ? getCatalogItem(characterPartCatalog, partSwapTargets[part.id]).name : ""}
+              onClear={() => onPartClear(part.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="advancedControl dockGroup buildPartsPanel optionalPartsPanel">
+        <h2>Optional Add-Ons</h2>
+        <small className="controlHint">
+          Hats, odd appendages, handheld bits, and extra shapes stay off by default so new rigs open clean.
+        </small>
+        <div className="partBuilderList">
+          {addOnParts.map((part) => (
             <PartBuilderRow
               key={part.id}
               part={part}

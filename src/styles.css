@@ -553,6 +553,61 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
+.recordFlow span.done {
+  background: #8fd8b5;
+}
+
+.makeShortPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border: 3px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(141, 183, 255, 0.18), transparent 46%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.makeShortPanel h2 {
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.05;
+}
+
+.makeShortPanel p {
+  margin: 0;
+  color: #4b4e68;
+}
+
+.shortFormatGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 9px;
+}
+
+.shortFormatGrid button {
+  display: grid;
+  gap: 5px;
+  min-height: 96px;
+  padding: 11px;
+  background: var(--paper);
+  text-align: left;
+  text-transform: none;
+}
+
+.shortFormatGrid strong {
+  color: var(--ink);
+}
+
+.shortFormatGrid span {
+  color: #4b4e68;
+  font-size: 12px;
+}
+
 .dashboardStats,
 .dashboardGrid {
   display: grid;
@@ -1532,6 +1587,88 @@ input[type="color"] {
   display: none;
 }
 
+.beginnerRoadmap {
+  border-color: var(--pond);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(111, 166, 140, 0.18), transparent 42%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.roadmapList {
+  display: grid;
+  gap: 7px;
+}
+
+.roadmapStep {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.roadmapStep > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font-weight: 950;
+}
+
+.roadmapStep.done > span {
+  background: #8fd8b5;
+}
+
+.roadmapStep strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roadmapStep button {
+  min-height: 30px;
+  padding: 0 8px;
+  background: var(--paper);
+  font-size: 10px;
+}
+
+.roadmapReward {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 2px solid var(--ink);
+  background: var(--nicotine);
+}
+
+.roadmapReward strong {
+  color: var(--ink);
+}
+
+.showObjectMap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.showObjectMap span {
+  padding: 4px 6px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: #4b4e68;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .controlCheatSheet {
   padding: 10px;
   border: 2px solid var(--ink);
@@ -1666,6 +1803,13 @@ input[type="color"] {
   background:
     var(--surface-grain),
     linear-gradient(135deg, rgba(141, 183, 255, 0.2), transparent 48%),
+    var(--surface);
+}
+
+.optionalPartsPanel {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(199, 168, 255, 0.16), transparent 48%),
     var(--surface);
 }
 
@@ -2482,6 +2626,26 @@ input[type="color"] {
   border: 1px solid var(--rule);
   color: #666b86;
   background: rgba(245, 241, 232, 0.72);
+}
+
+.actionEmpty {
+  display: grid;
+  gap: 7px;
+}
+
+.actionEmpty strong {
+  color: var(--ink);
+}
+
+.actionEmpty span {
+  color: #666b86;
+}
+
+.actionEmpty button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  background: var(--paper);
 }
 
 .editorStats {
@@ -4765,9 +4929,11 @@ input[type="color"] {
   }
 
   .dashboardHero,
+  .makeShortPanel,
   .dashboardGrid,
   .dashboardStats,
-  .templateGrid {
+  .templateGrid,
+  .shortFormatGrid {
     grid-template-columns: 1fr;
   }
 
