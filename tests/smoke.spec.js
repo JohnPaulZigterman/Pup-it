@@ -42,7 +42,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByRole("button", { name: "Finish" }).first().click();
   await expect(page.getByRole("heading", { name: "Episode Pipeline" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Submit to DoinkTV" })).toBeDisabled();
+  await expect(page.locator(".finishActionBar").getByRole("button", { name: "DoinkTV" })).toBeDisabled();
+  await expect(page.locator(".finishActionBar").getByRole("button", { name: "Export WEBM" })).toBeDisabled();
   await expect(page.getByText("Takes recorded")).toBeVisible();
 });
 

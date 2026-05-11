@@ -3230,6 +3230,16 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.finishReadinessPanel {
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(227, 189, 69, 0.18), transparent 44%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
 .submissionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

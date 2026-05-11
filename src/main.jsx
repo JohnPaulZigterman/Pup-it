@@ -2071,29 +2071,9 @@ function App() {
     });
   };
 
-  const exportTake = async () => {
-    const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/take`);
-    const take = await response.json();
-    downloadTake(take);
-  };
-
   const openReviewMode = () => {
     loadTakeLibrary();
     setMode("edit");
-  };
-
-  const downloadTake = (take) => {
-    const blob = new Blob([JSON.stringify(take, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `pup-it-${take.roomId || roomId}-${take.id || "take"}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setExportHistory((current) => [
-      { id: `take-${Date.now()}`, type: "take-json", exportedAt: new Date().toISOString() },
-      ...current
-    ]);
   };
 
   const downloadJson = (payload, filename) => {
@@ -2753,7 +2733,7 @@ function App() {
             <Theater size={34} />
             <div>
               <h1>Pup-It</h1>
-              <p>Live collaborative puppet animation.</p>
+              <p>Just make your show already</p>
             </div>
           </div>
           <form onSubmit={joinRoom} className="joinForm">
@@ -3068,9 +3048,7 @@ function App() {
             onMarkBestTake={markSelectedTakeBest}
             onQuickTrim={quickTrimSelectedTake}
             onSaveTakeAsScene={saveSelectedTakeAsScene}
-            onExport={downloadTake}
             onExportProject={exportProject}
-            onQueueVideoExport={queueVideoExport}
             onExportVideo={exportSelectedTakeVideo}
             videoExporting={videoExporting}
             doinkSubmission={doinkSubmission}
@@ -4655,9 +4633,7 @@ function SceneLibraryEditor({
   onMarkBestTake,
   onQuickTrim,
   onSaveTakeAsScene,
-  onExport,
   onExportProject,
-  onQueueVideoExport,
   onExportVideo,
   videoExporting,
   doinkSubmission,
@@ -4780,10 +4756,6 @@ function SceneLibraryEditor({
                 <Plus size={16} />
                 Add Cut
               </button>
-              <button onClick={onExportVideo} disabled={videoExporting}>
-                <Video size={16} />
-                {videoExporting ? "Rendering" : "720p WEBM"}
-              </button>
             </div>
           </div>
 
@@ -4840,33 +4812,15 @@ function SceneLibraryEditor({
             )}
           </div>
 
-          <div className="dockGroup exportPlanPanel">
-            <h2>Export Short</h2>
-            <small className="controlHint">720p WEBM gives a real browser-rendered review file; package export carries project data, audio tracks, credits, and metadata.</small>
+          <div className="dockGroup exportPlanPanel finishReadinessPanel">
+            <h2>Finish Readiness</h2>
+            <small className="controlHint">Use the Finish actions at the top for WEBM, package, and DoinkTV submission.</small>
             <div className="renderChecklist">
-              <span className="done">Preview</span>
+              <span className={selectedTake ? "done" : ""}>Take</span>
               <span className={selectedTake.tracks.audio.length ? "done" : ""}>Audio</span>
               <span className={selectedTake.sceneObjects?.length ? "done" : ""}>Props</span>
               <span className={timeline.length ? "done" : ""}>Cut</span>
               <span className={reviewReadyStatuses.includes(episodeStatus) ? "done" : ""}>Review</span>
-            </div>
-            <div className="libraryActions">
-              <button onClick={onExportProject}>
-                <Save size={16} />
-                Short Package
-              </button>
-              <button onClick={() => onExport(selectedTake)}>
-                <Video size={16} />
-                Raw Take JSON
-              </button>
-              <button onClick={onExportVideo} disabled={videoExporting}>
-                <Clapperboard size={16} />
-                {videoExporting ? "Rendering" : "720p WEBM"}
-              </button>
-              <button onClick={onQueueVideoExport}>
-                <Clapperboard size={16} />
-                Render Roadmap
-              </button>
             </div>
           </div>
         </>
@@ -4958,14 +4912,7 @@ function SceneLibraryEditor({
           <span className={doinkSubmission.creatorName.trim() ? "done" : ""}>Credit name</span>
           <span className={doinkSubmission.rightsNotes.trim() ? "done" : ""}>Rights note</span>
         </div>
-        <button
-          className="wideAction"
-          onClick={onSubmitToDoinkTv}
-          disabled={!hasSubmissionSource || doinkSubmitting}
-        >
-          <ExternalLink size={16} />
-          {doinkSubmitting ? "Submitting" : "Submit to DoinkTV"}
-        </button>
+        <small className="controlHint">When these notes look right, use the DoinkTV button in Finish actions.</small>
       </div>
 
       <div className="dockGroup">
@@ -5005,13 +4952,12 @@ function SceneLibraryEditor({
       <ProductionTimeline
         clips={timeline}
         onRemoveClip={onRemoveTimelineClip}
-        onExportProject={onExportProject}
       />
     </div>
   );
 }
 
-function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
+function ProductionTimeline({ clips, onRemoveClip }) {
   return (
     <div className="dockGroup productionTimelinePanel">
       <h2>Episode Assembly</h2>
@@ -5039,13 +4985,8 @@ function ProductionTimeline({ clips, onRemoveClip, onExportProject }) {
         <div className="emptyState actionEmpty">
           <strong>No rough cut yet.</strong>
           <span>Add the selected take above, or storyboard a shot and add that panel.</span>
-          <button onClick={onExportProject}>Export Current Package</button>
         </div>
       )}
-      <button className="wideAction" onClick={onExportProject}>
-        <Video size={16} />
-        Export Short Package
-      </button>
     </div>
   );
 }
