@@ -28,6 +28,30 @@ npm run dev
 The client runs on Vite's default port, usually `http://localhost:5173`.
 The realtime server runs on `http://localhost:4111`.
 
+## Postgres Persistence
+
+Pup-It is set up to use Postgres for durable show and episode data while keeping live performance rooms in memory for fast realtime puppeteering.
+
+Set `DATABASE_URL`, then run the migration:
+
+```bash
+$env:DATABASE_URL="postgres://user:password@localhost:5432/pup_it"
+npm run db:migrate
+npm run dev
+```
+
+The current persisted API surface is intentionally small and expandable:
+
+- `GET /api/shows`
+- `POST /api/shows`
+- `PUT /api/shows/:showId`
+- `GET /api/shows/:showId`
+- `GET /api/shows/:showId/episodes`
+- `POST /api/shows/:showId/episodes`
+- `PATCH /api/episodes/:episodeId/status`
+
+If `DATABASE_URL` is not configured, the app still runs and show saving falls back to browser storage.
+
 ## Architecture Direction
 
 - `shared/` contains data contracts and reusable logic used by both browser and server.
@@ -35,6 +59,8 @@ The realtime server runs on `http://localhost:4111`.
 - `src/renderer/` owns visual puppet rendering so new looks can be swapped in later.
 - `src/modules/` is the early registry for workflow modes and future plug-in style tools.
 - `server/` owns realtime rooms, recording sessions, and export endpoints.
+- `server/repositories/` owns persistence boundaries so Postgres can grow without leaking SQL through the app.
+- `server/migrations/` owns database schema changes.
 
 The intended growth pattern is to add capabilities as modules around stable schemas, not to keep expanding one large app file.
 

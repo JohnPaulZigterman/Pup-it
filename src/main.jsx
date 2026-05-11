@@ -8,6 +8,7 @@ import {
   Clapperboard,
   Circle,
   Copy,
+  ExternalLink,
   FolderOpen,
   HelpCircle,
   Library,
@@ -28,6 +29,15 @@ import {
   Wand2,
   X
 } from "lucide-react";
+import {
+  assetFormatCatalog,
+  assetImportTypeCatalog,
+  assetSceneSearchPresets,
+  assetTargetCatalog,
+  curatedAssetLibrary,
+  getAssetSearchText,
+  isOneClickSafeAsset
+} from "../shared/assetLibrary.js";
 import {
   cameraShotCatalog,
   createProjectExport,
@@ -185,6 +195,63 @@ function writeStoredShows(shows) {
   window.localStorage.setItem(SHOW_STORAGE_KEY, JSON.stringify(shows));
 }
 
+function showSessionFromPersistedShow(show) {
+  const showBible = show.showBible || {};
+  const houseStyle = show.houseStyle || {};
+  return {
+    schemaVersion: "pup-it.show.v1",
+    id: show.slug || show.id,
+    databaseId: show.id,
+    showName: show.showName || show.name || "Untitled Show",
+    savedAt: show.updatedAt || show.updated_at || new Date().toISOString(),
+    roomId: showBible.roomId || defaultRoomId,
+    scene: houseStyle.scene || sceneCatalog[0].id,
+    cameraShot: houseStyle.cameraShot || "wide",
+    lightingPreset: houseStyle.lightingPreset || "scene",
+    backgroundTheme: houseStyle.backgroundTheme || "painted-depth",
+    objectStyle: houseStyle.objectStyle || "soft-material",
+    cast: show.cast || [],
+    assetReferences: show.assetReferences || [],
+    storyboardPanels: showBible.storyboardPanels || [],
+    productionTimeline: showBible.productionTimeline || [],
+    takes: showBible.takes || []
+  };
+}
+
+async function fetchPersistedShows() {
+  const response = await fetch(`${SERVER_URL}/api/shows`);
+  if (!response.ok) throw new Error("Show database unavailable");
+  const data = await response.json();
+  return (data.shows || []).map(showSessionFromPersistedShow);
+}
+
+async function persistShowSession(session) {
+  const response = await fetch(`${SERVER_URL}/api/shows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...session,
+      slug: session.id,
+      houseStyle: {
+        scene: session.scene,
+        cameraShot: session.cameraShot,
+        lightingPreset: session.lightingPreset,
+        backgroundTheme: session.backgroundTheme,
+        objectStyle: session.objectStyle
+      },
+      showBible: {
+        roomId: session.roomId,
+        storyboardPanels: session.storyboardPanels,
+        productionTimeline: session.productionTimeline,
+        takes: session.takes
+      }
+    })
+  });
+  if (!response.ok) throw new Error("Show database unavailable");
+  const data = await response.json();
+  return showSessionFromPersistedShow(data.show);
+}
+
 function summarizeTakeForShow(take) {
   return {
     id: take.id,
@@ -245,6 +312,10 @@ function App() {
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const [productionTimeline, setProductionTimeline] = useState([]);
+  const [assetReferences, setAssetReferences] = useState([]);
+  const [assetFilter, setAssetFilter] = useState("all");
+  const [assetTarget, setAssetTarget] = useState("all");
+  const [assetSearch, setAssetSearch] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
@@ -367,12 +438,25 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const shows = loadStoredShows();
-    setSavedShows(shows);
-    if (shows[0]) {
-      setSelectedShowId(shows[0].id);
-      setShowName(shows[0].showName);
-    }
+    let active = true;
+    const loadShows = async () => {
+      let shows = [];
+      try {
+        shows = await fetchPersistedShows();
+      } catch (_error) {
+        shows = loadStoredShows();
+      }
+      if (!active) return;
+      setSavedShows(shows);
+      if (shows[0]) {
+        setSelectedShowId(shows[0].id);
+        setShowName(shows[0].showName);
+      }
+    };
+    loadShows();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -471,6 +555,80 @@ function App() {
       rigConfig: makeOriginalRig(),
       stylePreset: pickRandom(animationStyleCatalog).id
     });
+  };
+
+  const rememberAssetReference = (asset, importType) => {
+    const reference = {
+      id: `${asset.id}-${importType}`,
+      assetId: asset.id,
+      name: asset.name,
+      provider: asset.provider,
+      sourceUrl: asset.sourceUrl,
+      license: asset.license,
+      attribution: asset.attribution,
+      format: asset.format,
+      targets: asset.targets || [],
+      importType,
+      addedAt: new Date().toISOString()
+    };
+    setAssetReferences((current) => [
+      reference,
+      ...current.filter((item) => item.id !== reference.id)
+    ]);
+  };
+
+  const importAsset = (assetId, importType) => {
+    const asset = curatedAssetLibrary.find((item) => item.id === assetId);
+    if (!asset) return;
+    const safe = isOneClickSafeAsset(asset);
+    rememberAssetReference(asset, importType);
+
+    if (importType === "convert-to-puppet" && safe && self) {
+      const nextCharacter = asset.recommended?.character || self.character;
+      const baseCharacter = getCatalogItem(characterCatalog, nextCharacter);
+      const nextState = createPerformerState({
+        ...self.state,
+        rigConfig: {
+          ...baseCharacter.rigConfig,
+          ...self.state.rigConfig,
+          ...asset.recommended?.rigConfig
+        },
+        stylePreset: asset.recommended?.stylePreset || self.state.stylePreset,
+        characterDesign: {
+          name: asset.recommended?.characterDesign?.name || `${asset.name} Base`,
+          color: asset.recommended?.characterDesign?.color || self.state.characterDesign?.color || baseCharacter.color,
+          accent:
+            asset.recommended?.characterDesign?.accent || self.state.characterDesign?.accent || baseCharacter.accent
+        },
+        mouthOpen: 0,
+        speaking: false,
+        macro: null,
+        walking: false
+      });
+      const nextPerformer = { ...self, character: nextCharacter, state: nextState };
+      setCharacter(nextCharacter);
+      setPerformers((current) => upsertPerformer(current, nextPerformer));
+      socketRef.current.emit("performer:configure", {
+        name: nextPerformer.name,
+        character: nextPerformer.character,
+        state: nextPerformer.state
+      });
+      setStatus(`Converted "${asset.name}" into a customizable puppet starter.`);
+      return;
+    }
+
+    if (importType === "use-as-sprite" && safe) {
+      if (asset.recommended?.backgroundTheme) setBackgroundTheme(asset.recommended.backgroundTheme);
+      if (asset.recommended?.objectStyle) setObjectStyle(asset.recommended.objectStyle);
+      setStatus(`Added "${asset.name}" as a sprite/reference asset for this show.`);
+      return;
+    }
+
+    setStatus(
+      safe
+        ? `Added "${asset.name}" to this show's asset references.`
+        : `"${asset.name}" was saved as reference-only until its license is reviewed.`
+    );
   };
 
   const configureSelfFromShow = (performer) => {
@@ -866,6 +1024,7 @@ function App() {
       lightingPreset,
       backgroundTheme,
       objectStyle,
+      assetReferences,
       storyboardPanels,
       timeline: productionTimeline,
       takes: takeLibrary
@@ -898,26 +1057,35 @@ function App() {
       backgroundTheme,
       objectStyle,
       cast: clonePerformers(activePerformers),
+      assetReferences,
       storyboardPanels,
       productionTimeline,
       takes: takeLibrary.map(summarizeTakeForShow)
     };
   };
 
-  const saveShowSession = () => {
+  const saveShowSession = async () => {
     const session = createShowSession();
-    const nextShows = [
-      session,
-      ...savedShows.filter((show) => show.id !== session.id)
-    ].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
     try {
+      const persistedSession = await persistShowSession(session);
+      const nextShows = [
+        persistedSession,
+        ...savedShows.filter((show) => show.id !== persistedSession.id)
+      ].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+      setSavedShows(nextShows);
+      setSelectedShowId(persistedSession.id);
+      setShowName(persistedSession.showName);
+      setStatus(`Saved show "${persistedSession.showName}" to Postgres.`);
+    } catch (_databaseError) {
+      const nextShows = [
+        session,
+        ...savedShows.filter((show) => show.id !== session.id)
+      ].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
       writeStoredShows(nextShows);
       setSavedShows(nextShows);
       setSelectedShowId(session.id);
       setShowName(session.showName);
-      setStatus(`Saved show "${session.showName}".`);
-    } catch (_error) {
-      setStatus("This browser blocked show saving. Export the project as a backup.");
+      setStatus(`Saved show "${session.showName}" locally. Set DATABASE_URL to enable Postgres persistence.`);
     }
   };
 
@@ -927,6 +1095,7 @@ function App() {
     clearPlayback();
     setSelectedShowId(session.id);
     setShowName(session.showName);
+    setRoomId(session.roomId || roomId);
     setCameraShot(session.cameraShot || "wide");
     setLightingPreset(session.lightingPreset || "scene");
     setBackgroundTheme(session.backgroundTheme || "painted-depth");
@@ -934,6 +1103,7 @@ function App() {
     setStoryboardPanels(session.storyboardPanels || []);
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
+    setAssetReferences(session.assetReferences || []);
     setPreviewPerformers(null);
     changeScene(session.scene || sceneCatalog[0].id);
     const castMember =
@@ -1011,7 +1181,7 @@ function App() {
         </div>
         <div className="transport">
           <div className="modeSwitch" aria-label="Workflow mode">
-            {["perform", "build", "edit", "storyboard"].map((item) => (
+            {["perform", "build", "assets", "edit", "storyboard"].map((item) => (
               <button
                 key={item}
                 className={mode === item ? "selected" : ""}
@@ -1112,6 +1282,19 @@ function App() {
             onStyleChange={updateCharacterStyle}
             onDesignChange={updateCharacterDesign}
             onRandomize={randomizeCharacterDesign}
+          />
+        )}
+        {mode === "assets" && (
+          <AssetLibraryPanel
+            assets={curatedAssetLibrary}
+            references={assetReferences}
+            filter={assetFilter}
+            target={assetTarget}
+            search={assetSearch}
+            onFilterChange={setAssetFilter}
+            onTargetChange={setAssetTarget}
+            onSearchChange={setAssetSearch}
+            onImportAsset={importAsset}
           />
         )}
         {mode === "edit" && (
@@ -1481,6 +1664,160 @@ function PerformControls({
         </div>
       </div>
     </>
+  );
+}
+
+function AssetLibraryPanel({
+  assets,
+  references,
+  filter,
+  target,
+  search,
+  onFilterChange,
+  onTargetChange,
+  onSearchChange,
+  onImportAsset
+}) {
+  const searchQuery = search.trim().toLowerCase();
+  const filteredAssets = assets.filter((asset) => {
+    const matchesFormat = filter === "all" || asset.format === filter;
+    const matchesTarget = target === "all" || asset.targets?.includes(target);
+    const matchesSearch = !searchQuery || getAssetSearchText(asset).includes(searchQuery);
+    return matchesFormat && matchesTarget && matchesSearch;
+  });
+
+  return (
+    <div className="assetLibrary">
+      <div className="dockGroup">
+        <h2>Asset Library</h2>
+        <div className="editorHeader">
+          <Library size={18} />
+          <div>
+            <strong>Curated Free Sources</strong>
+            <small>CC0 assets can be imported directly. Mixed-license sources stay reference-only.</small>
+          </div>
+        </div>
+        <label className="assetSearchRow">
+          Search
+          <input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="rigs, mouths, diner setting, parody reference..."
+          />
+        </label>
+        <div className="assetPresetSearches" aria-label="Common scene searches">
+          {assetSceneSearchPresets.map((preset) => (
+            <button
+              key={preset}
+              className={search.toLowerCase() === preset ? "selected" : ""}
+              onClick={() => onSearchChange(preset)}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+        <div className="assetTargetBar" aria-label="Asset target filters">
+          <button className={target === "all" ? "selected" : ""} onClick={() => onTargetChange("all")}>
+            All
+          </button>
+          {assetTargetCatalog.map((targetItem) => (
+            <button
+              key={targetItem.id}
+              className={target === targetItem.id ? "selected" : ""}
+              onClick={() => onTargetChange(targetItem.id)}
+            >
+              {targetItem.name}
+            </button>
+          ))}
+        </div>
+        <label>
+          Format
+          <select value={filter} onChange={(event) => onFilterChange(event.target.value)}>
+            <option value="all">All formats</option>
+            {assetFormatCatalog.map((format) => (
+              <option key={format.id} value={format.id}>
+                {format.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="assetCardList">
+        {filteredAssets.length ? filteredAssets.map((asset) => {
+          const safe = isOneClickSafeAsset(asset);
+          const importTypes = assetImportTypeCatalog.filter((type) => asset.importTypes.includes(type.id));
+          return (
+            <article key={asset.id} className={`assetCard ${safe ? "assetSafe" : "assetWarning"}`}>
+              <div className={`assetPreview assetPreview-${asset.previewStyle}`} aria-hidden="true">
+                <span />
+                <i />
+              </div>
+              <div className="assetCardBody">
+                <div className="assetCardTitle">
+                  <strong>{asset.name}</strong>
+                  <span className={`licenseBadge ${safe ? "safe" : "warning"}`}>{asset.license}</span>
+                </div>
+                <small>
+                  {asset.provider} / {getCatalogItem(assetFormatCatalog, asset.format).name}
+                </small>
+                <p>{asset.description}</p>
+                <div className="assetTargets">
+                  {(asset.targets || []).map((targetId) => (
+                    <span key={targetId}>{getCatalogItem(assetTargetCatalog, targetId).name}</span>
+                  ))}
+                </div>
+                <div className="assetTags">
+                  {asset.tags.map((tag) => (
+                    <span key={tag}>{tag}</span>
+                  ))}
+                </div>
+                {!safe && <p className="licenseWarning">{asset.attribution}</p>}
+                <div className="assetActions">
+                  {importTypes.map((type) => (
+                    <button
+                      key={type.id}
+                      disabled={!safe && type.id !== "use-as-reference"}
+                      onClick={() => onImportAsset(asset.id, type.id)}
+                    >
+                      {type.name}
+                    </button>
+                  ))}
+                  {asset.sourceUrl ? (
+                    <a href={asset.sourceUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink size={15} />
+                      Source
+                    </a>
+                  ) : (
+                    <button disabled>Source</button>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        }) : (
+          <div className="emptyState">No assets match that search yet.</div>
+        )}
+      </div>
+
+      <div className="dockGroup">
+        <h2>Show References</h2>
+        {references.length ? (
+          <div className="takeList">
+            {references.map((reference) => (
+              <div className="assetReference" key={reference.id}>
+                <span>{reference.name}</span>
+                <small>
+                  {reference.license} / {reference.importType}
+                </small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">No external assets attached to this show yet.</div>
+        )}
+      </div>
+    </div>
   );
 }
 

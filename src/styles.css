@@ -965,6 +965,324 @@ input[type="color"] {
   gap: 16px;
 }
 
+.assetLibrary {
+  display: grid;
+  gap: 16px;
+}
+
+.assetCardList {
+  display: grid;
+  gap: 12px;
+}
+
+.assetSearchRow {
+  display: grid;
+  gap: 6px;
+}
+
+.assetSearchRow input {
+  min-width: 0;
+}
+
+.assetTargetBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assetPresetSearches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.assetTargetBar button,
+.assetPresetSearches button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.assetPresetSearches button {
+  min-height: 28px;
+  padding: 0 8px;
+  border-width: 1px;
+  background: var(--rail);
+}
+
+.assetTargetBar button.selected,
+.assetPresetSearches button.selected {
+  background: var(--nicotine);
+}
+
+.assetCard {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.assetCard.assetWarning {
+  background:
+    linear-gradient(135deg, rgba(246, 166, 178, 0.18), transparent 44%),
+    var(--surface);
+}
+
+.assetPreview {
+  position: relative;
+  min-height: 92px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  background: #f5f1e8;
+}
+
+.assetPreview span,
+.assetPreview i {
+  position: absolute;
+  display: block;
+}
+
+.assetPreview-modular span {
+  inset: 16px 30px 18px;
+  border-radius: 50% 50% 38% 42%;
+  background: #f1d089;
+}
+
+.assetPreview-modular i {
+  left: 22px;
+  right: 22px;
+  bottom: 12px;
+  height: 16px;
+  border-radius: 999px;
+  background: #425466;
+}
+
+.assetPreview-sprite,
+.assetPreview-pixel {
+  background:
+    linear-gradient(90deg, rgba(43, 45, 66, 0.14) 1px, transparent 1px) 0 0 / 12px 12px,
+    linear-gradient(rgba(255, 242, 168, 0.9), rgba(141, 183, 255, 0.8));
+}
+
+.assetPreview-sprite span,
+.assetPreview-pixel span {
+  left: 31px;
+  top: 22px;
+  width: 30px;
+  height: 42px;
+  border-radius: 8px;
+  background: #f05d5e;
+  box-shadow:
+    -16px 20px 0 -6px #2b2d42,
+    16px 20px 0 -6px #2b2d42;
+}
+
+.assetPreview-kenney {
+  background:
+    radial-gradient(circle at 32% 34%, #8fd8b5 0 14%, transparent 15%),
+    radial-gradient(circle at 70% 62%, #fff2a8 0 18%, transparent 19%),
+    linear-gradient(135deg, #8db7ff, #f5f1e8);
+}
+
+.assetPreview-texture {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 242, 168, 0.9) 0 10%, transparent 11%),
+    radial-gradient(circle at 70% 72%, rgba(240, 93, 94, 0.28) 0 12%, transparent 13%),
+    repeating-linear-gradient(22deg, rgba(43, 45, 66, 0.13) 0 3px, transparent 3px 10px),
+    linear-gradient(135deg, #8fd8b5, #f5f1e8);
+}
+
+.assetPreview-texture span {
+  inset: 18px 20px;
+  border: 2px solid rgba(43, 45, 66, 0.65);
+  background:
+    repeating-linear-gradient(90deg, rgba(43, 45, 66, 0.14) 0 2px, transparent 2px 7px),
+    rgba(245, 241, 232, 0.55);
+}
+
+.assetPreview-object {
+  background:
+    linear-gradient(180deg, #fff2a8 0 48%, #8fd8b5 49% 100%);
+}
+
+.assetPreview-object span {
+  left: 20px;
+  right: 20px;
+  bottom: 18px;
+  height: 34px;
+  border: 2px solid var(--ink);
+  border-radius: 3px 3px 9px 9px;
+  background: #f05d5e;
+}
+
+.assetPreview-object i {
+  left: 34px;
+  right: 34px;
+  top: 25px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  background: #f5f1e8;
+}
+
+.assetPreview-oga,
+.assetPreview-reference,
+.assetPreview-warning {
+  background:
+    repeating-linear-gradient(45deg, rgba(43, 45, 66, 0.12) 0 4px, transparent 4px 12px),
+    #ffd2df;
+}
+
+.assetPreview-oga span,
+.assetPreview-reference span,
+.assetPreview-warning span {
+  inset: 22px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: rgba(245, 241, 232, 0.8);
+}
+
+.assetPreview-reference {
+  background:
+    linear-gradient(90deg, rgba(141, 183, 255, 0.24), transparent 52%),
+    linear-gradient(180deg, #f5f1e8, #fff2a8);
+}
+
+.assetPreview-reference span {
+  inset: 18px 24px 28px;
+  border-radius: 40% 46% 42% 38%;
+  background: #f1d089;
+}
+
+.assetPreview-reference i {
+  left: 26px;
+  right: 26px;
+  bottom: 18px;
+  height: 10px;
+  background: #425466;
+}
+
+.assetCardBody {
+  display: grid;
+  gap: 7px;
+}
+
+.assetCardTitle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.assetCardTitle strong {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetCardBody small,
+.assetCardBody p,
+.licenseWarning,
+.assetReference small {
+  color: #666b86;
+}
+
+.assetCardBody p {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.licenseBadge,
+.assetTags span,
+.assetTargets span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  color: var(--ink);
+  background: var(--rail);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.licenseBadge.safe {
+  background: var(--pond);
+}
+
+.licenseBadge.warning {
+  background: var(--meat);
+}
+
+.assetTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.assetTargets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.assetTargets span {
+  background: #fff2a8;
+}
+
+.assetActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.assetActions button,
+.assetActions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.assetActions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.assetReference {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.assetReference span {
+  color: var(--ink);
+  font-weight: 850;
+}
+
 .storyboardEmpty {
   min-height: 100%;
   display: grid;

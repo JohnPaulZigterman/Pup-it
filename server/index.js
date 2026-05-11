@@ -1,6 +1,15 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import { checkDatabase, isDatabaseConfigured } from "./db.js";
+import {
+  getShow,
+  listEpisodes,
+  listShows,
+  updateEpisodeStatus,
+  upsertEpisode,
+  upsertShow
+} from "./repositories/projectRepository.js";
 import {
   createStoredTake,
   createTakeExport,
@@ -19,6 +28,7 @@ const PORT = Number(process.env.PORT || 4111);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
 const app = express();
+app.use(express.json({ limit: "5mb" }));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -29,6 +39,24 @@ const io = new Server(server, {
 });
 
 const rooms = new Map();
+
+function handleApiError(res, error) {
+  if (error?.code === "DATABASE_NOT_CONFIGURED") {
+    res.status(503).json({
+      error: "Database not configured",
+      detail: "Set DATABASE_URL and run server/migrations/001_core_project_model.sql."
+    });
+    return;
+  }
+
+  if (error?.code === "INVALID_STATUS") {
+    res.status(400).json({ error: error.message });
+    return;
+  }
+
+  console.error(error);
+  res.status(500).json({ error: "Unexpected server error" });
+}
 
 function getRoom(roomId) {
   if (!rooms.has(roomId)) {
@@ -201,8 +229,85 @@ app.get("/api/rooms/:roomId/takes/:takeId", (req, res) => {
   res.json(take);
 });
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/api/shows", async (_req, res) => {
+  try {
+    res.json({ shows: await listShows() });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.post("/api/shows", async (req, res) => {
+  try {
+    res.status(201).json({ show: await upsertShow(req.body) });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.put("/api/shows/:showId", async (req, res) => {
+  try {
+    res.json({ show: await upsertShow({ ...req.body, id: req.params.showId, slug: req.params.showId }) });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get("/api/shows/:showId", async (req, res) => {
+  try {
+    const show = await getShow(req.params.showId);
+    if (!show) {
+      res.status(404).json({ error: "Show not found" });
+      return;
+    }
+    res.json({ show });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get("/api/shows/:showId/episodes", async (req, res) => {
+  try {
+    res.json({ episodes: await listEpisodes(req.params.showId) });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.post("/api/shows/:showId/episodes", async (req, res) => {
+  try {
+    const episode = await upsertEpisode(req.params.showId, req.body);
+    if (!episode) {
+      res.status(404).json({ error: "Show not found" });
+      return;
+    }
+    res.status(201).json({ episode });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.patch("/api/episodes/:episodeId/status", async (req, res) => {
+  try {
+    const episode = await updateEpisodeStatus(req.params.episodeId, req.body.status);
+    if (!episode) {
+      res.status(404).json({ error: "Episode not found" });
+      return;
+    }
+    res.json({ episode });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get("/health", async (_req, res) => {
+  let database = { configured: isDatabaseConfigured(), ok: false };
+  try {
+    database = await checkDatabase();
+  } catch (_error) {
+    database = { configured: true, ok: false };
+  }
+  res.json({ ok: true, database });
 });
 
 server.listen(PORT, () => {
