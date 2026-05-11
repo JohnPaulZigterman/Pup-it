@@ -954,6 +954,62 @@ input[type="color"] {
   mix-blend-mode: soft-light;
 }
 
+.sceneObject {
+  position: absolute;
+  width: 104px;
+  height: 86px;
+  display: grid;
+  place-items: end center;
+  padding: 0 6px 8px;
+  border: 2px solid rgba(38, 41, 54, 0.42);
+  border-radius: 4px;
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 42%),
+    var(--object-tint, var(--surface));
+  box-shadow:
+    7px 9px 0 rgba(38, 41, 54, 0.12),
+    inset -10px -12px rgba(38, 41, 54, 0.08);
+  text-transform: none;
+  transform-origin: bottom center;
+}
+
+.sceneObject span {
+  max-width: 94px;
+  overflow: hidden;
+  padding: 3px 5px;
+  background: rgba(245, 241, 232, 0.8);
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sceneObject.selected {
+  outline: 3px solid var(--nicotine);
+}
+
+.sceneObject-kenney {
+  border-radius: 50% 44% 14px 16px;
+  background:
+    radial-gradient(circle at 30% 32%, var(--pond) 0 18%, transparent 19%),
+    radial-gradient(circle at 70% 48%, var(--nicotine) 0 16%, transparent 17%),
+    var(--object-tint, var(--surface));
+}
+
+.sceneObject-texture,
+.sceneObject-pixel {
+  background:
+    repeating-linear-gradient(32deg, rgba(38, 41, 54, 0.14) 0 3px, transparent 3px 11px),
+    var(--object-tint, var(--surface));
+}
+
+.sceneObject-object {
+  border-radius: 8px 8px 3px 3px;
+  background:
+    linear-gradient(180deg, var(--object-tint, var(--surface)) 0 62%, var(--meat) 63%);
+}
+
 .object-thin-ink .setFloor {
   outline: 1px solid rgba(43, 45, 66, 0.18);
   outline-offset: -6px;
@@ -1597,6 +1653,38 @@ input[type="color"] {
   font-weight: 850;
 }
 
+.sceneObjectList {
+  display: grid;
+  gap: 8px;
+}
+
+.sceneObjectEditor {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.sceneObjectEditor.selected {
+  background:
+    linear-gradient(90deg, rgba(227, 189, 69, 0.2), transparent),
+    var(--surface);
+}
+
+.sceneObjectEditor > button:first-child {
+  min-height: 32px;
+  background: var(--paper);
+  text-transform: none;
+}
+
+.sceneObjectEditor label {
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
 .storyboardEmpty {
   min-height: 100%;
   display: grid;
@@ -1802,6 +1890,28 @@ input[type="color"] {
   min-height: 32px;
   padding: 0;
   background: var(--meat);
+}
+
+.pipelineChecklist {
+  display: grid;
+  gap: 6px;
+}
+
+.pipelineChecklist span {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ink);
+  background: var(--rail);
+  color: #4b4e68;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pipelineChecklist span.done {
+  background: var(--pond);
+  color: var(--ink);
 }
 
 .libraryActions {
@@ -2229,6 +2339,19 @@ input[type="color"] {
   border-radius: 18px 26px 14px 22px;
 }
 
+.body-square .puppetBody {
+  height: 104px;
+  border-radius: 7px;
+}
+
+.body-triangle .puppetBody {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.body-blob .puppetBody {
+  border-radius: 54% 46% 48% 58%;
+}
+
 .animalFeature {
   display: none;
   position: absolute;
@@ -2353,7 +2476,12 @@ input[type="color"] {
 .archetype-owl .beak,
 .archetype-owl .wings,
 .archetype-snake .snout,
-.archetype-snake .tail {
+.archetype-snake .tail,
+.archetype-fuzzball .ears,
+.archetype-moonblock .snout,
+.archetype-shard .ears,
+.archetype-blobstack .ears,
+.archetype-staticling .snout {
   display: block;
 }
 
@@ -2561,6 +2689,197 @@ input[type="color"] {
   height: 54px;
   border-radius: 999px;
   background: rgba(255, 255, 255, calc(var(--highlight-opacity) * 0.32));
+}
+
+.archetype-fuzzball .puppetBody {
+  left: 21px;
+  bottom: 48px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50% 46% 52% 48%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.18) 0 11%, transparent 12%),
+    repeating-radial-gradient(circle at 50% 52%, transparent 0 8px, rgba(255, 255, 255, 0.08) 8px 11px),
+    var(--puppet);
+  box-shadow:
+    0 -9px 0 -5px var(--puppet),
+    14px -6px 0 -7px var(--puppet),
+    -16px 4px 0 -7px var(--puppet),
+    18px 13px 0 -8px var(--puppet),
+    -12px 18px 0 -8px var(--puppet),
+    inset -18px -18px rgba(0, 0, 0, 0.26);
+}
+
+.archetype-fuzzball .ears {
+  inset: -20px -10px auto;
+}
+
+.archetype-fuzzball .ears::before,
+.archetype-fuzzball .ears::after {
+  width: 36px;
+  height: 34px;
+  border-radius: 48% 52% 50% 50%;
+  background: var(--puppet);
+  box-shadow:
+    0 0 0 var(--line-width) var(--outline),
+    11px 9px 0 -8px var(--puppet);
+}
+
+.archetype-fuzzball .eye {
+  top: 42px;
+  color: var(--accent);
+}
+
+.archetype-fuzzball .mouth {
+  top: 70px;
+  background: var(--accent);
+}
+
+.archetype-moonblock .puppetBody {
+  left: 23px;
+  bottom: 54px;
+  width: 98px;
+  height: 112px;
+  border-radius: 2px;
+  transform: rotate(calc(var(--body-lean) + 1deg)) scaleX(var(--body-scale-x)) scaleY(calc(var(--body-squash) * var(--body-scale-y)));
+  background:
+    linear-gradient(90deg, transparent 0 48%, rgba(255, 255, 255, 0.18) 49% 51%, transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 28%),
+    var(--puppet);
+}
+
+.archetype-moonblock .puppetBody::before {
+  inset: 12px 11px auto;
+  width: auto;
+  height: 18px;
+  border: 1px solid rgba(38, 41, 54, 0.3);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.16);
+  transform: none;
+}
+
+.archetype-moonblock .eye {
+  top: 42px;
+  font-size: 28px;
+}
+
+.archetype-moonblock .eye.left {
+  left: 20px;
+}
+
+.archetype-moonblock .eye.right {
+  right: 20px;
+}
+
+.archetype-moonblock .snout {
+  left: 50%;
+  top: 28px;
+  width: 12px;
+  height: 72px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateX(-50%);
+}
+
+.archetype-shard .puppetBody {
+  left: 22px;
+  bottom: 50px;
+  width: 100px;
+  height: 118px;
+  border-radius: 5px 12px 3px 18px;
+  clip-path: polygon(52% 0, 100% 34%, 82% 100%, 18% 88%, 0 24%);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26) 0 22%, transparent 23%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.2) 0 24%, transparent 25%),
+    var(--puppet);
+}
+
+.archetype-shard .ears {
+  inset: -18px 5px auto;
+}
+
+.archetype-shard .ears::before,
+.archetype-shard .ears::after {
+  width: 34px;
+  height: 40px;
+  clip-path: polygon(50% 0, 100% 100%, 0 78%);
+  background: var(--accent);
+}
+
+.archetype-shard .eye {
+  top: 45px;
+}
+
+.archetype-shard .mouth {
+  top: 78px;
+}
+
+.archetype-blobstack .puppetBody {
+  left: 17px;
+  bottom: 46px;
+  width: 110px;
+  height: 124px;
+  border-radius: 52% 48% 45% 55%;
+  background:
+    radial-gradient(ellipse at 50% 18%, var(--accent) 0 28%, transparent 29%),
+    radial-gradient(ellipse at 36% 50%, rgba(255, 255, 255, 0.28) 0 20%, transparent 21%),
+    radial-gradient(ellipse at 58% 78%, rgba(0, 0, 0, 0.1) 0 24%, transparent 25%),
+    var(--puppet);
+}
+
+.archetype-blobstack .ears {
+  inset: 4px 18px auto;
+  height: 90px;
+}
+
+.archetype-blobstack .ears::before,
+.archetype-blobstack .ears::after {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(14px);
+}
+
+.archetype-blobstack .ears::after {
+  transform: translateY(48px) scale(1.24);
+}
+
+.archetype-blobstack .eye {
+  top: 56px;
+}
+
+.archetype-staticling .puppetBody {
+  left: 24px;
+  bottom: 52px;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px 5px 10px 4px;
+  background:
+    repeating-linear-gradient(0deg, rgba(38, 41, 54, 0.14) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(90deg, rgba(141, 183, 255, 0.22) 0 2px, transparent 2px 11px),
+    var(--puppet);
+}
+
+.archetype-staticling .puppetBody::before {
+  inset: 9px;
+  width: auto;
+  height: auto;
+  border: 2px solid rgba(38, 41, 54, 0.34);
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 48% 46%, rgba(255, 255, 255, 0.32) 0 10%, transparent 11%),
+    repeating-linear-gradient(17deg, rgba(38, 41, 54, 0.16) 0 2px, transparent 2px 8px);
+  transform: none;
+}
+
+.archetype-staticling .eye {
+  top: 38px;
+  color: #171821;
+}
+
+.archetype-staticling .mouth {
+  top: 68px;
 }
 
 .style-simple-doodle .puppetBody,

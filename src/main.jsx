@@ -202,6 +202,25 @@ function formatDuration(durationMs = 0) {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function createSceneObjectFromAsset(asset, index = 0) {
+  const isSetting = asset.targets?.includes("setting") || asset.format === "background";
+  return {
+    id: `scene-object-${asset.id}-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    assetId: asset.id,
+    name: asset.name,
+    sourceUrl: asset.sourceUrl,
+    license: asset.license,
+    attribution: asset.attribution,
+    kind: isSetting ? "setting" : "object",
+    x: isSetting ? 50 : 28 + (index % 4) * 14,
+    y: isSetting ? 48 : 66,
+    scale: isSetting ? 1.2 : 0.72,
+    layer: isSetting ? 0 : 2,
+    tint: asset.recommended?.objectStyle === "textured-cutout" ? "#fff2a8" : "#f5f1e8",
+    shape: asset.previewStyle || "object"
+  };
+}
+
 function makePreviewPerformers(take) {
   return indexPerformers(
     take.performers.map((performer, index) => ({
@@ -270,6 +289,8 @@ function showSessionFromPersistedShow(show) {
     backgroundTheme: houseStyle.backgroundTheme || "painted-depth",
     objectStyle: houseStyle.objectStyle || "soft-material",
     cast: show.cast || [],
+    episodeStatus: showBible.episodeStatus || "draft",
+    sceneObjects: showBible.sceneObjects || [],
     assetReferences: show.assetReferences || [],
     storyboardPanels: showBible.storyboardPanels || [],
     productionTimeline: showBible.productionTimeline || [],
@@ -302,6 +323,8 @@ async function persistShowSession(session) {
         roomId: session.roomId,
         storyboardPanels: session.storyboardPanels,
         productionTimeline: session.productionTimeline,
+        episodeStatus: session.episodeStatus,
+        sceneObjects: session.sceneObjects,
         takes: session.takes
       }
     })
@@ -323,7 +346,7 @@ function summarizeTakeForShow(take) {
   };
 }
 
-function createStoryboardPanel({ scene, performers, index, backgroundTheme, objectStyle, texturePreset }) {
+function createStoryboardPanel({ scene, performers, index, backgroundTheme, objectStyle, texturePreset, sceneObjects }) {
   return {
     id: `panel-${Date.now()}-${Math.round(Math.random() * 10000)}`,
     title: `Panel ${index}`,
@@ -335,6 +358,7 @@ function createStoryboardPanel({ scene, performers, index, backgroundTheme, obje
     backgroundTheme: backgroundTheme || "scene-native",
     objectStyle: objectStyle || "match-character",
     texturePreset: texturePreset || "paper-grain",
+    sceneObjects: sceneObjects || [],
     performers: clonePerformers(performers)
   };
 }
@@ -373,6 +397,9 @@ function App() {
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const [productionTimeline, setProductionTimeline] = useState([]);
+  const [episodeStatus, setEpisodeStatus] = useState("draft");
+  const [sceneObjects, setSceneObjects] = useState([]);
+  const [selectedSceneObjectId, setSelectedSceneObjectId] = useState(null);
   const [assetReferences, setAssetReferences] = useState([]);
   const [assetFilter, setAssetFilter] = useState("all");
   const [assetTarget, setAssetTarget] = useState("all");
@@ -471,6 +498,14 @@ function App() {
 
     const keydown = (event) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+      if (event.key === "1") setPose("neutral");
+      if (event.key === "2") setPose("listen");
+      if (event.key === "3") setPose("point");
+      if (event.key === "4") setPose("shrug");
+      if (event.key.toLowerCase() === "z") triggerMacro("wave");
+      if (event.key.toLowerCase() === "x") triggerMacro("hop");
+      if (event.key.toLowerCase() === "c") triggerMacro("panic");
+      if (event.key.toLowerCase() === "h") setIdleMotion(self?.state.idleMotion === "held" ? "subtle" : "held");
       pressed.add(event.key);
     };
     const keyup = (event) => pressed.delete(event.key);
@@ -559,6 +594,16 @@ function App() {
     const pose = getCatalogItem(poseCatalog, poseId);
     updateSelf({ pose: pose.id, expression: pose.expression });
   };
+  const moveSelfToMark = (mark) => {
+    const marks = {
+      left: { x: 30, y: 64 },
+      center: { x: 50, y: 62 },
+      right: { x: 70, y: 64 },
+      back: { x: 50, y: selectedScene.horizon + 12 }
+    };
+    updateSelf({ ...marks[mark], walking: false });
+    setStatus(`Snapped performer to ${mark} mark.`);
+  };
   const setIdleMotion = (idleMotion) => updateSelf({ idleMotion });
   const setMouthOpen = (mouthOpen, { immediate = false } = {}) => {
     const target = clamp(mouthOpen, 0, 1);
@@ -616,6 +661,24 @@ function App() {
       rigConfig: makeOriginalRig(),
       stylePreset: pickRandom(animationStyleCatalog).id
     });
+  };
+
+  const addSceneObjectFromAsset = (asset) => {
+    const sceneObject = createSceneObjectFromAsset(asset, sceneObjects.length);
+    setSceneObjects((current) => [...current, sceneObject]);
+    setSelectedSceneObjectId(sceneObject.id);
+    setStatus(`Placed "${asset.name}" in the scene.`);
+  };
+
+  const updateSceneObject = (objectId, patch) => {
+    setSceneObjects((current) =>
+      current.map((object) => (object.id === objectId ? { ...object, ...patch } : object))
+    );
+  };
+
+  const deleteSceneObject = (objectId) => {
+    setSceneObjects((current) => current.filter((object) => object.id !== objectId));
+    setSelectedSceneObjectId((current) => (current === objectId ? null : current));
   };
 
   const rememberAssetReference = (asset, importType) => {
@@ -681,6 +744,9 @@ function App() {
     if (importType === "use-as-sprite" && safe) {
       if (asset.recommended?.backgroundTheme) setBackgroundTheme(asset.recommended.backgroundTheme);
       if (asset.recommended?.objectStyle) setObjectStyle(asset.recommended.objectStyle);
+      if (asset.targets?.some((targetItem) => ["object", "setting", "sprite"].includes(targetItem))) {
+        addSceneObjectFromAsset(asset);
+      }
       setStatus(`Added "${asset.name}" as a sprite/reference asset for this show.`);
       return;
     }
@@ -974,7 +1040,8 @@ function App() {
       index: storyboardPanels.length + 1,
       backgroundTheme,
       objectStyle,
-      texturePreset: stageTexturePreset
+      texturePreset: stageTexturePreset,
+      sceneObjects
     });
     panel.shot = cameraShot;
     panel.lightingPreset = lightingPreset;
@@ -996,6 +1063,7 @@ function App() {
               backgroundTheme,
               objectStyle,
               texturePreset: stageTexturePreset,
+              sceneObjects,
               performers: clonePerformers(activePerformers)
             }
           : panel
@@ -1085,6 +1153,8 @@ function App() {
       lightingPreset,
       backgroundTheme,
       objectStyle,
+      episodeStatus,
+      sceneObjects,
       assetReferences,
       storyboardPanels,
       timeline: productionTimeline,
@@ -1177,6 +1247,8 @@ function App() {
       backgroundTheme,
       objectStyle,
       cast: clonePerformers(activePerformers),
+      episodeStatus,
+      sceneObjects,
       assetReferences,
       storyboardPanels,
       productionTimeline,
@@ -1220,6 +1292,9 @@ function App() {
     setLightingPreset(session.lightingPreset || "scene");
     setBackgroundTheme(session.backgroundTheme || "painted-depth");
     setObjectStyle(session.objectStyle || "soft-material");
+    setEpisodeStatus(session.episodeStatus || "draft");
+    setSceneObjects(session.sceneObjects || []);
+    setSelectedSceneObjectId(session.sceneObjects?.[0]?.id || null);
     setStoryboardPanels(session.storyboardPanels || []);
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
@@ -1394,6 +1469,14 @@ function App() {
               <div className="stageLighting" />
               <div className="horizonGuide" />
               <div className="setFloor" />
+              {sceneObjects.map((object) => (
+                <SceneObject
+                  key={object.id}
+                  object={object}
+                  selected={object.id === selectedSceneObjectId}
+                  onSelect={setSelectedSceneObjectId}
+                />
+              ))}
               {stagePerformers.map((performer) => (
                 <Puppet key={performer.id} performer={performer} isSelf={performer.id === selfId} />
               ))}
@@ -1435,6 +1518,7 @@ function App() {
             onObjectStyleChange={setObjectStyle}
             onDirectorAction={applyDirectorAction}
             onStoryboardCapture={addStoryboardPanel}
+            onMoveToMark={moveSelfToMark}
           />
         )}
         {mode === "build" && (
@@ -1453,10 +1537,16 @@ function App() {
             filter={assetFilter}
             target={assetTarget}
             search={assetSearch}
+            sceneObjects={sceneObjects}
+            selectedSceneObjectId={selectedSceneObjectId}
             onFilterChange={setAssetFilter}
             onTargetChange={setAssetTarget}
             onSearchChange={setAssetSearch}
             onImportAsset={importAsset}
+            onPlaceAsset={(asset) => addSceneObjectFromAsset(asset)}
+            onSelectSceneObject={setSelectedSceneObjectId}
+            onUpdateSceneObject={updateSceneObject}
+            onDeleteSceneObject={deleteSceneObject}
           />
         )}
         {mode === "edit" && (
@@ -1470,6 +1560,8 @@ function App() {
             onExport={downloadTake}
             onAddTakeToTimeline={addTakeToTimeline}
             timeline={productionTimeline}
+            episodeStatus={episodeStatus}
+            onEpisodeStatusChange={setEpisodeStatus}
             onRemoveTimelineClip={removeTimelineClip}
             onExportProject={exportProject}
           />
@@ -1771,6 +1863,26 @@ function ContextualInspector({
   );
 }
 
+function SceneObject({ object, selected, onSelect }) {
+  const Component = onSelect ? "button" : "div";
+  return (
+    <Component
+      className={`sceneObject sceneObject-${object.shape} ${selected ? "selected" : ""}`}
+      style={{
+        left: `${object.x}%`,
+        top: `${object.y}%`,
+        zIndex: 40 + object.layer,
+        transform: `translate(-50%, -100%) scale(${object.scale})`,
+        "--object-tint": object.tint
+      }}
+      title={object.name}
+      onClick={onSelect ? () => onSelect(object.id) : undefined}
+    >
+      <span>{object.name}</span>
+    </Component>
+  );
+}
+
 function ShowSessionControls({
   showName,
   savedShows,
@@ -1846,7 +1958,8 @@ function PerformControls({
   mouthCameraActive,
   onMacroTrigger,
   onDirectorAction,
-  onStoryboardCapture
+  onStoryboardCapture,
+  onMoveToMark
 }) {
   return (
     <>
@@ -1946,6 +2059,18 @@ function PerformControls({
       </div>
 
       <div className="dockGroup">
+        <h2>Marks</h2>
+        <div className="shotGrid">
+          {["left", "center", "right", "back"].map((mark) => (
+            <button key={mark} onClick={() => onMoveToMark(mark)}>
+              {mark}
+            </button>
+          ))}
+        </div>
+        <small className="controlHint">Hotkeys: 1-4 poses, Z/X/C macros, H hold idle.</small>
+      </div>
+
+      <div className="dockGroup">
         <h2>Expression</h2>
         <div className="segmented">
           {expressionCatalog.map((expression) => (
@@ -2041,10 +2166,16 @@ function AssetLibraryPanel({
   filter,
   target,
   search,
+  sceneObjects,
+  selectedSceneObjectId,
   onFilterChange,
   onTargetChange,
   onSearchChange,
-  onImportAsset
+  onImportAsset,
+  onPlaceAsset,
+  onSelectSceneObject,
+  onUpdateSceneObject,
+  onDeleteSceneObject
 }) {
   const searchQuery = search.trim().toLowerCase();
   const filteredAssets = assets.filter((asset) => {
@@ -2151,6 +2282,12 @@ function AssetLibraryPanel({
                       {type.name}
                     </button>
                   ))}
+                  <button
+                    disabled={!safe || !asset.targets?.some((targetItem) => ["object", "setting", "sprite"].includes(targetItem))}
+                    onClick={() => onPlaceAsset(asset)}
+                  >
+                    Place
+                  </button>
                   {asset.sourceUrl ? (
                     <a href={asset.sourceUrl} target="_blank" rel="noreferrer">
                       <ExternalLink size={15} />
@@ -2185,6 +2322,68 @@ function AssetLibraryPanel({
           <div className="emptyState">No external assets attached to this show yet.</div>
         )}
       </div>
+
+      <div className="dockGroup">
+        <h2>Scene Objects</h2>
+        {sceneObjects.length ? (
+          <div className="sceneObjectList">
+            {sceneObjects.map((object) => (
+              <div
+                className={`sceneObjectEditor ${object.id === selectedSceneObjectId ? "selected" : ""}`}
+                key={object.id}
+              >
+                <button onClick={() => onSelectSceneObject(object.id)}>{object.name}</button>
+                <label>
+                  X
+                  <input
+                    type="range"
+                    min="5"
+                    max="95"
+                    value={object.x}
+                    onChange={(event) => onUpdateSceneObject(object.id, { x: Number(event.target.value) })}
+                  />
+                </label>
+                <label>
+                  Y
+                  <input
+                    type="range"
+                    min="25"
+                    max="88"
+                    value={object.y}
+                    onChange={(event) => onUpdateSceneObject(object.id, { y: Number(event.target.value) })}
+                  />
+                </label>
+                <label>
+                  Scale
+                  <input
+                    type="range"
+                    min="0.35"
+                    max="1.8"
+                    step="0.05"
+                    value={object.scale}
+                    onChange={(event) => onUpdateSceneObject(object.id, { scale: Number(event.target.value) })}
+                  />
+                </label>
+                <label>
+                  Layer
+                  <input
+                    type="range"
+                    min="0"
+                    max="6"
+                    value={object.layer}
+                    onChange={(event) => onUpdateSceneObject(object.id, { layer: Number(event.target.value) })}
+                  />
+                </label>
+                <button className="danger" onClick={() => onDeleteSceneObject(object.id)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">Search for props or settings, then place them into the scene.</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2199,6 +2398,8 @@ function SceneLibraryEditor({
   onExport,
   onAddTakeToTimeline,
   timeline,
+  episodeStatus,
+  onEpisodeStatusChange,
   onRemoveTimelineClip,
   onExportProject
 }) {
@@ -2298,6 +2499,31 @@ function SceneLibraryEditor({
         </>
       )}
 
+      <div className="dockGroup">
+        <h2>Episode Pipeline</h2>
+        <label>
+          Status
+          <select value={episodeStatus} onChange={(event) => onEpisodeStatusChange(event.target.value)}>
+            <option value="draft">Draft</option>
+            <option value="rough_cut">Rough Cut</option>
+            <option value="ready_for_review">Ready for Review</option>
+            <option value="approved">Approved</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="published">Published</option>
+          </select>
+        </label>
+        <div className="pipelineChecklist">
+          <span className={takes.length ? "done" : ""}>Takes recorded</span>
+          <span className={timeline.length ? "done" : ""}>Timeline assembled</span>
+          <span className={selectedTake?.audioTrackCount || selectedTake?.tracks?.audio?.length ? "done" : ""}>
+            Character audio tracked
+          </span>
+          <span className={["approved", "scheduled", "published"].includes(episodeStatus) ? "done" : ""}>
+            Producer approved
+          </span>
+        </div>
+      </div>
+
       <ProductionTimeline
         clips={timeline}
         onRemoveClip={onRemoveTimelineClip}
@@ -2394,6 +2620,9 @@ function PanelFrame({ panel }) {
         <div className="stageLighting" />
         <div className="horizonGuide" />
         <div className="setFloor" />
+        {(panel.sceneObjects || []).map((object) => (
+          <SceneObject key={object.id} object={object} selected={false} />
+        ))}
         {panel.performers.map((performer) => (
           <Puppet key={performer.id} performer={performer} isSelf={false} />
         ))}

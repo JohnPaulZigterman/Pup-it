@@ -74,6 +74,101 @@ export const characterCatalog = [
       walkCycle: "floaty",
       mouthStyle: "minimal"
     }
+  },
+  {
+    id: "fuzzball",
+    name: "Fuzzball",
+    archetype: "fuzzball",
+    rig: "abstract",
+    stylePreset: "adult-surreal",
+    color: "#2d2b36",
+    accent: "#f6d94f",
+    rigConfig: {
+      body: "round",
+      limbs: "stick",
+      arms: false,
+      legs: false,
+      armLength: 18,
+      legLength: 16,
+      walkCycle: "floaty",
+      mouthStyle: "minimal"
+    }
+  },
+  {
+    id: "moonblock",
+    name: "Moonblock",
+    archetype: "moonblock",
+    rig: "abstract",
+    stylePreset: "abstract-block",
+    color: "#63b7d8",
+    accent: "#f4e36f",
+    rigConfig: {
+      body: "square",
+      limbs: "stick",
+      arms: false,
+      legs: false,
+      armLength: 18,
+      legLength: 16,
+      walkCycle: "stiff",
+      mouthStyle: "shape"
+    }
+  },
+  {
+    id: "shard",
+    name: "Shard",
+    archetype: "shard",
+    rig: "abstract",
+    stylePreset: "adult-surreal",
+    color: "#d76d58",
+    accent: "#fff2a8",
+    rigConfig: {
+      body: "triangle",
+      limbs: "hinged",
+      arms: true,
+      legs: true,
+      armLength: 34,
+      legLength: 24,
+      walkCycle: "stiff",
+      mouthStyle: "minimal"
+    }
+  },
+  {
+    id: "blobstack",
+    name: "Blob Stack",
+    archetype: "blobstack",
+    rig: "abstract",
+    stylePreset: "borderless-painterly",
+    color: "#8fd8b5",
+    accent: "#c7a8ff",
+    rigConfig: {
+      body: "blob",
+      limbs: "noodle",
+      arms: true,
+      legs: false,
+      armLength: 34,
+      legLength: 18,
+      walkCycle: "floaty",
+      mouthStyle: "flap"
+    }
+  },
+  {
+    id: "staticling",
+    name: "Staticling",
+    archetype: "staticling",
+    rig: "abstract",
+    stylePreset: "paper-cutout",
+    color: "#f5f1e8",
+    accent: "#8db7ff",
+    rigConfig: {
+      body: "square",
+      limbs: "stick",
+      arms: true,
+      legs: true,
+      armLength: 30,
+      legLength: 24,
+      walkCycle: "rubber",
+      mouthStyle: "shape"
+    }
   }
 ];
 
@@ -779,7 +874,10 @@ export const styleAdapterCatalog = [
 export const bodyShapeCatalog = [
   { id: "round", name: "Round" },
   { id: "tall", name: "Tall" },
-  { id: "block", name: "Block" }
+  { id: "block", name: "Block" },
+  { id: "square", name: "Square" },
+  { id: "triangle", name: "Shard" },
+  { id: "blob", name: "Blob" }
 ];
 
 export const limbStyleCatalog = [
