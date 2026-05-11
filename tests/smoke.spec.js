@@ -55,6 +55,9 @@ test("production workflow supports dashboard, asset placement, controls, and epi
 
   await expect(page.getByRole("heading", { name: "Scene Objects" })).toBeVisible();
   await expect(page.locator(".sceneObjectEditor")).toHaveCount(1);
+  await expect(page.getByLabel("Canvas object editor")).toBeVisible();
+  await page.getByLabel("Canvas object editor").getByRole("button", { name: "Right" }).click();
+  await expect(page.locator(".sceneObject.selected")).toBeVisible();
 
   await page.getByRole("button", { name: "Perform" }).first().click();
   await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();

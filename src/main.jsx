@@ -3651,6 +3651,20 @@ function App() {
                   showLabel={showStageMarkers}
                 />
               ))}
+              {mode === "assets" && selectedSceneObject ? (
+                <CanvasObjectToolbar
+                  object={selectedSceneObject}
+                  onChange={(patch) => updateSceneObject(selectedSceneObject.id, patch)}
+                  onDuplicate={() => duplicateSceneObject(selectedSceneObject.id)}
+                  onDelete={() => deleteSceneObject(selectedSceneObject.id)}
+                  onLayer={(delta) => moveSceneObjectLayer(selectedSceneObject.id, delta)}
+                />
+              ) : mode === "assets" ? (
+                <div className="spaceCanvasHint">
+                  <strong>Click a prop</strong>
+                  <span>Edit it right on the stage.</span>
+                </div>
+              ) : null}
               {stagePerformers.map((performer) => (
                 <Puppet
                   key={performer.id}
@@ -4482,6 +4496,88 @@ function SceneObject({ object, selected, onSelect, showLabel = true }) {
       {object.imageUrl && <img src={object.imageUrl} alt="" />}
       {showLabel ? <span>{object.name}</span> : null}
     </Component>
+  );
+}
+
+function CanvasObjectToolbar({ object, onChange, onDuplicate, onDelete, onLayer }) {
+  const nudge = (x = 0, y = 0) =>
+    onChange({
+      x: clamp((object.x || 50) + x, 5, 95),
+      y: clamp((object.y || 65) + y, 25, 88)
+    });
+
+  return (
+    <div className="canvasObjectToolbar" aria-label="Canvas object editor">
+      <div className="canvasObjectHeader">
+        <span
+          className={`canvasObjectPreview sceneObject-${object.shape || "object"} objectTexture-${object.texturePreset || "paper-grain"}`}
+          style={{ "--object-tint": object.tint || "#f5f1e8" }}
+        >
+          {object.imageUrl ? <img src={object.imageUrl} alt="" /> : null}
+        </span>
+        <div>
+          <strong>{object.name}</strong>
+          <small>{object.locked ? "locked" : object.hidden ? "hidden" : "editing on canvas"}</small>
+        </div>
+      </div>
+      <div className="canvasObjectState">
+        <span>{Math.round((object.scale || 1) * 100)}%</span>
+        <span>Layer {object.layer || 0}</span>
+        <span>{object.flipped ? "Flipped" : "Normal"}</span>
+        <span>{object.hidden ? "Hidden" : "Visible"}</span>
+      </div>
+      <div className="canvasObjectNudge" aria-label="Canvas object nudge controls">
+        <button type="button" disabled={object.locked} onClick={() => nudge(0, -3)}>Up</button>
+        <button type="button" disabled={object.locked} onClick={() => nudge(-3, 0)}>Left</button>
+        <button type="button" disabled={object.locked} onClick={() => onChange({ x: 50, y: 68 })}>Center</button>
+        <button type="button" disabled={object.locked} onClick={() => nudge(3, 0)}>Right</button>
+        <button type="button" disabled={object.locked} onClick={() => nudge(0, 3)}>Down</button>
+      </div>
+      <div className="canvasObjectHandles">
+        <button type="button" disabled={object.locked} onClick={() => onChange({ scale: Math.max(0.35, (object.scale || 1) - 0.08) })}>
+          - Size
+        </button>
+        <button type="button" disabled={object.locked} onClick={() => onChange({ scale: Math.min(1.8, (object.scale || 1) + 0.08) })}>
+          + Size
+        </button>
+        <button type="button" disabled={object.locked} onClick={() => onLayer(-1)}>
+          Back
+        </button>
+        <button type="button" disabled={object.locked} onClick={() => onLayer(1)}>
+          Front
+        </button>
+      </div>
+      <div className="canvasObjectSwatches" aria-label="Canvas object colors">
+        {characterColorSwatches.slice(0, 8).map((color) => (
+          <button
+            type="button"
+            key={color}
+            className={object.tint === color ? "selected" : ""}
+            aria-label={`Use ${color}`}
+            style={{ background: color }}
+            disabled={object.locked}
+            onClick={() => onChange({ tint: color })}
+          />
+        ))}
+      </div>
+      <div className="canvasObjectFooter">
+        <button type="button" onClick={() => onChange({ flipped: !object.flipped })} disabled={object.locked}>
+          Flip
+        </button>
+        <button type="button" onClick={() => onChange({ locked: !object.locked })}>
+          {object.locked ? "Unlock" : "Lock"}
+        </button>
+        <button type="button" onClick={() => onChange({ hidden: !object.hidden, locked: false })}>
+          {object.hidden ? "Show" : "Hide"}
+        </button>
+        <button type="button" onClick={onDuplicate}>
+          Clone
+        </button>
+        <button type="button" className="danger" onClick={onDelete}>
+          Remove
+        </button>
+      </div>
+    </div>
   );
 }
 
