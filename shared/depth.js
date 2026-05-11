@@ -31,6 +31,7 @@ export function movePerformerState(state, input, depthModel = defaultDepthModel)
     x: nextX,
     y: nextY,
     scale: nextScale,
-    facing: input.dx === 0 ? state.facing : input.dx > 0 ? 1 : -1
+    facing: input.dx === 0 ? state.facing : input.dx > 0 ? 1 : -1,
+    walking: input.dx !== 0 || input.dy !== 0
   };
 }

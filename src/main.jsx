@@ -5,6 +5,7 @@ import {
   Circle,
   Mic,
   MicOff,
+  Palette,
   Radio,
   Square,
   Theater,
@@ -13,10 +14,15 @@ import {
 } from "lucide-react";
 import {
   characterCatalog,
+  animationStyleCatalog,
+  bodyShapeCatalog,
   expressionCatalog,
   getCatalogItem,
+  limbStyleCatalog,
   macroCatalog,
-  sceneCatalog
+  mouthStyleCatalog,
+  sceneCatalog,
+  walkCycleCatalog
 } from "../shared/catalogs.js";
 import { defaultCharacterId, defaultRoomId } from "../shared/schema.js";
 import {
@@ -46,6 +52,7 @@ function App() {
   const [selfId, setSelfId] = useState(null);
   const [recording, setRecording] = useState(false);
   const [micLive, setMicLive] = useState(false);
+  const [mode, setMode] = useState("perform");
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
 
   const self = performers[selfId];
@@ -97,7 +104,15 @@ function App() {
         if (!performer) return current;
 
         const input = inputFromPressedKeys(pressed);
-        if (!hasInput(input)) return current;
+        if (!hasInput(input)) {
+          if (!performer.state.walking) return current;
+          const nextPerformer = {
+            ...performer,
+            state: { ...performer.state, walking: false }
+          };
+          socketRef.current.emit("performer:update", nextPerformer.state);
+          return upsertPerformer(current, nextPerformer);
+        }
 
         const nextPerformer = movePerformerFromInput(performer, input);
         const nextState = nextPerformer.state;
@@ -142,6 +157,20 @@ function App() {
   };
 
   const setExpression = (expression) => updateSelf({ expression });
+
+  const updateCharacterRig = (patch) => {
+    if (!self) return;
+    const baseCharacter = getCatalogItem(characterCatalog, self.character);
+    updateSelf({
+      rigConfig: {
+        ...baseCharacter.rigConfig,
+        ...self.state.rigConfig,
+        ...patch
+      }
+    });
+  };
+
+  const updateCharacterStyle = (stylePreset) => updateSelf({ stylePreset });
 
   const changeScene = (nextScene) => {
     setScene(nextScene);
@@ -274,6 +303,17 @@ function App() {
           <span>{status}</span>
         </div>
         <div className="transport">
+          <div className="modeSwitch" aria-label="Workflow mode">
+            {["perform", "build"].map((item) => (
+              <button
+                key={item}
+                className={mode === item ? "selected" : ""}
+                onClick={() => setMode(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
           <button className={recording ? "danger active" : ""} onClick={toggleTake}>
             {recording ? <Square size={17} /> : <Circle size={17} />}
             {recording ? "Stop" : "Record"}
@@ -298,47 +338,21 @@ function App() {
       </section>
 
       <aside className="controlDock">
-        <div className="dockGroup">
-          <h2>Scene</h2>
-          <div className="segmented">
-            {sceneCatalog.map((item) => (
-              <button
-                key={item.id}
-                className={scene === item.id ? "selected" : ""}
-                onClick={() => changeScene(item.id)}
-              >
-                {item.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="dockGroup">
-          <h2>Expression</h2>
-          <div className="segmented">
-            {expressionCatalog.map((expression) => (
-              <button
-                key={expression.id}
-                className={self?.state.expression === expression.id ? "selected" : ""}
-                onClick={() => setExpression(expression.id)}
-              >
-                {expression.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="dockGroup">
-          <h2>Macros</h2>
-          <div className="macroGrid">
-            {macroCatalog.map((macro) => (
-              <button key={macro.id} onClick={() => triggerMacro(macro.id)}>
-                <Wand2 size={16} />
-                {macro.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        {mode === "perform" ? (
+          <PerformControls
+            scene={scene}
+            self={self}
+            onSceneChange={changeScene}
+            onExpressionChange={setExpression}
+            onMacroTrigger={triggerMacro}
+          />
+        ) : (
+          <CharacterEditor
+            performer={self}
+            onRigChange={updateCharacterRig}
+            onStyleChange={updateCharacterStyle}
+          />
+        )}
 
         <div className="dockGroup performerGroup">
           <h2>Performers</h2>
@@ -351,6 +365,185 @@ function App() {
         </div>
       </aside>
     </main>
+  );
+}
+
+function PerformControls({ scene, self, onSceneChange, onExpressionChange, onMacroTrigger }) {
+  return (
+    <>
+      <div className="dockGroup">
+        <h2>Scene</h2>
+        <div className="segmented">
+          {sceneCatalog.map((item) => (
+            <button
+              key={item.id}
+              className={scene === item.id ? "selected" : ""}
+              onClick={() => onSceneChange(item.id)}
+            >
+              {item.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Expression</h2>
+        <div className="segmented">
+          {expressionCatalog.map((expression) => (
+            <button
+              key={expression.id}
+              className={self?.state.expression === expression.id ? "selected" : ""}
+              onClick={() => onExpressionChange(expression.id)}
+            >
+              {expression.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Macros</h2>
+        <div className="macroGrid">
+          {macroCatalog.map((macro) => (
+            <button key={macro.id} onClick={() => onMacroTrigger(macro.id)}>
+              <Wand2 size={16} />
+              {macro.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function CharacterEditor({ performer, onRigChange, onStyleChange }) {
+  if (!performer) return null;
+
+  const baseCharacter = getCatalogItem(characterCatalog, performer.character);
+  const rig = { ...baseCharacter.rigConfig, ...performer.state.rigConfig };
+  const stylePreset = performer.state.stylePreset || baseCharacter.stylePreset;
+
+  return (
+    <div className="characterEditor">
+      <div className="dockGroup">
+        <h2>Character Editor</h2>
+        <div className="editorHeader">
+          <Palette size={18} />
+          <div>
+            <strong>{baseCharacter.name}</strong>
+            <small>Live rig overrides for this performer</small>
+          </div>
+        </div>
+      </div>
+
+      <div className="dockGroup">
+        <h2>Animation Style</h2>
+        <div className="segmented">
+          {animationStyleCatalog.map((style) => (
+            <button
+              key={style.id}
+              className={stylePreset === style.id ? "selected" : ""}
+              onClick={() => onStyleChange(style.id)}
+            >
+              {style.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <EditorSelect
+        label="Body"
+        value={rig.body}
+        options={bodyShapeCatalog}
+        onChange={(body) => onRigChange({ body })}
+      />
+      <EditorSelect
+        label="Limbs"
+        value={rig.limbs}
+        options={limbStyleCatalog}
+        onChange={(limbs) => onRigChange({ limbs })}
+      />
+      <EditorSelect
+        label="Walk Cycle"
+        value={rig.walkCycle}
+        options={walkCycleCatalog}
+        onChange={(walkCycle) => onRigChange({ walkCycle })}
+      />
+      <EditorSelect
+        label="Mouth"
+        value={rig.mouthStyle}
+        options={mouthStyleCatalog}
+        onChange={(mouthStyle) => onRigChange({ mouthStyle })}
+      />
+
+      <div className="dockGroup">
+        <h2>Parts</h2>
+        <label className="toggleRow">
+          <input
+            type="checkbox"
+            checked={rig.arms}
+            onChange={(event) => onRigChange({ arms: event.target.checked })}
+          />
+          Arms
+        </label>
+        <label className="toggleRow">
+          <input
+            type="checkbox"
+            checked={rig.legs}
+            onChange={(event) => onRigChange({ legs: event.target.checked })}
+          />
+          Legs
+        </label>
+      </div>
+
+      <EditorRange
+        label="Arm Length"
+        value={rig.armLength}
+        min={22}
+        max={64}
+        onChange={(armLength) => onRigChange({ armLength })}
+      />
+      <EditorRange
+        label="Leg Length"
+        value={rig.legLength}
+        min={18}
+        max={58}
+        onChange={(legLength) => onRigChange({ legLength })}
+      />
+    </div>
+  );
+}
+
+function EditorSelect({ label, value, options, onChange }) {
+  return (
+    <label>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function EditorRange({ label, value, min, max, onChange }) {
+  return (
+    <label>
+      <span className="rangeLabel">
+        {label}
+        <small>{value}</small>
+      </span>
+      <input
+        type="range"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
   );
 }
 

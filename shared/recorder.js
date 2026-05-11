@@ -48,7 +48,9 @@ export function createTakeExport(room, exportedAt = new Date().toISOString()) {
     performers: [...room.performers.values()].map((performer) => ({
       id: performer.id,
       name: performer.name,
-      character: performer.character
+      character: performer.character,
+      rigConfig: performer.state.rigConfig,
+      stylePreset: performer.state.stylePreset
     })),
     tracks: {
       motion: room.events,

@@ -20,7 +20,10 @@ export function createPerformerState(overrides = {}) {
     facing: 1,
     expression: "neutral",
     speaking: false,
+    walking: false,
     macro: null,
+    rigConfig: null,
+    stylePreset: null,
     ...overrides
   };
 }
