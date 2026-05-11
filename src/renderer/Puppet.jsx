@@ -41,13 +41,13 @@ export function Puppet({ performer, isSelf }) {
         transform: `translate(-50%, -100%) scale(${scale})`,
         "--puppet": character.color,
         "--accent": character.accent,
-        "--facing": state.facing,
+        "--facing": state.facing < 0 ? -1 : 1,
         "--arm-length": `${rig.armLength}px`,
         "--leg-length": `${rig.legLength}px`,
-        "--body-lean": `${pose.bodyLean * state.facing}deg`,
+        "--body-lean": `${pose.bodyLean}deg`,
         "--body-squash": pose.bodySquash,
-        "--arm-left": `${pose.armLeft * state.facing}deg`,
-        "--arm-right": `${pose.armRight * state.facing}deg`,
+        "--arm-left": `${pose.armLeft}deg`,
+        "--arm-right": `${pose.armRight}deg`,
         "--leg-left": `${pose.legLeft}deg`,
         "--leg-right": `${pose.legRight}deg`,
         "--blink-delay": `${-(state.blinkSeed || 0)}ms`,
@@ -55,28 +55,30 @@ export function Puppet({ performer, isSelf }) {
       }}
     >
       <div className="nameTag">{performer.name}</div>
-      {rig.arms ? (
-        <>
-          <div className="limb arm armLeft" />
-          <div className="limb arm armRight" />
-        </>
-      ) : null}
-      {rig.legs ? (
-        <>
-          <div className="limb leg legLeft" />
-          <div className="limb leg legRight" />
-        </>
-      ) : null}
-      <div className="puppetBody">
-        <div className={`mouth mouth-${rig.mouthStyle} ${mouthOpen > 0.06 ? "mouth-active" : ""}`}>
-          {expression.face[2]}
+      <div className="puppetRig">
+        {rig.arms ? (
+          <>
+            <div className="limb arm armLeft" />
+            <div className="limb arm armRight" />
+          </>
+        ) : null}
+        {rig.legs ? (
+          <>
+            <div className="limb leg legLeft" />
+            <div className="limb leg legRight" />
+          </>
+        ) : null}
+        <div className="puppetBody">
+          <div className={`mouth mouth-${rig.mouthStyle} ${mouthOpen > 0.06 ? "mouth-active" : ""}`}>
+            {expression.face[2]}
+          </div>
+          <span className="eye eyeOpen left">{expression.face[0]}</span>
+          <span className="eye eyeOpen right">{expression.face[1]}</span>
+          <span className="eye eyeBlink left">{expression.blinkFace[0]}</span>
+          <span className="eye eyeBlink right">{expression.blinkFace[1]}</span>
         </div>
-        <span className="eye eyeOpen left">{expression.face[0]}</span>
-        <span className="eye eyeOpen right">{expression.face[1]}</span>
-        <span className="eye eyeBlink left">{expression.blinkFace[0]}</span>
-        <span className="eye eyeBlink right">{expression.blinkFace[1]}</span>
+        <div className="shadow" />
       </div>
-      <div className="shadow" />
     </div>
   );
 }

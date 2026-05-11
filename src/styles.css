@@ -480,6 +480,14 @@ input[type="range"] {
   color: var(--ink);
 }
 
+.puppetRig {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(var(--facing));
+  transform-origin: center bottom;
+  transition: transform 110ms steps(2, end);
+}
+
 .nameTag {
   position: absolute;
   left: 50%;
