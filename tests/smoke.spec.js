@@ -62,13 +62,14 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.locator("header").getByRole("button", { name: "Finish" }).click();
   await expect(page.getByRole("heading", { name: "Episode Pipeline" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
+  await expect(page.getByLabel("Finish mode path")).toBeVisible();
   await expect(page.getByText("Render Check")).toBeVisible();
   await expect(page.getByText("DoinkTV Handoff")).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();
   await expect(page.getByText("Backend render preview will appear here.")).toBeVisible();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "DoinkTV" })).toBeDisabled();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "Render Final" })).toBeDisabled();
-  await expect(page.locator(".finishActionBar").getByRole("button", { name: "Browser WEBM" })).toBeDisabled();
+  await expect(page.getByText("More Export Tools")).toBeVisible();
   await expect(page.getByText("Takes recorded")).toBeVisible();
 });
 

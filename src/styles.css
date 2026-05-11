@@ -4162,6 +4162,56 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.finishSpine {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 3px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(245, 241, 232, 0.34), transparent 48%),
+    var(--rail);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.finishSpineStep {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px;
+  border: 2px solid var(--ink);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.finishSpineStep.done {
+  background: var(--pond);
+}
+
+.finishSpineStep > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.finishSpineStep strong {
+  color: var(--ink);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.finishSpineStep button {
+  min-height: 30px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
 .finishedShortHeader {
   display: grid;
   gap: 2px;
@@ -4435,7 +4485,7 @@ input[type="color"] {
 
 .finishActionBar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 6px;
   border: 2px solid var(--ink);
@@ -4462,6 +4512,25 @@ input[type="color"] {
   cursor: not-allowed;
   opacity: 0.5;
   pointer-events: none;
+}
+
+.advancedFinishActions {
+  padding: 8px;
+  border: 2px dashed rgba(38, 41, 54, 0.58);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.advancedFinishActions summary {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.secondaryFinishActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
 }
 
 .buildToolStrip {

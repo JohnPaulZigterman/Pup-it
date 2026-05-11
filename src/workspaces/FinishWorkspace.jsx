@@ -121,6 +121,13 @@ export function SceneLibraryEditor({
   ];
   const doinkReadyCount = doinkReviewChecklist.filter((item) => item.done).length;
   const doinkMissing = doinkReviewChecklist.filter((item) => !item.done);
+  const finishSpineSteps = [
+    { id: "review", label: "Review", done: Boolean(selectedTake || timeline.length), actionLabel: selectedTake ? "Replay" : "Pick Take", action: selectedTake ? onPlay : onRefresh },
+    { id: "keep", label: "Keep", done: Boolean(selectedTake?.best || timeline.length), actionLabel: selectedTake?.best || timeline.length ? "Kept" : "Keep Take", action: onKeepTake },
+    { id: "render", label: "Render", done: renderSucceeded, actionLabel: backendRendering ? "Rendering" : renderSucceeded ? "Rendered" : "Render", action: onBackendRender },
+    { id: "package", label: "Package", done: readiness.readyForSubmission, actionLabel: "Package", action: onExportProject },
+    { id: "submit", label: "Submit", done: episodeStatus === "submitted", actionLabel: doinkSubmitting ? "Sending" : "Submit", action: onSubmitToDoinkTv }
+  ];
   const finishSteps = [
     {
       label: "Best take",
@@ -179,6 +186,23 @@ export function SceneLibraryEditor({
           <RefreshCw size={16} />
           Refresh
         </button>
+        <div className="finishSpine" aria-label="Finish mode path">
+          {finishSpineSteps.map((step, index) => {
+            const disabled =
+              (step.id === "keep" && !selectedTake) ||
+              (step.id === "render" && (backendRendering || !hasSubmissionSource)) ||
+              (step.id === "submit" && (!hasSubmissionSource || doinkSubmitting || backendRendering));
+            return (
+              <div className={`finishSpineStep ${step.done ? "done" : ""}`} key={step.id}>
+                <span>{index + 1}</span>
+                <strong>{step.label}</strong>
+                <button onClick={step.action} disabled={disabled}>
+                  {step.actionLabel}
+                </button>
+              </div>
+            );
+          })}
+        </div>
         <div className="finishedShortPanel">
           <div className="finishedShortHeader">
             <span className="eyebrow">Finished Short Flow</span>
@@ -302,7 +326,7 @@ export function SceneLibraryEditor({
             </button>
           </div>
         ) : null}
-        <div className="finishActionBar" aria-label="Finish actions">
+        <div className="finishActionBar primaryFinishActions" aria-label="Finish actions">
           <button onClick={onBackendRender} disabled={backendRendering || !hasSubmissionSource}>
             <RefreshCw size={16} />
             {backendRendering ? "Rendering" : "Render Final"}
@@ -319,6 +343,10 @@ export function SceneLibraryEditor({
             <ExternalLink size={16} />
             DoinkTV
           </button>
+        </div>
+        <details className="advancedFinishActions">
+          <summary>More Export Tools</summary>
+          <div className="finishActionBar secondaryFinishActions" aria-label="Advanced finish actions">
           <button onClick={onExportVideo} disabled={!hasTargetTake || videoExporting}>
             <Video size={16} />
             {videoExporting ? "Browser Render" : "Browser WEBM"}
@@ -327,7 +355,8 @@ export function SceneLibraryEditor({
             <Camera size={16} />
             Thumbnail
           </button>
-        </div>
+          </div>
+        </details>
       </div>
 
       <div className="dockGroup">
