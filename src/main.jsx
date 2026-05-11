@@ -208,6 +208,13 @@ const developmentPathCards = [
   }
 ];
 
+const publicVersionMilestones = [
+  { id: "perform", name: "Joy Loop", detail: "Record, replay, laugh, trim, export." },
+  { id: "toybox", name: "Toybox Identity", detail: "Original rigs, props, textures, and weird behavior." },
+  { id: "formats", name: "Comedy Formats", detail: "Arguments, fake ads, desk bits, street pieces, bumpers." },
+  { id: "render", name: "Render Path", detail: "Preview WEBM now, stage-matched video next, backend reliability later." }
+];
+
 const styleMutationControls = [
   {
     id: "roughen",
@@ -330,6 +337,8 @@ const shortFormatTemplates = [
     styleMutation: "roughen",
     prop: { name: "Important Object", shape: "star", tint: "#fff2a8", texturePreset: "photocopy" },
     assetSearch: "room furniture prop",
+    performanceGoal: "Record two characters disagreeing about one stupid object.",
+    surpriseNudge: "Make the prop too important for no reason.",
     nextMode: "build"
   },
   {
@@ -341,6 +350,8 @@ const shortFormatTemplates = [
     styleMutation: "thin-lines",
     prop: { name: "Bad Product", shape: "block", tint: "#8db7ff", texturePreset: "static-pattern" },
     assetSearch: "sign product furniture",
+    performanceGoal: "Sell a bad product with total confidence.",
+    surpriseNudge: "Give the product a feature nobody asked for.",
     nextMode: "assets"
   },
   {
@@ -352,6 +363,8 @@ const shortFormatTemplates = [
     styleMutation: "photocopy",
     prop: { name: "Floating Thing", shape: "bean", tint: "#e96f4c", texturePreset: "photocopy" },
     assetSearch: "space texture abstract",
+    performanceGoal: "Make a 10-second public-access interruption.",
+    surpriseNudge: "Let one visual detail be unexplained and too intense.",
     nextMode: "perform"
   },
   {
@@ -363,6 +376,8 @@ const shortFormatTemplates = [
     styleMutation: "collage",
     prop: { name: "Desk Mic", shape: "circle", tint: "#2b2d42", texturePreset: "paper-grain" },
     assetSearch: "desk microphone room",
+    performanceGoal: "Turn one throwaway conversation into a recurring bit.",
+    surpriseNudge: "Add a prop that does not belong on the desk.",
     nextMode: "perform"
   },
   {
@@ -374,6 +389,8 @@ const shortFormatTemplates = [
     styleMutation: "thin-lines",
     prop: { name: "Headline Card", shape: "block", tint: "#fff2a8", texturePreset: "paper-grain" },
     assetSearch: "desk sign city background",
+    performanceGoal: "Report a fake headline as if civilization depends on it.",
+    surpriseNudge: "Make the headline too specific.",
     nextMode: "perform"
   },
   {
@@ -385,6 +402,8 @@ const shortFormatTemplates = [
     styleMutation: "collage",
     prop: { name: "Street Sign", shape: "triangle", tint: "#8fd8b5", texturePreset: "stucco" },
     assetSearch: "street sign exterior prop",
+    performanceGoal: "Walk up to somebody and ask the wrong question.",
+    surpriseNudge: "Make the setting imply a bigger unseen world.",
     nextMode: "perform"
   }
 ];
@@ -2784,11 +2803,13 @@ function App() {
             templates={showStarterTemplates}
             shortFormats={shortFormatTemplates}
             developmentPaths={developmentPathCards}
+            publicMilestones={publicVersionMilestones}
             progress={beginnerProgress}
             takeCount={takeLibrary.length}
             panelCount={storyboardPanels.length}
             timelineCount={productionTimeline.length}
             onStartQuickShort={startQuickShort}
+            onStartSurpriseShort={() => startQuickShort(pickRandom(shortFormatTemplates).id)}
             onApplyTemplate={applyShowTemplate}
             onModeChange={setMode}
             onAssetSearch={openAssetSearch}
@@ -3131,11 +3152,13 @@ function ShowDashboard({
   templates,
   shortFormats,
   developmentPaths,
+  publicMilestones,
   progress,
   takeCount,
   panelCount,
   timelineCount,
   onStartQuickShort,
+  onStartSurpriseShort,
   onApplyTemplate,
   onModeChange,
   onAssetSearch,
@@ -3172,6 +3195,11 @@ function ShowDashboard({
           <span>Start</span>
           <strong>Make a New Short</strong>
         </button>
+        <button onClick={onStartSurpriseShort}>
+          <Shuffle size={17} />
+          <span>Surprise</span>
+          <strong>Give Me A Bit</strong>
+        </button>
         <button onClick={canFinish ? onExport : () => onModeChange("edit")}>
           <Video size={17} />
           <span>Finish</span>
@@ -3190,7 +3218,24 @@ function ShowDashboard({
             <button key={format.id} onClick={() => onStartQuickShort(format.id)}>
               <strong>{format.name}</strong>
               <span>{format.description}</span>
+              <small>{format.performanceGoal}</small>
+              <em>{format.surpriseNudge}</em>
             </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="publicPathPanel" aria-label="Initial public version path">
+        <div>
+          <span className="eyebrow">Initial Public Version</span>
+          <h2>Make one good short quickly, then make another one weirder.</h2>
+        </div>
+        <div className="publicMilestoneGrid">
+          {publicMilestones.map((milestone) => (
+            <article key={milestone.id}>
+              <strong>{milestone.name}</strong>
+              <span>{milestone.detail}</span>
+            </article>
           ))}
         </div>
       </section>

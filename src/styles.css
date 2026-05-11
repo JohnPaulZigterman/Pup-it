@@ -598,7 +598,8 @@ input[type="color"] {
   color: #4b4e68;
 }
 
-.philosophyPanel {
+.philosophyPanel,
+.publicPathPanel {
   display: grid;
   grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
   gap: 14px;
@@ -611,7 +612,8 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
-.philosophyPanel h2 {
+.philosophyPanel h2,
+.publicPathPanel h2 {
   margin: 4px 0 0;
   color: var(--ink);
   font-size: 22px;
@@ -681,6 +683,42 @@ input[type="color"] {
 .shortFormatGrid span {
   color: #4b4e68;
   font-size: 12px;
+}
+
+.shortFormatGrid small,
+.shortFormatGrid em {
+  color: #666b86;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.shortFormatGrid em {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.publicMilestoneGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.publicMilestoneGrid article {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+}
+
+.publicMilestoneGrid strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.publicMilestoneGrid span {
+  color: #4b4e68;
+  font-size: 11px;
 }
 
 .dashboardStats,
@@ -5379,6 +5417,7 @@ input[type="color"] {
   .dashboardStats,
   .templateGrid,
   .pathCardGrid,
+  .publicMilestoneGrid,
   .shortFormatGrid {
     grid-template-columns: 1fr;
   }
