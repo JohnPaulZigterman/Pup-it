@@ -5635,6 +5635,7 @@ function SceneLibraryEditor({
   const finalVideoPath = renderJob?.output?.videoPath || "";
   const finalVideoUrl = finalVideoPath ? `${SERVER_URL}${finalVideoPath}` : "";
   const audioMux = renderJob?.output?.audioMux || null;
+  const renderSucceeded = renderJob?.status === "succeeded" && Boolean(finalVideoPath);
   const audioTrackCount = audioMux?.trackCount ?? selectedTake?.tracks?.audio?.length ?? 0;
   const audioStatus =
     audioMux?.status === "muxed"
@@ -5668,8 +5669,12 @@ function SceneLibraryEditor({
     },
     {
       label: "Backend render",
-      done: Boolean(finalVideoPath),
-      detail: backendRendering ? "Rendering now" : finalVideoPath || "Create review WEBM"
+      done: renderSucceeded,
+      detail: backendRendering
+        ? "Rendering now"
+        : renderJob?.status === "failed"
+          ? "Render failed; try again"
+          : finalVideoPath || "Create review WEBM"
     },
     {
       label: "Audio",
@@ -5732,6 +5737,11 @@ function SceneLibraryEditor({
           </div>
           {finalVideoUrl ? (
             <video className="finalPreviewVideo" src={finalVideoUrl} controls muted playsInline />
+          ) : renderJob?.status === "failed" ? (
+            <div className="finalPreviewEmpty renderFailed">
+              <Video size={28} />
+              <span>Render failed. Check the backend, then try Render Final again.</span>
+            </div>
           ) : (
             <div className="finalPreviewEmpty">
               <Video size={28} />
@@ -5760,7 +5770,7 @@ function SceneLibraryEditor({
             <Save size={16} />
             Package
           </button>
-          <button onClick={onSubmitToDoinkTv} disabled={!hasSubmissionSource || doinkSubmitting}>
+          <button onClick={onSubmitToDoinkTv} disabled={!hasSubmissionSource || doinkSubmitting || backendRendering}>
             <ExternalLink size={16} />
             DoinkTV
           </button>
@@ -5922,10 +5932,11 @@ function SceneLibraryEditor({
           {projectExport?.renderPlan?.preferredThumbnailName || "export a thumbnail"}
         </small>
         {renderJob && (
-          <div className="renderJobCard">
+          <div className={`renderJobCard ${renderJob.status === "failed" ? "failed" : ""}`}>
             <strong>Backend render: {renderJob.status}</strong>
             <small>{renderJob.output?.videoPath || "Waiting for artifact path."}</small>
             <small>Audio: {audioStatus}</small>
+            {renderJob.error ? <small>Issue: {renderJob.error}</small> : null}
             {audioMux?.separateTracks?.length ? (
               <small>
                 Separate tracks:{" "}
@@ -6061,6 +6072,9 @@ function SceneLibraryEditor({
 
       <ProductionTimeline
         clips={timeline}
+        canAddSelectedTake={Boolean(selectedTake)}
+        onAddSelectedTake={() => selectedTake && onAddTakeToTimeline(selectedTake)}
+        onGoRecord={() => onModeChange("perform")}
         onRemoveClip={onRemoveTimelineClip}
         onMoveClip={onMoveTimelineClip}
         onTrimClip={onTrimTimelineClip}

@@ -11,7 +11,16 @@ function formatClipDuration(duration) {
   return duration || "0:05";
 }
 
-export function ProductionTimeline({ clips, onRemoveClip, onMoveClip, onTrimClip, onUpdateClip }) {
+export function ProductionTimeline({
+  clips,
+  canAddSelectedTake = false,
+  onAddSelectedTake,
+  onGoRecord,
+  onRemoveClip,
+  onMoveClip,
+  onTrimClip,
+  onUpdateClip
+}) {
   const totalDuration = clips.reduce((total, clip) => total + (typeof clip.duration === "number" ? clip.duration : 0), 0);
 
   return (
@@ -74,7 +83,13 @@ export function ProductionTimeline({ clips, onRemoveClip, onMoveClip, onTrimClip
       ) : (
         <div className="emptyState actionEmpty">
           <strong>No rough cut yet.</strong>
-          <span>Add the selected take above, or storyboard a shot and add that panel.</span>
+          <span>Add the selected take, record one, or storyboard a shot. Rough cuts render in order.</span>
+          <div className="emptyActionRow">
+            <button onClick={onAddSelectedTake} disabled={!canAddSelectedTake}>
+              Add Selected Take
+            </button>
+            <button onClick={onGoRecord}>Record Take</button>
+          </div>
         </div>
       )}
     </div>

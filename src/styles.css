@@ -3721,6 +3721,16 @@ input[type="color"] {
   background: var(--paper);
 }
 
+.emptyActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.emptyActionRow button {
+  min-height: 32px;
+}
+
 .editorStats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3894,6 +3904,10 @@ input[type="color"] {
   background: rgba(111, 166, 140, 0.18);
 }
 
+.renderJobCard.failed {
+  background: rgba(215, 109, 88, 0.18);
+}
+
 .renderJobCard strong {
   color: var(--ink);
   font-size: 12px;
@@ -3949,6 +3963,11 @@ input[type="color"] {
   padding: 12px;
   color: var(--rail);
   text-align: center;
+}
+
+.finalPreviewEmpty.renderFailed {
+  background: #5a2d35;
+  color: var(--paper);
 }
 
 .finishTargetPicker {
