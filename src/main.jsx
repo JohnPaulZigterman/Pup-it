@@ -12,6 +12,7 @@ import {
   FolderOpen,
   HelpCircle,
   Library,
+  ListChecks,
   Mic,
   MicOff,
   MousePointer2,
@@ -20,8 +21,10 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  Search,
   Shuffle,
   Save,
+  Sparkles,
   Square,
   Theater,
   Trash2,
@@ -100,6 +103,62 @@ const tutorialSteps = [
     mode: "edit",
     title: "Review Takes",
     body: "Edit mode keeps recorded performances inside the app so you can browse scenes, play them back, and export takes with separate character audio tracks."
+  }
+];
+
+const workflowSteps = [
+  { id: "home", label: "Setup", mode: "home", description: "Choose a show, template, or next task." },
+  { id: "cast", label: "Cast", mode: "build", description: "Design performers and reusable character rigs." },
+  { id: "sets", label: "Sets", mode: "assets", description: "Find settings, props, textures, and references." },
+  { id: "perform", label: "Perform", mode: "perform", description: "Rehearse, record, and improvise live." },
+  { id: "edit", label: "Edit", mode: "edit", description: "Review takes and assemble the episode." },
+  { id: "storyboard", label: "Board", mode: "storyboard", description: "Plan comic-strip beats and shot flow." }
+];
+
+const showStarterTemplates = [
+  {
+    id: "two-hander",
+    name: "Two Characters Talking",
+    description: "Readable blocking and soft TV lighting for a fast dialogue scene.",
+    scene: "studio",
+    cameraShot: "two-shot",
+    lightingPreset: "flat-tv",
+    backgroundTheme: "painted-depth",
+    objectStyle: "thin-ink",
+    assetSearch: "kitchen"
+  },
+  {
+    id: "street-bit",
+    name: "Street Interview",
+    description: "Exterior setup with prop-friendly search defaults.",
+    scene: "street",
+    cameraShot: "wide",
+    lightingPreset: "scene",
+    backgroundTheme: "stucco-wall",
+    objectStyle: "soft-material",
+    assetSearch: "street"
+  },
+  {
+    id: "late-bump",
+    name: "Late-Night Bump",
+    description: "A short weird interstitial with copy grit and punch-in framing.",
+    scene: "space",
+    cameraShot: "reaction",
+    lightingPreset: "dramatic",
+    backgroundTheme: "late-night-copy",
+    objectStyle: "paper-cut",
+    assetSearch: "space"
+  },
+  {
+    id: "desk-show",
+    name: "Podcast Desk",
+    description: "Reusable talking-head format for recurring bits.",
+    scene: "studio",
+    cameraShot: "two-shot",
+    lightingPreset: "cozy",
+    backgroundTheme: "wood-panel",
+    objectStyle: "soft-material",
+    assetSearch: "furniture"
   }
 ];
 
@@ -300,7 +359,9 @@ function App() {
   const [recording, setRecording] = useState(false);
   const [micLive, setMicLive] = useState(false);
   const [mouthCameraActive, setMouthCameraActive] = useState(false);
-  const [mode, setMode] = useState("perform");
+  const [mode, setMode] = useState("home");
+  const [experienceMode, setExperienceMode] = useState("beginner");
+  const [commandQuery, setCommandQuery] = useState("");
   const [cameraShot, setCameraShot] = useState("wide");
   const [lightingPreset, setLightingPreset] = useState("scene");
   const [backgroundTheme, setBackgroundTheme] = useState("painted-depth");
@@ -1038,6 +1099,65 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const applyShowTemplate = (templateId) => {
+    const template = getCatalogItem(showStarterTemplates, templateId);
+    changeScene(template.scene);
+    setCameraShot(template.cameraShot);
+    setLightingPreset(template.lightingPreset);
+    setBackgroundTheme(template.backgroundTheme);
+    setObjectStyle(template.objectStyle);
+    setAssetTarget("setting");
+    setAssetSearch(template.assetSearch);
+    setMode("perform");
+    setStatus(`${template.name} template loaded. Rehearse, record, then review the take.`);
+  };
+
+  const openAssetSearch = (query, target = "all") => {
+    setAssetSearch(query);
+    setAssetTarget(target);
+    setMode("assets");
+    setStatus(`Searching assets for "${query}".`);
+  };
+
+  const applyPolishPass = (kind) => {
+    if (kind === "lighting") {
+      setLightingPreset("flat-tv");
+      setBackgroundTheme("painted-depth");
+      setObjectStyle("thin-ink");
+      setStatus("Applied a cleaner TV lighting pass.");
+      return;
+    }
+    if (kind === "texture") {
+      setBackgroundTheme("pattern-held");
+      setObjectStyle("paper-cut");
+      setStatus("Applied a textured mixed-media pass.");
+      return;
+    }
+    setCameraShot("reaction");
+    setLightingPreset("dramatic");
+    setStatus("Applied a punchier camera and reaction setup.");
+  };
+
+  const commandItems = [
+    { id: "home", label: "Open show dashboard", keywords: "setup home project show", action: () => setMode("home") },
+    { id: "cast", label: "Edit current character", keywords: "cast character rig build customize", action: () => setMode("build") },
+    { id: "sets", label: "Search settings and props", keywords: "assets objects settings props backgrounds", action: () => openAssetSearch("", "setting") },
+    { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
+    { id: "kitchen", label: "Find kitchen scene pieces", keywords: "kitchen diner room background furniture", action: () => openAssetSearch("kitchen", "setting") },
+    { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
+    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review", action: () => { loadTakeLibrary(); setMode("edit"); } },
+    { id: "board", label: "Open storyboard mode", keywords: "storyboard panel comic strip planning", action: () => setMode("storyboard") },
+    { id: "export", label: "Export full project package", keywords: "export publish package video project", action: exportProject },
+    { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
+    { id: "texture-polish", label: "Add mixed-media texture", keywords: "texture paper pattern style weird", action: () => applyPolishPass("texture") },
+    { id: "punch-polish", label: "Punch in for a reaction", keywords: "camera close reaction punch button", action: () => applyPolishPass("camera") }
+  ];
+
+  const runCommand = (command) => {
+    command.action();
+    setCommandQuery("");
+  };
+
   const createShowSession = () => {
     const cleanShowName = showName.trim() || "Untitled Show";
     const selectedShow = savedShows.find((show) => show.id === selectedShowId);
@@ -1172,22 +1292,28 @@ function App() {
   }
 
   return (
-    <main className="appShell">
+    <main className={`appShell mode-${mode} experience-${experienceMode}`}>
       <header className="topBar">
         <div className="brandCompact">
           <Theater size={22} />
           <strong>Pup-It</strong>
           <span>{status}</span>
         </div>
+        <CommandSearch
+          query={commandQuery}
+          commands={commandItems}
+          onQueryChange={setCommandQuery}
+          onRunCommand={runCommand}
+        />
         <div className="transport">
           <div className="modeSwitch" aria-label="Workflow mode">
-            {["perform", "build", "assets", "edit", "storyboard"].map((item) => (
+            {workflowSteps.map((step) => (
               <button
-                key={item}
-                className={mode === item ? "selected" : ""}
-                onClick={() => setMode(item)}
+                key={step.id}
+                className={mode === step.mode ? "selected" : ""}
+                onClick={() => setMode(step.mode)}
               >
-                {item}
+                {step.label}
               </button>
             ))}
           </div>
@@ -1207,19 +1333,55 @@ function App() {
             <HelpCircle size={17} />
             Tutorial
           </button>
+          <button
+            className={experienceMode === "pro" ? "active" : ""}
+            onClick={() => setExperienceMode((current) => (current === "pro" ? "beginner" : "pro"))}
+          >
+            <Sparkles size={17} />
+            {experienceMode === "pro" ? "Pro" : "Beginner"}
+          </button>
         </div>
       </header>
 
+      <nav className="workflowRail" aria-label="Production workflow">
+        {workflowSteps.map((step, index) => (
+          <button
+            key={step.id}
+            className={mode === step.mode ? "selected" : ""}
+            title={step.description}
+            onClick={() => setMode(step.mode)}
+          >
+            <span>{index + 1}</span>
+            <strong>{step.label}</strong>
+          </button>
+        ))}
+      </nav>
+
       <section
         className={
-          mode === "storyboard"
+          mode === "home"
+            ? "dashboardStage"
+            : mode === "storyboard"
             ? "storyboardStage"
             : `stage ${selectedScene.className} ${selectedCameraShot.className} ${selectedLighting.className} ${selectedBackgroundTheme.className} ${selectedObjectStyle.className} texture-${stageTexturePreset}`
         }
         onPointerMove={handleStagePointerMove}
         onPointerLeave={handleStagePointerLeave}
       >
-        {mode === "storyboard" ? (
+        {mode === "home" ? (
+          <ShowDashboard
+            showName={showName}
+            savedShows={savedShows}
+            templates={showStarterTemplates}
+            takeCount={takeLibrary.length}
+            panelCount={storyboardPanels.length}
+            timelineCount={productionTimeline.length}
+            onApplyTemplate={applyShowTemplate}
+            onModeChange={setMode}
+            onAssetSearch={openAssetSearch}
+            onLoadShow={loadShowSession}
+          />
+        ) : mode === "storyboard" ? (
           <StoryboardCanvas
             panels={storyboardPanels}
             selectedPanelId={selectedStoryboardId}
@@ -1327,6 +1489,28 @@ function App() {
           />
         )}
 
+        <ContextualInspector
+          mode={mode}
+          self={self}
+          scene={selectedScene}
+          cameraShot={selectedCameraShot}
+          lighting={selectedLighting}
+          backgroundTheme={selectedBackgroundTheme}
+          objectStyle={selectedObjectStyle}
+          selectedTake={selectedTake}
+          selectedStoryboardPanel={selectedStoryboardPanel}
+          assetSearch={assetSearch}
+          assetTarget={assetTarget}
+          recording={recording}
+          micLive={micLive}
+          takeCount={takeLibrary.length}
+          timelineCount={productionTimeline.length}
+          onModeChange={setMode}
+          onRecordToggle={toggleTake}
+          onAssetSearch={openAssetSearch}
+          onPolish={applyPolishPass}
+        />
+
         <div className="dockGroup performerGroup">
           <h2>Performers</h2>
           {stagePerformers.map((performer) => (
@@ -1400,6 +1584,190 @@ function TutorialOverlay({ step, mode, onClose, onStepChange }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function CommandSearch({ query, commands, onQueryChange, onRunCommand }) {
+  const normalized = query.trim().toLowerCase();
+  const visibleCommands = normalized
+    ? commands.filter((command) => `${command.label} ${command.keywords}`.toLowerCase().includes(normalized)).slice(0, 5)
+    : commands.slice(0, 4);
+
+  return (
+    <div className="commandSearch">
+      <Search size={16} />
+      <input
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+        placeholder="Search actions, assets, exports..."
+        aria-label="Command search"
+      />
+      <div className="commandResults">
+        {visibleCommands.map((command) => (
+          <button key={command.id} onMouseDown={(event) => event.preventDefault()} onClick={() => onRunCommand(command)}>
+            {command.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ShowDashboard({
+  showName,
+  savedShows,
+  templates,
+  takeCount,
+  panelCount,
+  timelineCount,
+  onApplyTemplate,
+  onModeChange,
+  onAssetSearch,
+  onLoadShow
+}) {
+  return (
+    <div className="showDashboard">
+      <section className="dashboardHero">
+        <div>
+          <span className="eyebrow">Production Home</span>
+          <h1>{showName}</h1>
+          <p>Start with a reusable show format, rehearse a take, then move straight into review and export.</p>
+        </div>
+        <div className="recordFlow">
+          <span>Rehearse</span>
+          <span>Record</span>
+          <span>Review</span>
+          <span>Export</span>
+        </div>
+      </section>
+
+      <section className="dashboardStats" aria-label="Show progress">
+        <div>
+          <strong>{savedShows.length}</strong>
+          <span>shows</span>
+        </div>
+        <div>
+          <strong>{takeCount}</strong>
+          <span>takes</span>
+        </div>
+        <div>
+          <strong>{panelCount}</strong>
+          <span>boards</span>
+        </div>
+        <div>
+          <strong>{timelineCount}</strong>
+          <span>timeline</span>
+        </div>
+      </section>
+
+      <section className="dashboardGrid">
+        <div className="dashboardPanel">
+          <h2>Start Fast</h2>
+          <div className="templateGrid">
+            {templates.map((template) => (
+              <button key={template.id} onClick={() => onApplyTemplate(template.id)}>
+                <strong>{template.name}</strong>
+                <span>{template.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="dashboardPanel">
+          <h2>Jump To</h2>
+          <div className="dashboardActions">
+            <button onClick={() => onModeChange("build")}>
+              <Sparkles size={16} />
+              Design Cast
+            </button>
+            <button onClick={() => onAssetSearch("furniture", "object")}>
+              <Library size={16} />
+              Find Props
+            </button>
+            <button onClick={() => onModeChange("perform")}>
+              <Circle size={16} />
+              Perform
+            </button>
+            <button onClick={() => onModeChange("edit")}>
+              <ListChecks size={16} />
+              Review Takes
+            </button>
+          </div>
+          {savedShows[0] && (
+            <button className="wideAction" onClick={() => onLoadShow(savedShows[0].id)}>
+              <FolderOpen size={16} />
+              Continue {savedShows[0].showName}
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ContextualInspector({
+  mode,
+  self,
+  scene,
+  cameraShot,
+  lighting,
+  backgroundTheme,
+  objectStyle,
+  selectedTake,
+  selectedStoryboardPanel,
+  assetSearch,
+  assetTarget,
+  recording,
+  micLive,
+  takeCount,
+  timelineCount,
+  onModeChange,
+  onRecordToggle,
+  onAssetSearch,
+  onPolish
+}) {
+  const characterName =
+    self?.state.characterDesign?.name ||
+    (self ? getCatalogItem(characterCatalog, self.character).name : "No performer yet");
+  const modeLabel = workflowSteps.find((step) => step.mode === mode)?.label || "Setup";
+
+  return (
+    <div className="dockGroup contextInspector">
+      <h2>Inspector</h2>
+      <div className="inspectorSummary">
+        <strong>{modeLabel}</strong>
+        <small>{recording ? "Recording take" : micLive ? "Mic armed" : "Ready"}</small>
+      </div>
+      <div className="inspectorFacts">
+        <span>Character</span>
+        <strong>{characterName}</strong>
+        <span>Scene</span>
+        <strong>{scene.name}</strong>
+        <span>Shot</span>
+        <strong>{cameraShot.name}</strong>
+        <span>Look</span>
+        <strong>{backgroundTheme.name} / {objectStyle.name}</strong>
+      </div>
+      {mode === "assets" && (
+        <small className="controlHint">Searching {assetTarget || "all"} for {assetSearch || "anything useful"}.</small>
+      )}
+      {mode === "edit" && (
+        <small className="controlHint">
+          {selectedTake ? `Selected ${selectedTake.name || selectedTake.id}.` : `${takeCount} takes available.`} {timelineCount} clips in timeline.
+        </small>
+      )}
+      {mode === "storyboard" && (
+        <small className="controlHint">
+          {selectedStoryboardPanel ? `Boarding ${selectedStoryboardPanel.title}.` : "Capture or select a board panel."}
+        </small>
+      )}
+      <div className="inspectorActions">
+        <button onClick={onRecordToggle}>{recording ? "Stop Take" : "Record Take"}</button>
+        <button onClick={() => onPolish("lighting")}>Improve Lighting</button>
+        <button onClick={() => onAssetSearch("furniture", "object")}>Find Props</button>
+        <button onClick={() => onModeChange("edit")}>Review</button>
+      </div>
+    </div>
   );
 }
 
@@ -1497,7 +1865,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Shot</h2>
         <div className="shotGrid">
           {cameraShotCatalog.map((shot) => (
@@ -1513,7 +1881,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Lighting</h2>
         <div className="shotGrid">
           {lightingPresetCatalog.map((light) => (
@@ -1529,7 +1897,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Background Theme</h2>
         <div className="shotGrid">
           {backgroundThemeCatalog.map((theme) => (
@@ -1545,7 +1913,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Object Style</h2>
         <div className="shotGrid">
           {objectStyleCatalog.map((style) => (

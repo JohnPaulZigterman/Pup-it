@@ -150,8 +150,8 @@ input[type="color"] {
 .appShell {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: 64px minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 112px minmax(0, 1fr) 340px;
   background: #ece7dc;
 }
 
@@ -173,12 +173,65 @@ input[type="color"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
-  padding: 0 16px;
+  min-height: 64px;
+  padding: 10px 16px;
   border-bottom: 3px solid var(--ink);
   background:
     linear-gradient(90deg, rgba(227, 189, 69, 0.18), transparent 34%),
     var(--panel);
+}
+
+.commandSearch {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: inset 2px 2px 0 rgba(38, 41, 54, 0.07);
+}
+
+.commandSearch input {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.commandResults {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: -2px;
+  right: -2px;
+  z-index: 80;
+  display: none;
+  gap: 4px;
+  padding: 6px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 4px 4px 0 rgba(38, 41, 54, 0.22);
+}
+
+.commandSearch:focus-within .commandResults {
+  display: grid;
+}
+
+.commandResults button {
+  justify-content: flex-start;
+  min-height: 32px;
+  padding: 0 8px;
+  border-width: 1px;
+  background: var(--paper);
+  box-shadow: none;
+  text-align: left;
+  text-transform: none;
 }
 
 .brandCompact strong {
@@ -215,7 +268,7 @@ input[type="color"] {
 
 .modeSwitch {
   display: grid;
-  grid-template-columns: repeat(4, minmax(76px, 1fr));
+  grid-template-columns: repeat(6, minmax(68px, 1fr));
   gap: 4px;
   padding: 4px;
   border: 2px solid var(--ink);
@@ -234,6 +287,51 @@ input[type="color"] {
 
 .modeSwitch button.selected {
   color: var(--ink);
+  background: var(--nicotine);
+}
+
+.workflowRail {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px 10px;
+  border-right: 3px solid var(--ink);
+  background:
+    linear-gradient(180deg, rgba(227, 189, 69, 0.13), transparent 36%),
+    var(--rail);
+  overflow: auto;
+}
+
+.workflowRail button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 7px;
+  border-width: 2px;
+  background: var(--surface);
+  text-align: left;
+  text-transform: none;
+}
+
+.workflowRail button span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.workflowRail button strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflowRail button.selected {
   background: var(--nicotine);
 }
 
@@ -331,6 +429,165 @@ input[type="color"] {
   background:
     linear-gradient(90deg, rgba(43, 45, 66, 0.09) 1px, transparent 1px) 0 0 / 28px 28px,
     #fffcf0;
+}
+
+.dashboardStage {
+  overflow: auto;
+  padding: 22px;
+  background:
+    linear-gradient(90deg, rgba(43, 45, 66, 0.08) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(180deg, #f5f1e8, #d9d1c3);
+}
+
+.showDashboard {
+  display: grid;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.dashboardHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 20px;
+  border: 3px solid var(--ink);
+  background:
+    linear-gradient(120deg, rgba(227, 189, 69, 0.25), transparent 44%),
+    var(--surface);
+  box-shadow: 5px 5px 0 rgba(38, 41, 54, 0.18);
+}
+
+.eyebrow {
+  color: #666b86;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dashboardHero h1 {
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.dashboardHero p {
+  max-width: 620px;
+  margin: 0;
+  color: #4b4e68;
+}
+
+.recordFlow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(74px, 1fr));
+  gap: 6px;
+}
+
+.recordFlow span {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dashboardStats,
+.dashboardGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboardStats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboardStats div,
+.dashboardPanel {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.dashboardStats div {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+}
+
+.dashboardStats strong {
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.dashboardStats span {
+  color: #666b86;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.dashboardGrid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+}
+
+.dashboardPanel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.dashboardPanel h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.templateGrid button {
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  padding: 12px;
+  background: var(--paper);
+  text-align: left;
+  text-transform: none;
+}
+
+.templateGrid button strong,
+.dashboardActions button {
+  color: var(--ink);
+}
+
+.templateGrid button span {
+  color: #4b4e68;
+  font-size: 12px;
+}
+
+.dashboardActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboardActions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 10px;
+  background: var(--paper);
 }
 
 .stage::before {
@@ -763,6 +1020,63 @@ input[type="color"] {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-shadow: none;
+}
+
+.contextInspector {
+  background:
+    linear-gradient(135deg, rgba(111, 166, 140, 0.18), transparent 42%),
+    var(--surface);
+}
+
+.inspectorSummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.inspectorSummary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.inspectorSummary small,
+.inspectorFacts span {
+  color: #666b86;
+}
+
+.inspectorFacts {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.inspectorFacts strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspectorActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.inspectorActions button {
+  min-height: 34px;
+  padding: 0 7px;
+  background: var(--paper);
+  font-size: 11px;
+}
+
+.experience-beginner .advancedControl {
+  display: none;
 }
 
 .segmented,
@@ -2889,7 +3203,7 @@ input[type="color"] {
 
   .appShell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(520px, 62vh) auto;
+    grid-template-rows: auto auto minmax(520px, 62vh) auto;
   }
 
   .topBar {
@@ -2902,6 +3216,35 @@ input[type="color"] {
   .transport {
     width: 100%;
     overflow-x: auto;
+  }
+
+  .commandSearch {
+    width: 100%;
+    max-width: none;
+  }
+
+  .workflowRail {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(96px, 1fr);
+    grid-template-columns: none;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 3px solid var(--ink);
+  }
+
+  .workflowRail button {
+    min-height: 38px;
+  }
+
+  .dashboardHero,
+  .dashboardGrid,
+  .dashboardStats,
+  .templateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .recordFlow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .storyboardStrip {
