@@ -98,6 +98,7 @@ import {
 } from "./workflows/finishFlow.js";
 import { SceneLibraryEditor } from "./workspaces/FinishWorkspace.jsx";
 import {
+  buildPublicReleaseWorkflow,
   computeBeginnerProgress,
   getTutorialTrack,
   getWorkspaceIdentity,
@@ -4211,6 +4212,14 @@ function ShowDashboard({
   onLoadShow
 }) {
   const canFinish = progress.readyToExport;
+  const publicWorkflow = buildPublicReleaseWorkflow({
+    progress,
+    takeCount,
+    timelineCount,
+    savedShowCount: savedShows.length,
+    exportCount: progress.exported ? 1 : 0,
+    episodeStatus: progress.hasSubmitted ? "submitted" : "draft"
+  });
   const dashboardPath = makeShortMilestones.map((milestone) => ({
     ...milestone,
     done:
@@ -4329,6 +4338,24 @@ function ShowDashboard({
               <span>{index + 1}</span>
               <strong>{step.label}</strong>
             </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="publicBetaPanel" aria-label="Public release workflow">
+        <div>
+          <span className="eyebrow">Public-Ready Spine</span>
+          <h2>Make it, perform it, send it.</h2>
+          <p>Every big feature should keep a one-button beginner path, a deeper pro path, and a durable home in the Show Kit.</p>
+        </div>
+        <div className="publicBetaGrid">
+          {publicWorkflow.map((pillar) => (
+            <article className={pillar.done ? "done" : ""} key={pillar.id}>
+              <span>{pillar.shortTitle}</span>
+              <strong>{pillar.title}</strong>
+              <small>{pillar.status}</small>
+              <b>{pillar.nextStep}</b>
+            </article>
           ))}
         </div>
       </section>

@@ -194,6 +194,74 @@ export const makeShortMilestones = [
   { id: "finish", label: "Export / Submit", shortLabel: "Finish", description: "Render, package, and submit when ready." }
 ];
 
+export const publicReleasePillars = [
+  {
+    id: "five-minute-cartoon",
+    title: "Five-Minute Cartoon Beta",
+    shortTitle: "Make It",
+    beginnerVersion: "One clear path from start to exported short.",
+    proUnlock: "Format templates, richer finish targets, export choices, and readiness checks.",
+    showKitHome: "Saved shows, reusable rigs, sets, cuts, takes, and export history.",
+    publicGoal: "A first-time user can finish one funny short without guessing."
+  },
+  {
+    id: "live-puppet-studio",
+    title: "Live Puppet Studio",
+    shortTitle: "Perform It",
+    beginnerVersion: "Record, replay, and feel rewarded immediately.",
+    proUnlock: "Motion feel presets, cue deck, camera punches, sound stings, and lane review.",
+    showKitHome: "Performance presets, macros, cue memories, reusable takes, and scene beats.",
+    publicGoal: "The act of performing feels smooth enough that users want another take."
+  },
+  {
+    id: "doinktv-pipeline",
+    title: "DoinkTV-Ready Pipeline",
+    shortTitle: "Send It",
+    beginnerVersion: "Render final, package source, and submit from one Finish strip.",
+    proUnlock: "Backend render checks, metadata, credits, rights notes, thumbnail, and review status.",
+    showKitHome: "Submission data, license notes, exports, episode status, and network handoff history.",
+    publicGoal: "A short can move from Pup-It into a real review queue."
+  }
+];
+
+export function buildPublicReleaseWorkflow({
+  progress = {},
+  takeCount = 0,
+  timelineCount = 0,
+  savedShowCount = 0,
+  exportCount = 0,
+  episodeStatus = "draft"
+} = {}) {
+  const submitted = ["submitted", "ready_for_review", "approved", "scheduled", "published"].includes(episodeStatus);
+  const showKitStarted = savedShowCount > 0 || progress.hasShow || progress.hasRig || progress.hasSet;
+  return publicReleasePillars.map((pillar) => {
+    if (pillar.id === "five-minute-cartoon") {
+      const done = Boolean(progress.exported || submitted);
+      return {
+        ...pillar,
+        done,
+        status: done ? "public-beta ready" : progress.readyToExport ? "ready to export" : "needs first short",
+        nextStep: progress.readyToExport ? "Export Short" : "Follow 5-Minute Trial"
+      };
+    }
+    if (pillar.id === "live-puppet-studio") {
+      const done = takeCount > 0 && Boolean(progress.hasTake);
+      return {
+        ...pillar,
+        done,
+        status: done ? "performance loop proven" : "needs a recorded take",
+        nextStep: done ? "Replay And Improve" : "Record Take"
+      };
+    }
+    return {
+      ...pillar,
+      done: submitted || exportCount > 0,
+      status: submitted ? "submitted" : exportCount > 0 ? "package created" : showKitStarted ? "show kit started" : "needs saved show",
+      nextStep: submitted ? "Track Review" : exportCount > 0 ? "Submit DoinkTV" : timelineCount > 0 ? "Package Cut" : "Save Show Kit"
+    };
+  });
+}
+
 export const workspaceIdentity = {
   home: {
     label: "Start",

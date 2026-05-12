@@ -515,6 +515,8 @@ input[type="color"] {
 .workflowRail button strong {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
 }
 
 .workflowRail button.selected {
@@ -1032,6 +1034,84 @@ input[type="color"] {
 .fiveMinuteTrialPanel p {
   margin: 0;
   color: #4b4e68;
+}
+
+.publicBetaPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 14px;
+  border: 3px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(111, 166, 140, 0.24), transparent 44%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.publicBetaPanel h2 {
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.08;
+}
+
+.publicBetaPanel p {
+  margin: 0;
+  color: #4b4e68;
+}
+
+.publicBetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.publicBetaGrid article {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-height: 112px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.44), transparent 62%),
+    var(--paper);
+}
+
+.publicBetaGrid article.done {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 58%),
+    var(--pond);
+}
+
+.publicBetaGrid span,
+.publicBetaGrid b {
+  color: #5f6278;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.publicBetaGrid strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.05;
+}
+
+.publicBetaGrid small {
+  color: #4b4e68;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.publicBetaGrid b {
+  align-self: end;
+  width: fit-content;
+  padding: 3px 5px;
+  border: 1px solid var(--ink);
+  background: rgba(255, 255, 255, 0.34);
 }
 
 .trialMeter {
@@ -5986,16 +6066,16 @@ input[type="color"] {
 .nameTag {
   position: absolute;
   left: 50%;
-  top: -30px;
+  top: -42px;
   transform: translateX(-50%);
-  max-width: 132px;
-  padding: 5px 8px;
+  max-width: 120px;
+  padding: 4px 7px;
   border: 2px solid var(--ink);
   border-radius: 2px;
   color: var(--ink);
   background: rgba(245, 241, 232, 0.92);
-  font-size: 12px;
-  font-weight: 750;
+  font-size: 10px;
+  font-weight: 850;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7941,26 +8021,43 @@ input[type="color"] {
   .workflowRail {
     width: 100%;
     max-width: 100vw;
+    gap: 5px;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(96px, 1fr);
+    grid-auto-columns: minmax(78px, max-content);
     grid-template-columns: none;
     overflow-x: auto;
+    padding: 8px;
     border-right: 0;
     border-bottom: 3px solid var(--ink);
   }
 
   .workflowRail button {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 5px;
     min-height: 38px;
+    padding: 0 5px;
+  }
+
+  .workflowRail button span {
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+
+  .workflowRail button strong {
+    font-size: 11px;
   }
 
   .dashboardHero,
   .fiveMinuteTrialPanel,
+  .publicBetaPanel,
   .makeShortPanel,
   .dashboardGrid,
   .dashboardStats,
   .templateGrid,
   .trialChecklist,
-  .shortFormatGrid {
+  .shortFormatGrid,
+  .publicBetaGrid {
     grid-template-columns: 1fr;
   }
 

@@ -2,7 +2,14 @@ import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createProjectExport, createShowToolbox } from "../shared/production.js";
 import { createRenderModel } from "../shared/renderModel.js";
 import { buildDoinkReviewChecklist, buildRenderPreflight, summarizeFinishConfidence, summarizeTakeSpark } from "../src/workflows/finishReadiness.js";
-import { getTutorialTrack, getWorkspaceIdentity, makeShortMilestones, tutorialTracks } from "../src/workflow/shortFlow.js";
+import {
+  buildPublicReleaseWorkflow,
+  getTutorialTrack,
+  getWorkspaceIdentity,
+  makeShortMilestones,
+  publicReleasePillars,
+  tutorialTracks
+} from "../src/workflow/shortFlow.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
   const project = {
@@ -97,6 +104,42 @@ test("tutorial tracks scale from first cartoon to expert app tour", () => {
   expect(getTutorialTrack("ultra")).toMatchObject({ setupLabel: "Set Me Up", level: "First cartoon" });
   expect(getTutorialTrack("expert").steps.length).toBeGreaterThan(6);
   expect(getTutorialTrack("missing").id).toBe("beginner");
+});
+
+test("public release workflow keeps beginner pro and show kit paths linked", () => {
+  expect(publicReleasePillars.map((pillar) => pillar.shortTitle)).toEqual(["Make It", "Perform It", "Send It"]);
+  publicReleasePillars.forEach((pillar) => {
+    expect(pillar.beginnerVersion).toMatch(/one|record|render/i);
+    expect(pillar.proUnlock.length).toBeGreaterThan(20);
+    expect(pillar.showKitHome).toMatch(/Show Kit|Saved shows|Performance|Submission/i);
+  });
+
+  const workflow = buildPublicReleaseWorkflow({
+    progress: {
+      hasShow: true,
+      hasRig: true,
+      hasSet: true,
+      hasTake: true,
+      readyToExport: true,
+      exported: false,
+      hasSubmitted: false
+    },
+    takeCount: 1,
+    timelineCount: 1,
+    savedShowCount: 1,
+    exportCount: 0,
+    episodeStatus: "draft"
+  });
+
+  expect(workflow.find((pillar) => pillar.id === "five-minute-cartoon")).toMatchObject({
+    status: "ready to export",
+    nextStep: "Export Short"
+  });
+  expect(workflow.find((pillar) => pillar.id === "live-puppet-studio").done).toBe(true);
+  expect(workflow.find((pillar) => pillar.id === "doinktv-pipeline")).toMatchObject({
+    status: "show kit started",
+    nextStep: "Package Cut"
+  });
 });
 
 test("render model preserves scene depth and direct-manipulated part offsets", () => {
