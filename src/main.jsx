@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import {
@@ -96,7 +96,6 @@ import {
   describeFinishTarget as describeFinishTargetFromState,
   resolveFinishTake as resolveFinishTakeFromState
 } from "./workflows/finishFlow.js";
-import { SceneLibraryEditor } from "./workspaces/FinishWorkspace.jsx";
 import {
   buildPublicReleaseWorkflow,
   computeBeginnerProgress,
@@ -107,6 +106,10 @@ import {
   workflowSteps
 } from "./workflow/shortFlow.js";
 import "./styles.css";
+
+const SceneLibraryEditor = lazy(() =>
+  import("./workspaces/FinishWorkspace.jsx").then((module) => ({ default: module.SceneLibraryEditor }))
+);
 
 const SERVER_URL =
   import.meta.env.VITE_SERVER_URL ||
@@ -3969,46 +3972,48 @@ function App() {
           />
         )}
         {mode === "edit" && (
-          <SceneLibraryEditor
-            takes={takeLibrary}
-            selectedTake={selectedTake}
-            playbackActive={playbackActive}
-            projectExport={createCurrentProjectExport()}
-            onRefresh={loadTakeLibrary}
-            onSelectTake={selectTake}
-            onPlay={playSelectedTake}
-            onTakeMetaChange={updateSelectedTakeMeta}
-            onMarkBestTake={markSelectedTakeBest}
-            onQuickTrim={quickTrimSelectedTake}
-            onSaveTakeAsScene={saveSelectedTakeAsScene}
-            onKeepTake={keepSelectedTake}
-            onMakeAnotherBit={startAnotherBit}
-            onExportProject={exportProject}
-            onExportVideo={exportSelectedTakeVideo}
-            onExportThumbnail={exportSelectedTakeThumbnail}
-            onBackendRender={requestBackendRender}
-            backendRendering={backendRendering}
-            renderJob={renderJob}
-            finishTarget={finishTarget}
-            finishTargetLabel={describeFinishTarget()}
-            onFinishTargetChange={setFinishTarget}
-            videoExporting={videoExporting}
-            doinkSubmission={doinkSubmission}
-            doinkSubmitting={doinkSubmitting}
-            doinkEndpointConfigured={Boolean(DOINKTV_SUBMISSION_URL)}
-            onDoinkSubmissionChange={updateDoinkSubmission}
-            onSubmitToDoinkTv={submitToDoinkTv}
-            onAddTakeToTimeline={addTakeToTimeline}
-            timeline={productionTimeline}
-            episodeStatus={episodeStatus}
-            onEpisodeStatusChange={setEpisodeStatus}
-            onRemoveTimelineClip={removeTimelineClip}
-            onMoveTimelineClip={moveTimelineClip}
-            onTrimTimelineClip={trimTimelineClip}
-            onUpdateTimelineClip={updateTimelineClip}
-            onModeChange={setMode}
-            serverUrl={SERVER_URL}
-          />
+          <Suspense fallback={<div className="dockGroup lazyWorkspaceFallback">Loading Finish workspace...</div>}>
+            <SceneLibraryEditor
+              takes={takeLibrary}
+              selectedTake={selectedTake}
+              playbackActive={playbackActive}
+              projectExport={createCurrentProjectExport()}
+              onRefresh={loadTakeLibrary}
+              onSelectTake={selectTake}
+              onPlay={playSelectedTake}
+              onTakeMetaChange={updateSelectedTakeMeta}
+              onMarkBestTake={markSelectedTakeBest}
+              onQuickTrim={quickTrimSelectedTake}
+              onSaveTakeAsScene={saveSelectedTakeAsScene}
+              onKeepTake={keepSelectedTake}
+              onMakeAnotherBit={startAnotherBit}
+              onExportProject={exportProject}
+              onExportVideo={exportSelectedTakeVideo}
+              onExportThumbnail={exportSelectedTakeThumbnail}
+              onBackendRender={requestBackendRender}
+              backendRendering={backendRendering}
+              renderJob={renderJob}
+              finishTarget={finishTarget}
+              finishTargetLabel={describeFinishTarget()}
+              onFinishTargetChange={setFinishTarget}
+              videoExporting={videoExporting}
+              doinkSubmission={doinkSubmission}
+              doinkSubmitting={doinkSubmitting}
+              doinkEndpointConfigured={Boolean(DOINKTV_SUBMISSION_URL)}
+              onDoinkSubmissionChange={updateDoinkSubmission}
+              onSubmitToDoinkTv={submitToDoinkTv}
+              onAddTakeToTimeline={addTakeToTimeline}
+              timeline={productionTimeline}
+              episodeStatus={episodeStatus}
+              onEpisodeStatusChange={setEpisodeStatus}
+              onRemoveTimelineClip={removeTimelineClip}
+              onMoveTimelineClip={moveTimelineClip}
+              onTrimTimelineClip={trimTimelineClip}
+              onUpdateTimelineClip={updateTimelineClip}
+              onModeChange={setMode}
+              serverUrl={SERVER_URL}
+            />
+          </Suspense>
         )}
         {mode === "storyboard" && (
           <StoryboardEditor
