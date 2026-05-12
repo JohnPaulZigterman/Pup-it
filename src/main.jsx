@@ -1095,6 +1095,7 @@ function App() {
   const [videoExporting, setVideoExporting] = useState(false);
   const [backendRendering, setBackendRendering] = useState(false);
   const [renderJob, setRenderJob] = useState(null);
+  const [performanceMoments, setPerformanceMoments] = useState([]);
   const [finishTarget, setFinishTarget] = useState("selected-take");
   const [storyboardPanels, setStoryboardPanels] = useState([]);
   const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
@@ -1218,6 +1219,11 @@ function App() {
         setCameraPunchScale(savedTake.directorCamera?.punchScale || 1);
         setCameraShakeOffset({ x: 0, y: 0 });
         setMode("edit");
+        addPerformanceMoment({
+          type: "take",
+          label: "Take saved",
+          detail: `${savedTake.name || "Fresh take"} is ready to replay.`
+        });
         window.setTimeout(() => playTake(savedTake), 120);
       }
       setStatus(isRecording ? "Recording movement and audio chunks." : "Take saved. Replay it while the performance energy is fresh.");
@@ -1421,6 +1427,19 @@ function App() {
       socketRef.current.emit("performer:update", nextState);
       return upsertPerformer(current, { ...performer, state: nextState });
     });
+  };
+
+  const addPerformanceMoment = ({ type = "cue", label, detail = "" }) => {
+    setPerformanceMoments((current) => [
+      {
+        id: `moment-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+        type,
+        label,
+        detail,
+        at: new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })
+      },
+      ...current
+    ].slice(0, 6));
   };
 
   const setExpression = (expression) => updateSelf({ expression });
@@ -2030,10 +2049,16 @@ function App() {
   };
 
   const triggerMacro = (macro) => {
+    const macroItem = getCatalogItem(macroCatalog, macro);
     updateSelf({ macro });
     socketRef.current.emit("macro:trigger", macro);
     playSoundSting(macro === "panic" ? "zap" : macro === "hop" ? "pop" : "tap");
     flashMacro(selfId, macro);
+    addPerformanceMoment({
+      type: "macro",
+      label: macroItem.name,
+      detail: "Gesture cue fired live."
+    });
     window.setTimeout(() => updateSelf({ macro: null }), 850);
   };
 
@@ -2079,6 +2104,11 @@ function App() {
     if (preset.cameraShot) setCameraShot(preset.cameraShot);
     if (preset.lightingPreset) setLightingPreset(preset.lightingPreset);
     playSoundSting(preset.id === "chaotic" ? "pop" : "tap");
+    addPerformanceMoment({
+      type: "preset",
+      label: preset.name,
+      detail: preset.description
+    });
     setStatus(`${preset.name} performance feel loaded.`);
   };
 
@@ -2136,6 +2166,11 @@ function App() {
       playSoundSting(action.soundSting);
       if (["thump", "zap", "drop"].includes(action.soundSting)) triggerCameraShake();
     }
+    addPerformanceMoment({
+      type: "director",
+      label: action.name,
+      detail: action.soundSting ? `${action.soundSting} sting` : "Director cue applied."
+    });
     setStatus(`${action.name} setup applied.`);
   };
 
@@ -2334,9 +2369,11 @@ function App() {
 
   const toggleTake = () => {
     if (recording) {
+      addPerformanceMoment({ type: "take", label: "Stop take", detail: "Saving the performance for replay." });
       socketRef.current.emit("take:stop");
       return;
     }
+    addPerformanceMoment({ type: "take", label: "Record take", detail: "Live performance capture started." });
     socketRef.current.emit("take:start", {
       cameraShot,
       lightingPreset,
@@ -3862,6 +3899,7 @@ function App() {
             backgroundTheme={backgroundTheme}
             objectStyle={objectStyle}
             floorMarks={floorMarks}
+            performanceMoments={performanceMoments}
             shotTemplates={shotTemplateCatalog}
             onCameraShotChange={setCameraShot}
             onCameraFollowChange={setCameraFollow}
@@ -5112,6 +5150,7 @@ function PerformControls({
   backgroundTheme,
   objectStyle,
   floorMarks,
+  performanceMoments = [],
   shotTemplates,
   onSceneChange,
   onCameraShotChange,
@@ -5151,6 +5190,18 @@ function PerformControls({
   const intentLabel = self?.state.motionIntent === "settling" ? "settling" : self?.state.walking ? "moving" : "ready";
   const mouthPercent = Math.min(100, Math.round((self?.state.mouthOpen || 0) * 100));
   const performanceReady = Boolean(self && (micLive || (self.state.mouthControl || "audio") !== "audio"));
+  const latestMoment = performanceMoments[0];
+  const instrumentScore = Math.min(
+    100,
+    Math.round(
+      (performanceReady ? 24 : 8) +
+        Math.min(22, motionEnergy * 0.22) +
+        Math.min(18, mouthPercent * 0.18) +
+        (cameraShot !== "wide" ? 12 : 4) +
+        (latestMoment ? 14 : 0) +
+        (recording ? 10 : 0)
+    )
+  );
   const livePads = [
     {
       id: "reaction",
@@ -5304,6 +5355,14 @@ function PerformControls({
       <div className="dockGroup performanceLoopPanel">
         <h2>Performance Loop</h2>
         <small className="controlHint">Keep the reward close: rehearse, record a short take, then jump straight to replay.</small>
+        <div className="performanceInstrumentPanel" aria-label="Performance instrument">
+          <div>
+            <span className="eyebrow">Instrument Feel</span>
+            <strong>{activeMotionFeel.name}</strong>
+            <small>{latestMoment ? `${latestMoment.label}: ${latestMoment.detail}` : "Fire a cue, move, or record to start building performance energy."}</small>
+          </div>
+          <b>{instrumentScore}%</b>
+        </div>
         <div className="performanceReadiness" aria-label="Performance readiness">
           <span className={self ? "done" : ""}>Rig</span>
           <span className={performanceReady ? "done" : ""}>Mouth</span>
@@ -5334,6 +5393,25 @@ function PerformControls({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="dockGroup performanceMemoryPanel">
+        <h2>Cue Memory</h2>
+        {performanceMoments.length ? (
+          <div className="performanceMomentList" aria-label="Recent performance cues">
+            {performanceMoments.slice(0, 4).map((moment) => (
+              <span className={`moment-${moment.type}`} key={moment.id}>
+                <strong>{moment.label}</strong>
+                <small>{moment.at} / {moment.detail}</small>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState compactEmpty">
+            <strong>No cues yet.</strong>
+            <span>Try a Live Pad or Cue Deck button and Pup-It will remember the last beats.</span>
+          </div>
+        )}
       </div>
 
       <div className="dockGroup puppetFeelPanel">

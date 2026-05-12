@@ -2723,6 +2723,41 @@ input[type="color"] {
   background-blend-mode: multiply, normal, normal;
 }
 
+.performanceInstrumentPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(143, 216, 181, 0.24), rgba(255, 242, 168, 0.2)),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.performanceInstrumentPanel strong,
+.performanceInstrumentPanel small {
+  display: block;
+}
+
+.performanceInstrumentPanel small {
+  color: #4b4e68;
+  line-height: 1.25;
+}
+
+.performanceInstrumentPanel b {
+  display: grid;
+  width: 58px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--nicotine);
+  color: var(--ink);
+  font-size: 16px;
+}
+
 .livePadPanel {
   border-color: var(--ink);
   background:
@@ -2786,6 +2821,53 @@ input[type="color"] {
     var(--surface-grain),
     linear-gradient(135deg, rgba(227, 189, 69, 0.16), transparent 48%),
     var(--surface);
+}
+
+.performanceMemoryPanel {
+  border-color: var(--meat);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(246, 166, 178, 0.22), rgba(255, 242, 168, 0.18)),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.performanceMomentList {
+  display: grid;
+  gap: 6px;
+}
+
+.performanceMomentList span {
+  display: grid;
+  gap: 2px;
+  min-height: 42px;
+  padding: 7px;
+  border: 1px solid var(--ink);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.performanceMomentList span:first-child {
+  border-width: 2px;
+  background: var(--nicotine);
+}
+
+.performanceMomentList strong,
+.performanceMomentList small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.performanceMomentList strong {
+  color: var(--ink);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.performanceMomentList small {
+  color: #4b4e68;
+  font-size: 10px;
 }
 
 .feelReadout {
@@ -2918,6 +3000,46 @@ input[type="color"] {
 
 .postTakeReward small {
   color: #4b4e68;
+}
+
+.takeSparkPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px;
+  border: 2px solid var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(255, 242, 168, 0.24), rgba(255, 255, 255, 0.2)),
+    var(--surface);
+}
+
+.takeSparkPanel.good {
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(143, 216, 181, 0.38), rgba(255, 242, 168, 0.2)),
+    var(--surface);
+}
+
+.takeSparkPanel strong,
+.takeSparkPanel small {
+  display: block;
+}
+
+.takeSparkPanel small {
+  color: #4b4e68;
+  line-height: 1.25;
+}
+
+.takeSparkPanel b {
+  display: grid;
+  width: 54px;
+  height: 40px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: var(--pond);
+  color: var(--ink);
 }
 
 .rewardScoreboard {

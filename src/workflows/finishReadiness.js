@@ -134,3 +134,58 @@ export function buildRenderPreflight({
     status: renderSucceeded ? "rendered" : backendRendering ? "rendering" : readyToRender ? "ready" : "needs-attention"
   };
 }
+
+export function summarizeTakeSpark(take = null) {
+  if (!take) {
+    return {
+      score: 0,
+      label: "No take yet",
+      details: ["Record a quick performance first."],
+      laneCount: 0
+    };
+  }
+  const motionEvents = take.tracks?.motion || [];
+  const audioEvents = take.tracks?.audio || [];
+  const mouthEvents = motionEvents.filter((event) => event.state?.mouthOpen > 0.08 || event.state?.speaking);
+  const cueEvents = motionEvents.filter((event) => event.type === "macro:trigger" || event.macro || event.state?.macro);
+  const hasCamera = Boolean(take.cameraShot && take.cameraShot !== "wide");
+  const hasProps = Boolean(take.sceneObjects?.length);
+  const laneCount = [
+    motionEvents.length > 4,
+    mouthEvents.length > 2,
+    cueEvents.length > 0,
+    audioEvents.length > 0,
+    hasCamera,
+    hasProps,
+    (take.performers?.length || 0) > 1
+  ].filter(Boolean).length;
+  const durationMs = take.durationMs || 0;
+  const durationScore = durationMs >= 3000 && durationMs <= 45000 ? 18 : durationMs > 0 ? 9 : 0;
+  const score = Math.min(
+    100,
+    durationScore +
+      Math.min(22, motionEvents.length * 2) +
+      Math.min(16, mouthEvents.length * 3) +
+      (audioEvents.length ? 14 : 0) +
+      (cueEvents.length ? 12 : 0) +
+      (hasCamera ? 8 : 0) +
+      (hasProps ? 5 : 0) +
+      ((take.performers?.length || 0) > 1 ? 5 : 0)
+  );
+  const label =
+    score >= 78
+      ? "Airing-energy take"
+      : score >= 58
+        ? "Funny little keeper"
+        : score >= 34
+          ? "Good rough pass"
+          : "Needs one more perform pass";
+  const details = [
+    motionEvents.length > 4 ? "body motion reads" : "add a little movement",
+    mouthEvents.length > 2 || audioEvents.length ? "mouth/audio has life" : "talk or open the mouth",
+    cueEvents.length ? "has a cue moment" : "try one cue button",
+    hasCamera ? "camera changed" : "wide shot only"
+  ];
+
+  return { score, label, details, laneCount };
+}

@@ -19,6 +19,7 @@ import {
   buildDoinkReviewChecklist,
   describeAudioStatus,
   formatDuration,
+  summarizeTakeSpark,
   summarizeFinishConfidence
 } from "../workflows/finishReadiness.js";
 import { ProductionTimeline } from "./ProductionTimeline.jsx";
@@ -73,6 +74,7 @@ export function SceneLibraryEditor({
         { id: "audio", label: "Audio", count: selectedTake.tracks.audio.length }
       ]
     : [];
+  const takeSpark = summarizeTakeSpark(selectedTake);
   const reviewReadyStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
   const hasSubmissionSource = Boolean(selectedTake || takes.length || timeline.length);
   const hasTargetTake = hasUsableFinishTake({
@@ -521,6 +523,14 @@ export function SceneLibraryEditor({
                 <strong>{selectedTake.performers.length}</strong>
                 Cast
               </span>
+            </div>
+            <div className={`takeSparkPanel ${takeSpark.score >= 58 ? "good" : ""}`} aria-label="Take spark">
+              <div>
+                <span className="eyebrow">Take Spark</span>
+                <strong>{takeSpark.label}</strong>
+                <small>{takeSpark.details.join(" / ")}</small>
+              </div>
+              <b>{takeSpark.score}%</b>
             </div>
             <label className="takeNameField">
               Take Name

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createDoinkTvSubmissionPackage, createProjectExport, createShowToolbox } from "../shared/production.js";
 import { createRenderModel } from "../shared/renderModel.js";
-import { buildDoinkReviewChecklist, buildRenderPreflight, summarizeFinishConfidence } from "../src/workflows/finishReadiness.js";
+import { buildDoinkReviewChecklist, buildRenderPreflight, summarizeFinishConfidence, summarizeTakeSpark } from "../src/workflows/finishReadiness.js";
 import { getTutorialTrack, getWorkspaceIdentity, makeShortMilestones, tutorialTracks } from "../src/workflow/shortFlow.js";
 
 test("DoinkTV package includes admin review manifest and missing-item guidance", () => {
@@ -168,4 +168,27 @@ test("render preflight separates render blockers from optional review file", () 
   expect(preflight.status).toBe("ready");
   expect(preflight.blockers).toEqual([]);
   expect(preflight.checks.find((item) => item.id === "deliverable").done).toBe(false);
+});
+
+test("take spark rewards live performance ingredients", () => {
+  const spark = summarizeTakeSpark({
+    durationMs: 8000,
+    performers: [{ id: "one" }, { id: "two" }],
+    sceneObjects: [{ id: "prop" }],
+    cameraShot: "reaction",
+    tracks: {
+      motion: [
+        { type: "performer:update", state: { x: 44 } },
+        { type: "performer:update", state: { x: 45, mouthOpen: 0.4 } },
+        { type: "performer:update", state: { x: 46, speaking: true } },
+        { type: "performer:update", state: { x: 47 } },
+        { type: "macro:trigger", macro: "panic" }
+      ],
+      audio: [{ performerId: "one" }]
+    }
+  });
+
+  expect(spark.score).toBeGreaterThanOrEqual(70);
+  expect(spark.label).toMatch(/take|keeper/i);
+  expect(spark.details).toContain("has a cue moment");
 });

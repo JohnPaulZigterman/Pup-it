@@ -75,11 +75,14 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByRole("heading", { name: "Performance Presets" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Motion" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live Pad" })).toBeVisible();
+  await expect(page.getByLabel("Performance instrument")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cue Memory" })).toBeVisible();
   await expect(page.getByLabel("Performance readiness")).toBeVisible();
   await expect(page.getByRole("button", { name: "TV Ready" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Audio" })).toHaveClass(/selected/);
   await page.getByRole("button", { name: "5 Big Reaction Face, punch-in, and weird expression." }).click();
   await expect(page.getByRole("button", { name: "Surprise" })).toHaveClass(/selected/);
+  await expect(page.getByLabel("Recent performance cues")).toContainText("Reaction");
   await page.getByRole("button", { name: "Loose Puppet", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Director Camera" })).toBeVisible();
   await page.getByRole("button", { name: "Punch In" }).click();
