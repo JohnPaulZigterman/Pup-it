@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
@@ -34,11 +35,33 @@ import {
 const PORT = Number(process.env.PORT || 4111);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distRoot = path.resolve(__dirname, "../dist");
 const renderStaticRoot = path.resolve(__dirname, "../renders");
+const allowedOrigins = new Set(
+  [
+    CLIENT_ORIGIN,
+    process.env.PUBLIC_BASE_URL,
+    "http://127.0.0.1:5173",
+    "http://localhost:5173"
+  ]
+    .flatMap((value) => String(value || "").split(","))
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+const clientBundleAvailable = existsSync(path.join(distRoot, "index.html"));
+
+function isAllowedSocketOrigin(origin) {
+  if (!origin || allowedOrigins.has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return process.env.NODE_ENV === "production" && hostname.endsWith(".onrender.com");
+  } catch {
+    return false;
+  }
+}
 
 const app = express();
 app.use((req, res, next) => {
-  const allowedOrigins = new Set([CLIENT_ORIGIN, "http://127.0.0.1:5173", "http://localhost:5173"]);
   const origin = req.headers.origin;
   if (origin && allowedOrigins.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -57,7 +80,9 @@ app.use("/renders", express.static(renderStaticRoot));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [CLIENT_ORIGIN, "http://127.0.0.1:5173"],
+    origin: (origin, callback) => {
+      callback(null, isAllowedSocketOrigin(origin));
+    },
     methods: ["GET", "POST"]
   },
   maxHttpBufferSize: 1e7
@@ -498,8 +523,41 @@ app.get("/health", async (_req, res) => {
   } catch (_error) {
     database = { configured: true, ok: false };
   }
-  res.json({ ok: true, database });
+  res.json({
+    ok: true,
+    service: "pup-it",
+    clientBundle: clientBundleAvailable,
+    database,
+    renderArtifacts: "/renders",
+    version: process.env.RENDER_GIT_COMMIT || process.env.npm_package_version || "local"
+  });
 });
+
+app.get("/ready", async (_req, res) => {
+  let database = { configured: isDatabaseConfigured(), ok: false };
+  try {
+    database = await checkDatabase();
+  } catch (_error) {
+    database = { configured: true, ok: false };
+  }
+  const ready = clientBundleAvailable && (!database.configured || database.ok);
+  res.status(ready ? 200 : 503).json({
+    ready,
+    clientBundle: clientBundleAvailable,
+    database
+  });
+});
+
+if (clientBundleAvailable) {
+  app.use(express.static(distRoot));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path.startsWith("/socket.io/") || req.path.startsWith("/renders/")) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(distRoot, "index.html"));
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`Pup-It realtime server listening on http://localhost:${PORT}`);

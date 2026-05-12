@@ -108,7 +108,9 @@ import {
 } from "./workflow/shortFlow.js";
 import "./styles.css";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4111";
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ||
+  (import.meta.env.DEV ? "http://localhost:4111" : window.location.origin);
 const DOINKTV_SUBMISSION_URL = import.meta.env.VITE_DOINKTV_SUBMISSION_URL || "";
 const SHOW_STORAGE_KEY = "pup-it-shows-v1";
 const AUTOSAVE_DRAFT_KEY = "pup-it-autosave-draft-v1";

@@ -10,6 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const renderRoot = path.resolve(__dirname, "../renders");
 const rendererVersion = "pup-it-headless-chromium-v2";
 const ffmpegCommand = process.env.FFMPEG_PATH || ffmpegStaticPath || "ffmpeg";
+const chromiumArgs = process.env.PLAYWRIGHT_CHROMIUM_ARGS
+  ? process.env.PLAYWRIGHT_CHROMIUM_ARGS.split(" ").filter(Boolean)
+  : process.env.NODE_ENV === "production"
+    ? ["--no-sandbox", "--disable-setuid-sandbox"]
+    : [];
 
 function sanitizeFilePart(value, fallback = "track") {
   return String(value || fallback)
@@ -579,7 +584,7 @@ export async function renderWithHeadlessChromium(request, jobId) {
 
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, args: chromiumArgs });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
     await page.setContent(renderHtml(), { waitUntil: "domcontentloaded" });
     const result = await page.evaluate((payload) => window.renderPupIt(payload), { ...request, renderModel });

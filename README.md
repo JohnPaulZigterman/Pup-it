@@ -61,6 +61,36 @@ The current persisted API surface is intentionally small and expandable:
 
 If `DATABASE_URL` is not configured, the app still runs and show saving falls back to browser storage.
 
+## Render Deployment
+
+The repo includes `render.yaml` for a Render Blueprint deployment with one Node web service and one Postgres database.
+
+Recommended Render settings:
+
+- Build command: `npm ci && npm run render:build`
+- Pre-deploy command: `npm run db:migrate`
+- Start command: `npm start`
+- Health check path: `/health`
+
+The production server serves the built Vite app from `dist/`, Socket.IO, API routes, render artifacts under `/renders`, and the SPA fallback from the same origin. In production, the browser client uses the deployed origin by default, so `VITE_SERVER_URL` can stay empty for a single Render web service.
+
+Important environment variables:
+
+- `DATABASE_URL`: supplied by the Render Postgres database in the Blueprint.
+- `CLIENT_ORIGIN`: optional comma-separated allowed browser origins. Set this to the final Render URL or your custom domain when known.
+- `PUBLIC_BASE_URL`: optional deployed public URL, useful when a custom domain is attached.
+- `VITE_DOINKTV_SUBMISSION_URL`: optional external DoinkTV intake endpoint. Leave empty to use Pup-It's built-in `/api/doinktv/submissions` handoff.
+- `PGSSLMODE=require`: optional when connecting to an external Postgres URL that requires SSL.
+- `PLAYWRIGHT_BROWSERS_PATH=0`: recommended on Render so Chromium is installed into the deployed app bundle.
+- `PLAYWRIGHT_CHROMIUM_ARGS`: optional space-separated Chromium launch flags. Production defaults to `--no-sandbox --disable-setuid-sandbox`.
+
+Backend rendering depends on Playwright Chromium and `ffmpeg-static`. `npm run render:build` builds the Vite client and installs the Chromium browser binary needed by `server/renderWorker.js`.
+
+Health endpoints:
+
+- `GET /health`: deployment health check. It stays 200 even if Postgres is not configured, so the app can boot with local/browser fallback.
+- `GET /ready`: stricter readiness check. It returns 503 if the client bundle is missing or a configured database is unavailable.
+
 ## Architecture Direction
 
 - `shared/` contains data contracts and reusable logic used by both browser and server.

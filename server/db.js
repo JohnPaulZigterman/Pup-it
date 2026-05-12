@@ -7,7 +7,11 @@ export const databaseUrl = process.env.DATABASE_URL || "";
 export const db = databaseUrl
   ? new Pool({
       connectionString: databaseUrl,
-      max: Number(process.env.PG_POOL_MAX || 8)
+      max: Number(process.env.PG_POOL_MAX || 8),
+      ssl:
+        process.env.PGSSLMODE === "require" || process.env.PGSSL === "true"
+          ? { rejectUnauthorized: false }
+          : undefined
     })
   : null;
 
