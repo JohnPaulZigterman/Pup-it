@@ -1137,6 +1137,7 @@ function App() {
     schedulingNotes: ""
   });
   const [status, setStatus] = useState("Create or join a room to start puppeteering.");
+  const [liveServerState, setLiveServerState] = useState("idle");
 
   const self = performers[selfId];
   const selectedScene = getCatalogItem(sceneCatalog, scene);
@@ -1178,14 +1179,31 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
-  const showStageMarkers = mode === "assets" || mode === "edit";
-  const showPuppetLabels = mode === "edit";
+  const showStageMarkers = mode === "assets" || (mode === "edit" && experienceMode === "pro");
+  const showPuppetLabels = mode === "build" && experienceMode === "pro";
+  const showSessionControls = mode === "home" || experienceMode === "pro";
+  const showProjectGuide = mode === "home" || experienceMode === "pro";
+  const showRoadmap = mode === "home" || experienceMode === "pro";
+  const showContextActionStrip = experienceMode === "pro";
+  const showShowKit = mode === "home" || experienceMode === "pro";
+  const showInspector = experienceMode === "pro";
 
   useEffect(() => {
     const socket = io(SERVER_URL, { autoConnect: false });
     socketRef.current = socket;
 
-    socket.on("connect", () => setSelfId(socket.id));
+    socket.on("connect", () => {
+      setSelfId(socket.id);
+      setLiveServerState("connected");
+    });
+    socket.on("connect_error", () => {
+      setLiveServerState("disconnected");
+      setStatus("Live server disconnected. Solo mode is active until the server comes back.");
+    });
+    socket.on("disconnect", () => {
+      setLiveServerState("disconnected");
+      setStatus("Live server disconnected. Solo mode is active until the server comes back.");
+    });
     socket.on("room:snapshot", (snapshot) => {
       selectedSceneRef.current = snapshot.scene;
       setScene(snapshot.scene);
@@ -3788,9 +3806,30 @@ function App() {
       </section>
 
       <aside className="controlDock">
-        <ShowSessionControls
-          showName={showName}
-          savedShows={savedShows}
+        {liveServerState === "disconnected" && (
+          <div className="dockGroup connectionNotice" role="status">
+            <h2>Solo Mode</h2>
+            <strong>Live server is not connected.</strong>
+            <small>Build and preview still work here. Multiplayer rooms, take recording, and backend render need the Pup-It server.</small>
+          </div>
+        )}
+
+        {mode === "perform" && !startedShortFormat && experienceMode === "beginner" && (
+          <div className="dockGroup stageLobbyPanel">
+            <h2>Stage Lobby</h2>
+            <strong>You are in the puppet show.</strong>
+            <small>Move around, test the mouth, or start a tiny short when you want a production path.</small>
+            <div className="stageLobbyActions">
+              <button onClick={() => startQuickShort("argument")}>Make A Short</button>
+              <button onClick={toggleTake}>{recording ? "Stop Take" : "Record Test"}</button>
+            </div>
+          </div>
+        )}
+
+        {showSessionControls && (
+          <ShowSessionControls
+            showName={showName}
+            savedShows={savedShows}
             selectedShowId={selectedShowId}
             saveManifest={showSaveManifest}
             saveSummary={showSaveSummary}
@@ -3799,83 +3838,92 @@ function App() {
             onSaveShow={saveShowSession}
             onLoadShow={loadShowSession}
             onExportShow={exportShowSession}
-        />
+          />
+        )}
 
-        <NewProjectGuide
-          mode={mode}
-          scene={scene}
-          character={character}
-          hasCustomRigParts={hasCustomRigParts}
-          sceneObjectCount={sceneObjects.length}
-          onSceneChange={changeScene}
-          onCharacterChange={changeCharacterRig}
-          onCustomizeRig={() => setMode("build")}
-          onPlaceInScene={() => openAssetSearch("", "object")}
-          onPerform={() => setMode("perform")}
-          onSaveShow={saveShowSession}
-        />
+        {showProjectGuide && (
+          <NewProjectGuide
+            mode={mode}
+            scene={scene}
+            character={character}
+            hasCustomRigParts={hasCustomRigParts}
+            sceneObjectCount={sceneObjects.length}
+            onSceneChange={changeScene}
+            onCharacterChange={changeCharacterRig}
+            onCustomizeRig={() => setMode("build")}
+            onPlaceInScene={() => openAssetSearch("", "object")}
+            onPerform={() => setMode("perform")}
+            onSaveShow={saveShowSession}
+          />
+        )}
 
-        <BeginnerRoadmap
-          mode={mode}
-          progress={beginnerProgress}
-          selectedTake={selectedTake}
-          onModeChange={setMode}
-          onStartQuickShort={() => startQuickShort("argument")}
-          onRecordToggle={toggleTake}
-          recording={recording}
-          onReplay={playSelectedTake}
-          onSaveScene={saveSelectedTakeAsScene}
-          onAddToCut={keepSelectedTake}
-        />
+        {showRoadmap && (
+          <BeginnerRoadmap
+            mode={mode}
+            progress={beginnerProgress}
+            selectedTake={selectedTake}
+            onModeChange={setMode}
+            onStartQuickShort={() => startQuickShort("argument")}
+            onRecordToggle={toggleTake}
+            recording={recording}
+            onReplay={playSelectedTake}
+            onSaveScene={saveSelectedTakeAsScene}
+            onAddToCut={keepSelectedTake}
+          />
+        )}
 
-        <ContextActionStrip
-          mode={mode}
-          selectedPart={getCatalogItem(characterPartCatalog, selectedPartId)}
-          selectedPartValue={self?.state.characterParts?.[selectedPartId]}
-          selectedSceneObject={selectedSceneObject}
-          selectedTake={selectedTake}
-          playbackActive={playbackActive}
-          canUndo={historyPast.length > 0}
-          canRedo={historyFuture.length > 0}
-          autosaveLabel={lastAutosaveAt ? `Autosaved ${lastAutosaveAt}` : "Autosave ready"}
-          onUndo={undoLastAction}
-          onRedo={redoLastAction}
-          onPartShape={() =>
-            updateCharacterPart(selectedPartId, {
-              label: getCatalogItem(characterPartCatalog, selectedPartId).label,
-              mode: "shape",
-              shape: selectedPartId === "torso" ? "bean" : "circle",
-              source: ""
-            })
-          }
-          onPartDuplicate={() => duplicateCharacterPart(selectedPartId)}
-          onPartToggleHidden={() => updateCharacterPart(selectedPartId, { hidden: !self?.state.characterParts?.[selectedPartId]?.hidden })}
-          onPartClear={() => clearCharacterPart(selectedPartId)}
-          onObjectDuplicate={() => selectedSceneObject && duplicateSceneObject(selectedSceneObject.id)}
-          onObjectForward={() => selectedSceneObject && moveSceneObjectLayer(selectedSceneObject.id, 1)}
-          onObjectDelete={() => selectedSceneObject && deleteSceneObject(selectedSceneObject.id)}
-          onReplay={playSelectedTake}
-          onMarkBestTake={markSelectedTakeBest}
-          onAddCut={() => selectedTake && addTakeToTimeline(selectedTake)}
-          onExport={exportProject}
-        />
+        {showContextActionStrip && (
+          <ContextActionStrip
+            mode={mode}
+            selectedPart={getCatalogItem(characterPartCatalog, selectedPartId)}
+            selectedPartValue={self?.state.characterParts?.[selectedPartId]}
+            selectedSceneObject={selectedSceneObject}
+            selectedTake={selectedTake}
+            playbackActive={playbackActive}
+            canUndo={historyPast.length > 0}
+            canRedo={historyFuture.length > 0}
+            autosaveLabel={lastAutosaveAt ? `Autosaved ${lastAutosaveAt}` : "Autosave ready"}
+            onUndo={undoLastAction}
+            onRedo={redoLastAction}
+            onPartShape={() =>
+              updateCharacterPart(selectedPartId, {
+                label: getCatalogItem(characterPartCatalog, selectedPartId).label,
+                mode: "shape",
+                shape: selectedPartId === "torso" ? "bean" : "circle",
+                source: ""
+              })
+            }
+            onPartDuplicate={() => duplicateCharacterPart(selectedPartId)}
+            onPartToggleHidden={() => updateCharacterPart(selectedPartId, { hidden: !self?.state.characterParts?.[selectedPartId]?.hidden })}
+            onPartClear={() => clearCharacterPart(selectedPartId)}
+            onObjectDuplicate={() => selectedSceneObject && duplicateSceneObject(selectedSceneObject.id)}
+            onObjectForward={() => selectedSceneObject && moveSceneObjectLayer(selectedSceneObject.id, 1)}
+            onObjectDelete={() => selectedSceneObject && deleteSceneObject(selectedSceneObject.id)}
+            onReplay={playSelectedTake}
+            onMarkBestTake={markSelectedTakeBest}
+            onAddCut={() => selectedTake && addTakeToTimeline(selectedTake)}
+            onExport={exportProject}
+          />
+        )}
 
-        <ShowBiblePanel
-          showName={showName}
-          castCount={activePerformers.length}
-          sceneSetCount={sceneSets.length}
-          propCount={sceneObjects.length}
-          referenceCount={assetReferences.length}
-          macroCount={macroCatalog.length}
-          boardCount={storyboardPanels.length}
-          timelineCount={productionTimeline.length}
-          toolbox={activeShowToolbox}
-          saveSummary={showSaveSummary}
-          activeStyle={activeAnimationStyle}
-          episodeStatus={episodeStatus}
-          onSaveShow={saveShowSession}
-          onModeChange={setMode}
-        />
+        {showShowKit && (
+          <ShowBiblePanel
+            showName={showName}
+            castCount={activePerformers.length}
+            sceneSetCount={sceneSets.length}
+            propCount={sceneObjects.length}
+            referenceCount={assetReferences.length}
+            macroCount={macroCatalog.length}
+            boardCount={storyboardPanels.length}
+            timelineCount={productionTimeline.length}
+            toolbox={activeShowToolbox}
+            saveSummary={showSaveSummary}
+            activeStyle={activeAnimationStyle}
+            episodeStatus={episodeStatus}
+            onSaveShow={saveShowSession}
+            onModeChange={setMode}
+          />
+        )}
 
         {mode === "perform" && (
           <PerformControls
@@ -3943,6 +3991,7 @@ function App() {
             onPartDuplicate={duplicateCharacterPart}
             onPartSwap={swapCharacterParts}
             onPartClear={clearCharacterPart}
+            onDone={() => setMode("assets")}
           />
         )}
         {mode === "assets" && (
@@ -4030,28 +4079,30 @@ function App() {
           />
         )}
 
-        <ContextualInspector
-          mode={mode}
-          self={self}
-          scene={selectedScene}
-          perspective={selectedPerspective}
-          cameraShot={selectedCameraShot}
-          lighting={selectedLighting}
-          backgroundTheme={selectedBackgroundTheme}
-          objectStyle={selectedObjectStyle}
-          selectedTake={selectedTake}
-          selectedStoryboardPanel={selectedStoryboardPanel}
-          assetSearch={assetSearch}
-          assetTarget={assetTarget}
-          recording={recording}
-          micLive={micLive}
-          takeCount={takeLibrary.length}
-          timelineCount={productionTimeline.length}
-          onModeChange={setMode}
-          onRecordToggle={toggleTake}
-          onAssetSearch={openAssetSearch}
-          onPolish={applyPolishPass}
-        />
+        {showInspector && (
+          <ContextualInspector
+            mode={mode}
+            self={self}
+            scene={selectedScene}
+            perspective={selectedPerspective}
+            cameraShot={selectedCameraShot}
+            lighting={selectedLighting}
+            backgroundTheme={selectedBackgroundTheme}
+            objectStyle={selectedObjectStyle}
+            selectedTake={selectedTake}
+            selectedStoryboardPanel={selectedStoryboardPanel}
+            assetSearch={assetSearch}
+            assetTarget={assetTarget}
+            recording={recording}
+            micLive={micLive}
+            takeCount={takeLibrary.length}
+            timelineCount={productionTimeline.length}
+            onModeChange={setMode}
+            onRecordToggle={toggleTake}
+            onAssetSearch={openAssetSearch}
+            onPolish={applyPolishPass}
+          />
+        )}
       </aside>
       <video
         ref={mouthVideoRef}
@@ -5284,7 +5335,7 @@ function PerformControls({
 
   return (
     <>
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Scene</h2>
         <div className="segmented">
           {sceneCatalog.map((item) => (
@@ -5299,14 +5350,14 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup perspectivePanel">
+      <div className="dockGroup perspectivePanel advancedControl">
         <h2>Perspective</h2>
         <strong>{selectedPerspective.name}</strong>
         <small>{selectedPerspective.description}</small>
         <small>{selectedScene.perspectiveNote}</small>
       </div>
 
-      <div className="dockGroup styleRemixPanel">
+      <div className="dockGroup styleRemixPanel advancedControl">
         <h2>Style Remix</h2>
         <div className="styleRemixSummary">
           <span>{getCatalogItem(backgroundThemeCatalog, backgroundTheme).name}</span>
@@ -5346,7 +5397,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Shot Templates</h2>
         <div className="shotTemplateList">
           {shotTemplates.map((template) => (
@@ -5358,7 +5409,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup directorCameraPanel">
+      <div className="dockGroup directorCameraPanel advancedControl">
         <h2>Director Camera</h2>
         <small className="controlHint">Lightweight framing for performance: follow a rig, punch in, or add a quick impact shake.</small>
         <label className="toggleRow">
@@ -5429,7 +5480,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup performanceMemoryPanel">
+      <div className="dockGroup performanceMemoryPanel advancedControl">
         <h2>Cue Memory</h2>
         {performanceMoments.length ? (
           <div className="performanceMomentList" aria-label="Recent performance cues">
@@ -5448,7 +5499,7 @@ function PerformControls({
         )}
       </div>
 
-      <div className="dockGroup puppetFeelPanel">
+      <div className="dockGroup puppetFeelPanel advancedControl">
         <h2>Puppet Feel</h2>
         <div className="feelReadout">
           <strong>{activeMotionFeel.name}</strong>
@@ -5477,7 +5528,7 @@ function PerformControls({
         <small className="controlHint">Hold Shift to scoot, Alt for tiny adjustments. Movement still stays locked to the scene floor.</small>
       </div>
 
-      <div className="dockGroup performanceFeelPanel">
+      <div className="dockGroup performanceFeelPanel advancedControl">
         <h2>Feel Boosters</h2>
         <small className="controlHint">One-click performance polish: make the puppet feel better before you think about animation curves.</small>
         <div className="quickRemixGrid">
@@ -5592,7 +5643,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup cueDeckPanel">
+      <div className="dockGroup cueDeckPanel advancedControl">
         <h2>Cue Deck</h2>
         <small className="controlHint">Fast live buttons for camera punches, lighting shifts, scene beats, and performer reactions.</small>
         <div className="macroGrid">
@@ -5694,7 +5745,7 @@ function PerformControls({
         </div>
       </div>
 
-      <div className="dockGroup">
+      <div className="dockGroup advancedControl">
         <h2>Performance Presets</h2>
         <div className="shotTemplateList performancePresetList">
           {performancePresets.map((preset) => (
@@ -6488,7 +6539,8 @@ function CharacterEditor({
   onPartChange,
   onPartDuplicate,
   onPartSwap,
-  onPartClear
+  onPartClear,
+  onDone
 }) {
   if (!performer) return null;
 
@@ -6608,17 +6660,17 @@ function CharacterEditor({
             <Palette size={15} />
             Color
           </button>
-          <button type="button" title="Clone the head part" onClick={() => onPartDuplicate("head")}>
-            <Copy size={15} />
-            Clone
+          <button type="button" title="Select and move the current part on the canvas" onClick={() => onSelectedPartChange(selectedPart.id)}>
+            <MousePointer2 size={15} />
+            Move
           </button>
           <button
             type="button"
-            title="Hide or show the head part"
-            onClick={() => onPartChange("head", { hidden: !characterParts.head?.hidden })}
+            title="Done with the rig for now"
+            onClick={onDone}
           >
-            <X size={15} />
-            {characterParts.head?.hidden ? "Show" : "Hide"}
+            <ChevronRight size={15} />
+            Done
           </button>
         </div>
       </div>

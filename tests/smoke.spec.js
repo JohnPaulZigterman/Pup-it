@@ -10,7 +10,8 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();
   await expect(page.locator(".puppet.self .nameTag")).toHaveCount(0);
   await expect(page.locator(".floorMark")).toHaveCount(0);
-  await expect(page.locator(".newProjectGuide")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stage Lobby" })).toBeVisible();
+  await expect(page.locator(".newProjectGuide")).toHaveCount(0);
 
   await page.getByRole("button", { name: "1 Start" }).click();
   await expect(page.getByLabel("Current workspace")).toContainText("Launchpad");
@@ -24,8 +25,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByRole("button", { name: "Rig" }).first().click();
   await expect(page.getByLabel("Current workspace")).toContainText("Paint Studio");
   await expect(page.getByRole("heading", { name: "Character Creator" })).toBeVisible();
-  await expect(page.locator(".showKitBranches").getByText("Tech Tree")).toBeVisible();
-  await expect(page.locator(".showKitBranches").getByText("Cast Branch")).toBeVisible();
+  await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
   await expect(page.getByLabel("Canvas part editor")).toBeVisible();
   await page.getByLabel("Canvas part editor").getByRole("button", { name: "Shape" }).click();
   await expect(page.getByLabel("Canvas part editor").getByText("Made")).toBeVisible();
@@ -61,6 +61,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
 
   await page.getByRole("button", { name: "Space" }).first().click();
   await expect(page.getByLabel("Current workspace")).toContainText("Set Builder");
+  await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
   await page.getByPlaceholder("rigs, mouths, diner setting, parody reference...").fill("furniture");
   await page.locator(".assetActions").getByRole("button", { name: "Use as Material" }).first().click();
 
@@ -72,22 +73,20 @@ test("production workflow supports dashboard, asset placement, controls, and epi
 
   await page.getByRole("button", { name: "Perform" }).first().click();
   await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Performance Presets" })).toBeVisible();
+  await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Motion" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live Pad" })).toBeVisible();
   await expect(page.getByLabel("Performance instrument")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cue Memory" })).toBeVisible();
+  await expect(page.locator(".directorCameraPanel")).toBeHidden();
+  await expect(page.locator(".performancePresetList")).toBeHidden();
   await expect(page.getByLabel("Performance readiness")).toBeVisible();
-  await expect(page.getByRole("button", { name: "TV Ready" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Audio" })).toHaveClass(/selected/);
   await page.getByRole("button", { name: "5 Big Reaction Face, punch-in, and weird expression." }).click();
   await expect(page.getByRole("button", { name: "Surprise" })).toHaveClass(/selected/);
-  await expect(page.getByLabel("Recent performance cues")).toContainText("Reaction");
   await page.getByRole("button", { name: "Loose Puppet", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Director Camera" })).toBeVisible();
-  await page.getByRole("button", { name: "Punch In" }).click();
 
   await page.locator("header").getByRole("button", { name: "Review" }).click();
+  await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Episode Pipeline" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Submit to DoinkTV" })).toBeVisible();
   await expect(page.getByLabel("Finish mode path")).toBeVisible();
@@ -139,7 +138,8 @@ test("main workstation avoids horizontal overflow across common viewport sizes",
     await page.getByLabel("Performer").fill("Responsive QA");
     await page.getByRole("button", { name: "Join Stage" }).click();
     await expect(page.getByText("Controls Cheat Sheet")).toBeVisible();
-    await expect(page.locator(".newProjectGuide")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Stage Lobby" })).toBeVisible();
+    await expect(page.locator(".newProjectGuide")).toHaveCount(0);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);

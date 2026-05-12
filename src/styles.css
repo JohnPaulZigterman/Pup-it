@@ -2566,6 +2566,42 @@ input[type="color"] {
   background: var(--nicotine);
 }
 
+.connectionNotice,
+.stageLobbyPanel {
+  border-color: var(--ink);
+  background:
+    var(--surface-grain),
+    linear-gradient(135deg, rgba(141, 183, 255, 0.2), transparent 42%),
+    var(--surface);
+  background-blend-mode: multiply, normal, normal;
+}
+
+.connectionNotice strong,
+.stageLobbyPanel strong {
+  color: var(--ink);
+}
+
+.connectionNotice small,
+.stageLobbyPanel small {
+  color: #4b4e68;
+  line-height: 1.35;
+}
+
+.stageLobbyActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stageLobbyActions button {
+  min-height: 38px;
+  background: var(--paper);
+}
+
+.stageLobbyActions button:first-child {
+  background: var(--nicotine);
+}
+
 .roadmapList {
   display: grid;
   gap: 7px;
