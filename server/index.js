@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import { existsSync } from "node:fs";
+import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
@@ -37,6 +38,11 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distRoot = path.resolve(__dirname, "../dist");
 const renderStaticRoot = path.resolve(__dirname, "../renders");
+const ROOM_IDLE_TTL_MS = Number(process.env.ROOM_IDLE_TTL_MS || 1000 * 60 * 60 * 3);
+const MAX_ROOM_TAKES = Number(process.env.MAX_ROOM_TAKES || 25);
+const MAX_MEMORY_RECORDS = Number(process.env.MAX_MEMORY_RECORDS || 100);
+const MAX_RENDER_ARTIFACT_DIRS = Number(process.env.MAX_RENDER_ARTIFACT_DIRS || 50);
+const RENDER_ARTIFACT_TTL_MS = Number(process.env.RENDER_ARTIFACT_TTL_MS || 1000 * 60 * 60 * 24 * 7);
 const allowedOrigins = new Set(
   [
     CLIENT_ORIGIN,
@@ -49,6 +55,7 @@ const allowedOrigins = new Set(
     .filter(Boolean)
 );
 const clientBundleAvailable = existsSync(path.join(distRoot, "index.html"));
+let databaseHealthCache = { checkedAt: 0, value: { configured: isDatabaseConfigured(), ok: false } };
 
 function isAllowedSocketOrigin(origin) {
   if (!origin || allowedOrigins.has(origin)) return true;
@@ -75,8 +82,14 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json({ limit: "5mb" }));
-app.use("/renders", express.static(renderStaticRoot));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));
+app.use(
+  "/renders",
+  express.static(renderStaticRoot, {
+    etag: true,
+    maxAge: "1h"
+  })
+);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -91,6 +104,64 @@ const io = new Server(server, {
 const rooms = new Map();
 const memoryRenderJobs = new Map();
 const memoryDoinkSubmissions = new Map();
+
+function trimMapToLimit(map, limit = MAX_MEMORY_RECORDS) {
+  while (map.size > limit) {
+    const oldestKey = map.keys().next().value;
+    if (!oldestKey) break;
+    map.delete(oldestKey);
+  }
+}
+
+function touchRoom(room) {
+  room.lastActiveAt = Date.now();
+}
+
+function pruneRooms(now = Date.now()) {
+  for (const [roomId, room] of rooms.entries()) {
+    if (room.performers.size > 0 || room.recording) continue;
+    if (now - (room.lastActiveAt || now) > ROOM_IDLE_TTL_MS) rooms.delete(roomId);
+  }
+}
+
+async function pruneRenderArtifacts(now = Date.now()) {
+  try {
+    const entries = await readdir(renderStaticRoot, { withFileTypes: true });
+    const dirs = await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry) => {
+          const fullPath = path.join(renderStaticRoot, entry.name);
+          const info = await stat(fullPath);
+          return { name: entry.name, fullPath, mtimeMs: info.mtimeMs };
+        })
+    );
+    const expired = dirs.filter((dir) => now - dir.mtimeMs > RENDER_ARTIFACT_TTL_MS);
+    const overflow = dirs
+      .filter((dir) => !expired.some((expiredDir) => expiredDir.name === dir.name))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(MAX_RENDER_ARTIFACT_DIRS);
+    await Promise.all(
+      [...expired, ...overflow].map((dir) =>
+        rm(dir.fullPath, { recursive: true, force: true })
+      )
+    );
+  } catch (_error) {
+    // Artifact cleanup should never block a render or health check.
+  }
+}
+
+async function getCachedDatabaseHealth({ maxAgeMs = 30000 } = {}) {
+  if (Date.now() - databaseHealthCache.checkedAt < maxAgeMs) return databaseHealthCache.value;
+  let database = { configured: isDatabaseConfigured(), ok: false };
+  try {
+    database = await checkDatabase();
+  } catch (_error) {
+    database = { configured: true, ok: false };
+  }
+  databaseHealthCache = { checkedAt: Date.now(), value: database };
+  return database;
+}
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
@@ -114,6 +185,7 @@ async function persistRenderJob(job) {
       persistence: "memory"
     };
     memoryRenderJobs.set(memoryJob.id, memoryJob);
+    trimMapToLimit(memoryRenderJobs);
     return memoryJob;
   }
 }
@@ -134,6 +206,7 @@ async function persistRenderJobUpdate(job, patch) {
     persistence: "memory"
   };
   memoryRenderJobs.set(memoryJob.id, memoryJob);
+  trimMapToLimit(memoryRenderJobs);
   return memoryJob;
 }
 
@@ -156,10 +229,13 @@ function handleApiError(res, error) {
 }
 
 function getRoom(roomId) {
+  pruneRooms();
   if (!rooms.has(roomId)) {
     rooms.set(roomId, createRoom({ id: roomId }));
   }
-  return rooms.get(roomId);
+  const room = rooms.get(roomId);
+  touchRoom(room);
+  return room;
 }
 
 io.on("connection", (socket) => {
@@ -261,6 +337,7 @@ io.on("connection", (socket) => {
     if (wasRecording) {
       savedTake = createStoredTake(room, room.takes.length + 1);
       room.takes.unshift(savedTake);
+      room.takes = room.takes.slice(0, MAX_ROOM_TAKES);
     }
 
     io.to(activeRoomId).emit("take:status", {
@@ -297,6 +374,7 @@ io.on("connection", (socket) => {
 });
 
 app.get("/api/rooms/:roomId/take", (req, res) => {
+  pruneRooms();
   const room = rooms.get(req.params.roomId);
   if (!room) {
     res.status(404).json({ error: "Room not found" });
@@ -307,6 +385,7 @@ app.get("/api/rooms/:roomId/take", (req, res) => {
 });
 
 app.get("/api/rooms/:roomId/takes", (req, res) => {
+  pruneRooms();
   const room = rooms.get(req.params.roomId);
   if (!room) {
     res.status(404).json({ error: "Room not found" });
@@ -320,6 +399,7 @@ app.get("/api/rooms/:roomId/takes", (req, res) => {
 });
 
 app.get("/api/rooms/:roomId/takes/:takeId", (req, res) => {
+  pruneRooms();
   const room = rooms.get(req.params.roomId);
   const take = room?.takes.find((item) => item.id === req.params.takeId);
   if (!take) {
@@ -330,9 +410,10 @@ app.get("/api/rooms/:roomId/takes/:takeId", (req, res) => {
   res.json(take);
 });
 
-app.get("/api/shows", async (_req, res) => {
+app.get("/api/shows", async (req, res) => {
   try {
-    res.json({ shows: await listShows() });
+    res.setHeader("Cache-Control", "private, max-age=10");
+    res.json({ shows: await listShows({ limit: req.query.limit }) });
   } catch (error) {
     if (error?.code === "DATABASE_NOT_CONFIGURED") {
       res.json({ shows: [], persistence: "local" });
@@ -454,6 +535,7 @@ app.post("/api/render-jobs", async (req, res) => {
         submitUrl: "/api/doinktv/submissions"
       }
     });
+    void pruneRenderArtifacts();
   } catch (error) {
     handleApiError(res, error);
   }
@@ -506,6 +588,7 @@ app.post("/api/doinktv/submissions", (req, res) => {
     package: submissionPackage
   };
   memoryDoinkSubmissions.set(submissionRecord.id, submissionRecord);
+  trimMapToLimit(memoryDoinkSubmissions);
   res.status(202).json({
     submission: submissionRecord,
     review: {
@@ -517,29 +600,23 @@ app.post("/api/doinktv/submissions", (req, res) => {
 });
 
 app.get("/health", async (_req, res) => {
-  let database = { configured: isDatabaseConfigured(), ok: false };
-  try {
-    database = await checkDatabase();
-  } catch (_error) {
-    database = { configured: true, ok: false };
-  }
+  const database = await getCachedDatabaseHealth();
   res.json({
     ok: true,
     service: "pup-it",
     clientBundle: clientBundleAvailable,
     database,
     renderArtifacts: "/renders",
+    artifactPolicy: {
+      maxDirectories: MAX_RENDER_ARTIFACT_DIRS,
+      ttlMs: RENDER_ARTIFACT_TTL_MS
+    },
     version: process.env.RENDER_GIT_COMMIT || process.env.npm_package_version || "local"
   });
 });
 
 app.get("/ready", async (_req, res) => {
-  let database = { configured: isDatabaseConfigured(), ok: false };
-  try {
-    database = await checkDatabase();
-  } catch (_error) {
-    database = { configured: true, ok: false };
-  }
+  const database = await getCachedDatabaseHealth();
   const ready = clientBundleAvailable && (!database.configured || database.ok);
   res.status(ready ? 200 : 503).json({
     ready,
@@ -549,7 +626,18 @@ app.get("/ready", async (_req, res) => {
 });
 
 if (clientBundleAvailable) {
-  app.use(express.static(distRoot));
+  app.use(
+    express.static(distRoot, {
+      etag: true,
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      }
+    })
+  );
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api/") || req.path.startsWith("/socket.io/") || req.path.startsWith("/renders/")) {
       next();

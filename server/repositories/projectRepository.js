@@ -69,11 +69,13 @@ function renderJobFromRow(row) {
   };
 }
 
-export async function listShows() {
+export async function listShows({ limit = 25 } = {}) {
   const result = await query(
     `select *
      from shows
-     order by updated_at desc`
+     order by updated_at desc
+     limit $1`,
+    [Math.max(1, Math.min(Number(limit) || 25, 100))]
   );
   return result.rows.map(showFromRow);
 }

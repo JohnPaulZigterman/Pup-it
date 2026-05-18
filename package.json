@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite --host 0.0.0.0",
     "dev:server": "node --watch server/index.js",
+    "dev:qa": "node scripts/dev-qa.mjs",
     "db:migrate": "node server/scripts/migrate.js",
     "start": "node server/index.js",
     "build": "vite build",

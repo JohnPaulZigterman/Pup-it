@@ -6,3 +6,6 @@ renders/
 .env.local
 .DS_Store
 npm-debug.log*
+tmp-*.log
+test-results/
+playwright-report/

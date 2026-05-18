@@ -62,11 +62,14 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await page.getByRole("button", { name: "Space" }).first().click();
   await expect(page.getByLabel("Current workspace")).toContainText("Set Builder");
   await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Prop Dropper" })).toBeVisible();
+  await page.getByLabel("Quick prop dropper").getByRole("button", { name: "Chair" }).click();
+  await expect(page.locator(".sceneObject.selected")).toBeVisible();
   await page.getByPlaceholder("rigs, mouths, diner setting, parody reference...").fill("furniture");
   await page.locator(".assetActions").getByRole("button", { name: "Use as Material" }).first().click();
 
   await expect(page.getByRole("heading", { name: "Scene Objects" })).toBeVisible();
-  await expect(page.locator(".sceneObjectEditor")).toHaveCount(1);
+  await expect(page.locator(".sceneObjectEditor")).toHaveCount(2);
   await expect(page.getByLabel("Canvas object editor")).toBeVisible();
   await page.getByLabel("Canvas object editor").getByRole("button", { name: "Right" }).click();
   await expect(page.locator(".sceneObject.selected")).toBeVisible();
@@ -76,6 +79,7 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.locator(".newProjectGuide, .showKitBranches, .beginnerRoadmap")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Motion" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live Pad" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Moment Boosters" })).toBeVisible();
   await expect(page.getByLabel("Performance instrument")).toBeVisible();
   await expect(page.locator(".directorCameraPanel")).toBeHidden();
   await expect(page.locator(".performancePresetList")).toBeHidden();
@@ -96,15 +100,20 @@ test("production workflow supports dashboard, asset placement, controls, and epi
   await expect(page.getByLabel("Render pipeline")).toBeVisible();
   await expect(page.getByLabel("Render depth fidelity")).toBeVisible();
   await expect(page.getByText("Render Depth v1")).toBeVisible();
+  await expect(page.getByLabel("Render history")).toBeVisible();
+  await expect(page.getByText("First Airable Package")).toBeVisible();
   await expect(page.getByText("DoinkTV Handoff")).toBeVisible();
   await expect(page.getByText("Finished Short Flow")).toBeVisible();
   await expect(page.getByText("Ready Enough Score")).toBeVisible();
   await expect(page.getByText("Delivery Preview")).toBeVisible();
   await expect(page.getByText("Backend render preview will appear here.")).toBeVisible();
+  await expect(page.getByLabel("Finish mode path").getByRole("button", { name: "Polish" })).toBeDisabled();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "DoinkTV" })).toBeDisabled();
   await expect(page.locator(".finishActionBar").getByRole("button", { name: "Render Final" })).toBeDisabled();
   await expect(page.getByText("More Export Tools")).toBeVisible();
   await expect(page.getByText("Takes recorded")).toBeVisible();
+  await page.getByRole("button", { name: "1 Start" }).click();
+  await expect(page.getByRole("button", { name: "New Bit From Kit" })).toBeVisible();
 });
 
 test("tiered tutorial can set up an ultra beginner first cartoon", async ({ page }) => {

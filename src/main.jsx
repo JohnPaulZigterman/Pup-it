@@ -97,6 +97,24 @@ import {
   resolveFinishTake as resolveFinishTakeFromState
 } from "./workflows/finishFlow.js";
 import {
+  AUTOSAVE_DRAFT_KEY,
+  fetchPersistedShows,
+  floorMarksForSession,
+  loadStoredShows,
+  makeShowId,
+  persistEpisodeSnapshot,
+  persistShowSession,
+  summarizeTakeForShow,
+  writeStoredShows
+} from "./workflows/showPersistence.js";
+import {
+  createTakeThumbnailDataUrl,
+  exportTakePreviewVideo,
+  makePreviewPerformers,
+  polishTakeForReview,
+  quickTrimTake
+} from "./workflows/takeReview.js";
+import {
   buildPublicReleaseWorkflow,
   computeBeginnerProgress,
   getTutorialTrack,
@@ -105,6 +123,11 @@ import {
   tutorialTracks,
   workflowSteps
 } from "./workflow/shortFlow.js";
+import {
+  buildCommandItems,
+  buildPrimaryNextAction,
+  findCommandMatch
+} from "./workflow/workflowActions.js";
 import "./styles.css";
 
 const SceneLibraryEditor = lazy(() =>
@@ -115,8 +138,6 @@ const SERVER_URL =
   import.meta.env.VITE_SERVER_URL ||
   (import.meta.env.DEV ? "http://localhost:4111" : window.location.origin);
 const DOINKTV_SUBMISSION_URL = import.meta.env.VITE_DOINKTV_SUBMISSION_URL || "";
-const SHOW_STORAGE_KEY = "pup-it-shows-v1";
-const AUTOSAVE_DRAFT_KEY = "pup-it-autosave-draft-v1";
 const partSwapTargets = {
   leftArm: "rightArm",
   rightArm: "leftArm",
@@ -591,29 +612,13 @@ function createSceneObjectFromShape({ name, shape, tint, texturePreset }, index 
   };
 }
 
-function makePreviewPerformers(take) {
-  return indexPerformers(
-    take.performers.map((performer, index) => ({
-      id: performer.id,
-      name: performer.name,
-      character: performer.character,
-      state: createPerformerState({
-        x: 34 + index * 18,
-        y: 68,
-        pose: performer.pose,
-        idleMotion: performer.idleMotion,
-        motionFeel: performer.motionFeel || "smooth",
-        behaviorPreset: performer.behaviorPreset || "none",
-        mouthControl: performer.mouthControl,
-        rigConfig: performer.rigConfig,
-        stylePreset: performer.stylePreset,
-        characterDesign: performer.characterDesign,
-        characterParts: performer.characterParts,
-        blinkSeed: index * 337
-      })
-    }))
-  );
-}
+const quickPropDroppers = [
+  { id: "chair", name: "Chair", shape: "blocky", tint: "#8db7ff", texturePreset: "woodgrain" },
+  { id: "table", name: "Table", shape: "rectangle", tint: "#c6925f", texturePreset: "woodgrain" },
+  { id: "sign", name: "Bad Sign", shape: "rectangle", tint: "#fff2a8", texturePreset: "photocopy" },
+  { id: "box", name: "Mystery Box", shape: "blocky", tint: "#f26f5c", texturePreset: "paper-grain" },
+  { id: "weird", name: "Weird Shape", shape: "scribble", tint: "#c7a8ff", texturePreset: "static-pattern" }
+];
 
 function clonePerformers(performers) {
   return performers.map((performer) => ({
@@ -622,399 +627,12 @@ function clonePerformers(performers) {
   }));
 }
 
-function applyTakeEventToPreview(performers, event) {
-  if (event.type === "performer:update") return updatePerformerState(performers, event.performerId, event.state);
-  if (event.type === "performer:joined" || event.type === "performer:configured") {
-    return upsertPerformer(performers, event.performer);
-  }
-  if (event.type === "performer:left") return removePerformer(performers, event.performerId);
-  if (event.type === "macro:trigger") {
-    return updatePerformerState(performers, event.performerId, { macro: event.macro });
-  }
-  return performers;
-}
-
-function drawPreviewVideoFrame(ctx, { take, performers, atMs, width, height }) {
-  const sceneItem = getCatalogItem(sceneCatalog, take.scene || "studio");
-  const backgroundTheme = getCatalogItem(backgroundThemeCatalog, take.backgroundTheme || "scene-native");
-  const objectStyle = getCatalogItem(objectStyleCatalog, take.objectStyle || "match-character");
-  const shot = getCatalogItem(cameraShotCatalog, take.cameraShot || "wide");
-  const background = {
-    studio: ["#f5f1e8", "#d9d1c3"],
-    street: ["#dfe8ef", "#b7c8c6"],
-    space: ["#242335", "#0f1020"]
-  }[sceneItem.id] || ["#f5f1e8", "#d9d1c3"];
-  const themeTints = {
-    "painted-depth": ["#f5f1e8", "#d9d1c3"],
-    "late-night-copy": ["#ece7d9", "#8f91a2"],
-    "broadcast-flat": ["#f4f7fb", "#d4e0ec"],
-    "pattern-held": ["#fff2a8", "#8db7ff"],
-    "vintage-wallpaper": ["#f8e6a0", "#c7a8ff"],
-    "wood-panel": ["#c6925f", "#6e4631"],
-    "stucco-wall": ["#e9dfcc", "#b7a994"],
-    "abstract-gallery": ["#f26f5c", "#436b63"]
-  }[backgroundTheme.id];
-  if (themeTints) {
-    background[0] = themeTints[0];
-    background[1] = themeTints[1];
-  }
-  const horizon = ((sceneItem.horizon || 50) / 100) * height;
-  const foreground = ((sceneItem.foreground || 86) / 100) * height;
-  const shotScale = shot.id === "close" ? 1.38 : shot.id === "reaction" ? 1.28 : shot.id === "two-shot" ? 1.12 : 1;
-
-  ctx.save();
-  ctx.translate(width / 2, height * 0.62);
-  ctx.scale(shotScale, shotScale);
-  ctx.translate(-width / 2, -height * 0.62);
-
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, background[0]);
-  gradient.addColorStop(1, background[1]);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
-  for (let x = -80; x < width + 80; x += 90) {
-    ctx.fillRect(x + ((atMs / 80) % 90), 0, 26, height);
-  }
-
-  ctx.strokeStyle = "rgba(43,45,66,0.22)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, horizon);
-  ctx.lineTo(width, horizon);
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(43,45,66,0.08)";
-  ctx.beginPath();
-  ctx.moveTo(width * 0.08, foreground);
-  ctx.lineTo(width * 0.92, foreground);
-  ctx.lineTo(width * 0.7, horizon + 30);
-  ctx.lineTo(width * 0.3, horizon + 30);
-  ctx.closePath();
-  ctx.fill();
-
-  for (const mark of take.floorMarks || []) {
-    ctx.fillStyle = "rgba(227,189,69,0.72)";
-    ctx.strokeStyle = "rgba(43,45,66,0.55)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse((mark.x / 100) * width, (mark.y / 100) * height, 16, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  const sceneObjectItems = (take.sceneObjects || []).filter((object) => !object.hidden);
-  const stageItems = [
-    ...sceneObjectItems.map((object) => ({ type: "object", y: object.y || 60, object })),
-    ...performerList(performers).map((performer) => ({ type: "performer", y: performer.state.y, performer }))
-  ];
-
-  stageItems
-    .sort((a, b) => a.y - b.y)
-    .forEach((performer) => {
-      if (performer.type === "object") {
-        const object = performer.object;
-        const x = (object.x / 100) * width;
-        const y = (object.y / 100) * height;
-        const scale = (object.scale || 0.7) * 80;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(((object.flipped ? -1 : 1) * ((object.layer || 0) - 2) * 0.03));
-        ctx.fillStyle = object.tint || "#f5f1e8";
-        ctx.strokeStyle = objectStyle.id === "thin-ink" ? "rgba(43,45,66,0.68)" : "#2b2d42";
-        ctx.lineWidth = objectStyle.id === "thin-ink" ? 2 : 4;
-        if (object.shape === "circle") {
-          ctx.beginPath();
-          ctx.arc(0, -scale * 0.4, scale * 0.42, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        } else if (object.shape === "triangle") {
-          ctx.beginPath();
-          ctx.moveTo(0, -scale);
-          ctx.lineTo(scale * 0.55, 0);
-          ctx.lineTo(-scale * 0.55, 0);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.roundRect(-scale * 0.5, -scale, scale, scale * 0.72, 8);
-          ctx.fill();
-          ctx.stroke();
-        }
-        ctx.restore();
-        return;
-      }
-      const item = performer.performer;
-      const character = getCatalogItem(characterCatalog, item.character);
-      const state = item.state;
-      const x = (state.x / 100) * width;
-      const y = (state.y / 100) * height;
-      const depth = Math.max(0, Math.min(1, (state.y - (sceneItem.horizon || 50)) / ((sceneItem.foreground || 86) - (sceneItem.horizon || 50))));
-      const scale = (0.54 + depth * 0.48) * (state.scale || 1);
-      const bounce = state.walking ? Math.sin(atMs / 95) * 5 * scale : 0;
-      const bodyColor = state.characterDesign?.color || character.color || "#8fd8b5";
-      const accent = state.characterDesign?.accent || character.accent || "#2b2d42";
-
-      ctx.save();
-      ctx.translate(x, y + bounce);
-      ctx.scale(scale * (state.facing < 0 ? -1 : 1), scale);
-      ctx.fillStyle = "rgba(30,29,39,0.18)";
-      ctx.beginPath();
-      ctx.ellipse(0, 14, 48, 12, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bodyColor;
-      ctx.strokeStyle = "#2b2d42";
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.roundRect(-34, -86, 68, 92, 20);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.ellipse(0, -112, 38, 34, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.arc(-13, -118, 4, 0, Math.PI * 2);
-      ctx.arc(13, -118, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      const mouthOpen = Math.max(state.mouthOpen || 0, state.speaking ? 0.2 : 0);
-      ctx.fillStyle = "#1c1b24";
-      ctx.beginPath();
-      ctx.ellipse(0, -101, 10, 3 + mouthOpen * 14, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    });
-
-  ctx.restore();
-
-  ctx.fillStyle = "rgba(245,241,232,0.78)";
-  ctx.fillRect(24, 24, 360, 46);
-  ctx.fillStyle = "#2b2d42";
-  ctx.font = "700 22px Arial";
-  ctx.fillText(take.name || "Pup-It preview render", 42, 54);
-  ctx.font = "700 13px Arial";
-  ctx.fillText(`${backgroundTheme.name} / ${shot.name}`, 42, 72);
-}
-
-async function exportTakePreviewVideo(take, { onFrame } = {}) {
-  if (!take || !window.MediaRecorder) throw new Error("Browser video export is not available here.");
-  const width = 1280;
-  const height = 720;
-  const fps = 24;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
-  const recorder = new MediaRecorder(canvas.captureStream(fps), { mimeType });
-  const chunks = [];
-  recorder.ondataavailable = (event) => {
-    if (event.data?.size) chunks.push(event.data);
-  };
-  const stopped = new Promise((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-  });
-  let performers = makePreviewPerformers(take);
-  const events = [...(take.tracks?.motion || [])].sort((a, b) => a.at - b.at);
-  let eventIndex = 0;
-  const trimStartMs = take.trimStartMs || 0;
-  const trimEndMs = take.trimEndMs ?? take.durationMs ?? 5000;
-  const durationMs = Math.max(1000, Math.min(trimEndMs - trimStartMs, 45000));
-  const frameMs = 1000 / fps;
-
-  recorder.start();
-  for (let atMs = 0; atMs <= durationMs; atMs += frameMs) {
-    const renderAtMs = trimStartMs + atMs;
-    while (eventIndex < events.length && (events[eventIndex].at || 0) <= renderAtMs) {
-      performers = applyTakeEventToPreview(performers, events[eventIndex]);
-      eventIndex += 1;
-    }
-    drawPreviewVideoFrame(ctx, { take, performers, atMs: renderAtMs, width, height });
-    onFrame?.(Math.min(1, atMs / durationMs));
-    await new Promise((resolve) => window.setTimeout(resolve, frameMs));
-  }
-  recorder.stop();
-  return stopped;
-}
-
-function createTakeThumbnailDataUrl(take) {
-  if (!take) return "";
-  const width = 1280;
-  const height = 720;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  drawPreviewVideoFrame(ctx, {
-    take,
-    performers: makePreviewPerformers(take),
-    atMs: take.trimStartMs || 0,
-    width,
-    height
-  });
-  return canvas.toDataURL("image/png");
-}
-
 function downloadDataUrl(dataUrl, filename) {
   if (!dataUrl) return;
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = filename;
   link.click();
-}
-
-function makeShowId(showName) {
-  const slug = (showName || "untitled-show")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 42);
-  return slug || `show-${Date.now()}`;
-}
-
-function loadStoredShows() {
-  try {
-    const stored = window.localStorage.getItem(SHOW_STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_error) {
-    return [];
-  }
-}
-
-function writeStoredShows(shows) {
-  window.localStorage.setItem(SHOW_STORAGE_KEY, JSON.stringify(shows));
-}
-
-function showSessionFromPersistedShow(show) {
-  const showBible = show.showBible || {};
-  const houseStyle = show.houseStyle || {};
-  return {
-    schemaVersion: "pup-it.show.v1",
-    id: show.slug || show.id,
-    databaseId: show.id,
-    showName: show.showName || show.name || "Untitled Show",
-    savedAt: show.updatedAt || show.updated_at || new Date().toISOString(),
-    roomId: showBible.roomId || defaultRoomId,
-    scene: houseStyle.scene || sceneCatalog[0].id,
-    perspective: houseStyle.perspective,
-    cameraShot: houseStyle.cameraShot || "wide",
-    lightingPreset: houseStyle.lightingPreset || "scene",
-    backgroundTheme: houseStyle.backgroundTheme || "painted-depth",
-    objectStyle: houseStyle.objectStyle || "soft-material",
-    cast: show.cast || [],
-    episodeStatus: showBible.episodeStatus || "draft",
-    sceneObjects: showBible.sceneObjects || [],
-    sceneSets: showBible.sceneSets || [],
-    floorMarks: showBible.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, houseStyle.scene || sceneCatalog[0].id)),
-    assetReferences: show.assetReferences || [],
-    storyboardPanels: showBible.storyboardPanels || [],
-    productionTimeline: showBible.productionTimeline || [],
-    takes: showBible.takes || [],
-    doinkSubmission: showBible.doinkSubmission || {},
-    showToolbox: showBible.showToolbox || {}
-  };
-}
-
-async function fetchPersistedShows() {
-  const response = await fetch(`${SERVER_URL}/api/shows`);
-  if (!response.ok) throw new Error("Show database unavailable");
-  const data = await response.json();
-  if (data.persistence === "local") throw new Error("Show database unavailable");
-  return (data.shows || []).map(showSessionFromPersistedShow);
-}
-
-async function persistShowSession(session) {
-  const response = await fetch(`${SERVER_URL}/api/shows`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...session,
-      slug: session.id,
-      houseStyle: {
-        scene: session.scene,
-        perspective: session.perspective,
-        cameraShot: session.cameraShot,
-        lightingPreset: session.lightingPreset,
-        backgroundTheme: session.backgroundTheme,
-        objectStyle: session.objectStyle
-      },
-      showBible: {
-        roomId: session.roomId,
-        storyboardPanels: session.storyboardPanels,
-        productionTimeline: session.productionTimeline,
-        episodeStatus: session.episodeStatus,
-        sceneObjects: session.sceneObjects,
-        sceneSets: session.sceneSets,
-        floorMarks: session.floorMarks,
-        takes: session.takes,
-        doinkSubmission: session.doinkSubmission,
-        showToolbox: session.showToolbox
-      }
-    })
-  });
-  if (!response.ok) throw new Error("Show database unavailable");
-  const data = await response.json();
-  if (data.persistence === "local") throw new Error("Show database unavailable");
-  return showSessionFromPersistedShow(data.show);
-}
-
-async function persistEpisodeSnapshot(showId, session) {
-  const response = await fetch(`${SERVER_URL}/api/shows/${encodeURIComponent(showId)}/episodes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      seasonNumber: 1,
-      episodeNumber: 1,
-      title: `${session.showName} Episode 1`,
-      status: session.episodeStatus || "draft",
-      metadata: {
-        currentScene: session.scene,
-        perspective: session.perspective,
-        cameraShot: session.cameraShot,
-        lightingPreset: session.lightingPreset,
-        backgroundTheme: session.backgroundTheme,
-        objectStyle: session.objectStyle
-      },
-      scenes: [
-        {
-          id: "current-stage",
-          scene: session.scene,
-          sceneObjects: session.sceneObjects || [],
-          floorMarks: session.floorMarks || []
-        }
-      ],
-      takes: session.takes || [],
-      finalCuts: session.productionTimeline || [],
-      publishingPackages: []
-    })
-  });
-  if (!response.ok) throw new Error("Episode database unavailable");
-  return response.json();
-}
-
-function summarizeTakeForShow(take) {
-  return {
-    id: take.id,
-    name: take.name,
-    scene: take.scene,
-    durationMs: take.durationMs,
-    performerCount: take.performerCount,
-    audioTrackCount: take.audioTrackCount,
-    motionEventCount: take.motionEventCount,
-    best: Boolean(take.best)
-  };
 }
 
 function createStoryboardPanel({
@@ -1065,6 +683,7 @@ function App() {
   const commandInputRef = useRef(null);
   const playbackTimersRef = useRef([]);
   const cameraTimersRef = useRef([]);
+  const takeLibraryCacheRef = useRef({ roomId: "", loadedAt: 0 });
   const [joined, setJoined] = useState(false);
   const [roomId, setRoomId] = useState(defaultRoomId);
   const [showName, setShowName] = useState("Untitled Show");
@@ -1101,6 +720,7 @@ function App() {
   const [videoExporting, setVideoExporting] = useState(false);
   const [backendRendering, setBackendRendering] = useState(false);
   const [renderJob, setRenderJob] = useState(null);
+  const [renderHistory, setRenderHistory] = useState([]);
   const [performanceMoments, setPerformanceMoments] = useState([]);
   const [finishTarget, setFinishTarget] = useState("selected-take");
   const [storyboardPanels, setStoryboardPanels] = useState([]);
@@ -1179,6 +799,19 @@ function App() {
     () => (mode === "edit" && previewPerformers ? performerList(previewPerformers) : activePerformers),
     [activePerformers, mode, previewPerformers]
   );
+  const castAutosaveKey = JSON.stringify(
+    activePerformers.map((performer) => ({
+      id: performer.id,
+      name: performer.name,
+      character: performer.character,
+      rigConfig: performer.state.rigConfig,
+      stylePreset: performer.state.stylePreset,
+      characterDesign: performer.state.characterDesign,
+      characterParts: performer.state.characterParts,
+      behaviorPreset: performer.state.behaviorPreset,
+      mouthControl: performer.state.mouthControl
+    }))
+  );
   const showStageMarkers = mode === "assets" || (mode === "edit" && experienceMode === "pro");
   const showPuppetLabels = mode === "build" && experienceMode === "pro";
   const showSessionControls = mode === "home" || experienceMode === "pro";
@@ -1194,7 +827,7 @@ function App() {
 
     socket.on("connect", () => {
       setSelfId(socket.id);
-      setLiveServerState("connected");
+      setLiveServerState((current) => (current === "joining" ? "joining" : "connected"));
     });
     socket.on("connect_error", () => {
       setLiveServerState("disconnected");
@@ -1211,6 +844,7 @@ function App() {
       setPerformers(indexPerformers(snapshot.performers));
       setJoined(true);
       setMode("perform");
+      setLiveServerState("connected");
       setStatus(`Live in room "${snapshot.id}". Open another tab to test multiplayer.`);
     });
     socket.on("performer:joined", (performer) => {
@@ -1388,7 +1022,7 @@ function App() {
     const loadShows = async () => {
       let shows = [];
       try {
-        shows = await fetchPersistedShows();
+        shows = await fetchPersistedShows(SERVER_URL);
       } catch (_error) {
         shows = loadStoredShows();
       }
@@ -1438,6 +1072,8 @@ function App() {
 
   const joinRoom = (event) => {
     event.preventDefault();
+    setLiveServerState("joining");
+    setStatus(`Entering room "${roomId}". Setting up the stage.`);
     socketRef.current.connect();
     socketRef.current.emit("room:join", { roomId, name, character, scene: selectedSceneRef.current });
   };
@@ -2392,9 +2028,14 @@ function App() {
   };
 
   const toggleTake = () => {
+    if (!socketRef.current?.connected) {
+      setStatus("Live server is disconnected. Reconnect before recording a synced take.");
+      return;
+    }
     if (recording) {
       addPerformanceMoment({ type: "take", label: "Stop take", detail: "Saving the performance for replay." });
       socketRef.current.emit("take:stop");
+      takeLibraryCacheRef.current = { roomId: "", loadedAt: 0 };
       return;
     }
     addPerformanceMoment({ type: "take", label: "Record take", detail: "Live performance capture started." });
@@ -2414,7 +2055,7 @@ function App() {
   };
 
   const openReviewMode = () => {
-    loadTakeLibrary();
+    loadTakeLibrary({ force: true });
     setMode("edit");
   };
 
@@ -2428,13 +2069,16 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const loadTakeLibrary = async () => {
+  const loadTakeLibrary = async ({ force = false } = {}) => {
+    const cache = takeLibraryCacheRef.current;
+    if (!force && cache.roomId === roomId && Date.now() - cache.loadedAt < 8000) return;
     const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(roomId)}/takes`);
     if (!response.ok) {
       setTakeLibrary([]);
       return;
     }
     const library = await response.json();
+    takeLibraryCacheRef.current = { roomId, loadedAt: Date.now() };
     setTakeLibrary(library.takes || []);
   };
 
@@ -2524,6 +2168,8 @@ function App() {
         storyboardPanels,
         timeline: productionTimeline,
         takes: takeLibrary,
+        renderHistory,
+        exportHistory,
         style: {
           ...activeAnimationStyle,
           backgroundTheme,
@@ -2541,6 +2187,8 @@ function App() {
       storyboardPanels,
       productionTimeline,
       takeLibrary,
+      renderHistory,
+      exportHistory,
       activeAnimationStyle,
       backgroundTheme,
       objectStyle,
@@ -2758,16 +2406,19 @@ function App() {
 
   const quickTrimSelectedTake = (edge) => {
     if (!selectedTake) return;
-    const trimMs = 500;
-    const currentStart = selectedTake.trimStartMs || 0;
-    const currentEnd = selectedTake.trimEndMs ?? selectedTake.durationMs;
-    const nextTake =
-      edge === "start"
-        ? { ...selectedTake, trimStartMs: Math.min(currentStart + trimMs, Math.max(0, currentEnd - 1000)) }
-        : { ...selectedTake, trimEndMs: Math.max(currentStart + 1000, currentEnd - trimMs) };
+    const nextTake = quickTrimTake(selectedTake, edge);
     setSelectedTake(nextTake);
     setTakeLibrary((current) => current.map((take) => (take.id === nextTake.id ? nextTake : take)));
     setStatus(`Trimmed ${edge} by half a second for review.`);
+  };
+
+  const polishSelectedTake = () => {
+    if (!selectedTake) return;
+    const polishedTake = polishTakeForReview(selectedTake);
+    setSelectedTake(polishedTake);
+    setTakeLibrary((current) => current.map((take) => (take.id === polishedTake.id ? polishedTake : take)));
+    setPreviewPerformers(makePreviewPerformers(polishedTake));
+    setStatus("Polished this take with smoother motion, mouth cleanup, and review-friendly framing.");
   };
 
   const updateSelectedTakeMeta = (patch) => {
@@ -2853,6 +2504,7 @@ function App() {
       storyboardPanels,
       timeline: productionTimeline,
       takes: takeLibrary,
+      renderHistory,
       showToolbox: activeShowToolbox
     });
 
@@ -2939,6 +2591,20 @@ function App() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    const historyId = `render-${Date.now()}`;
+    setRenderHistory((current) => [
+      {
+        id: historyId,
+        status: "running",
+        label: describeFinishTarget(),
+        target: finishTarget,
+        startedAt: new Date().toISOString(),
+        videoPath: "",
+        durationMs: renderModel.durationMs || 0,
+        clipCount: renderModel.timelineSegments?.length || 1
+      },
+      ...current
+    ].slice(0, 8));
     setBackendRendering(true);
     setStatus(`Sending ${describeFinishTarget()} to the backend render queue.`);
     try {
@@ -2959,6 +2625,21 @@ function App() {
       if (!response.ok) throw new Error("Backend render endpoint rejected the job.");
       const data = await response.json();
       setRenderJob(data.renderJob);
+      setRenderHistory((current) =>
+        current.map((item) =>
+          item.id === historyId
+            ? {
+                ...item,
+                id: data.renderJob.id,
+                status: data.renderJob.status,
+                completedAt: data.renderJob.updatedAt || new Date().toISOString(),
+                videoPath: data.renderJob.output?.videoPath || "",
+                thumbnailPath: data.renderJob.output?.thumbnailPath || "",
+                audioStatus: data.renderJob.output?.audioMux?.status || "unknown"
+              }
+            : item
+        )
+      );
       setExportHistory((current) => [
         { id: data.renderJob.id, type: "backend-render", exportedAt: new Date().toISOString() },
         ...current
@@ -2974,6 +2655,18 @@ function App() {
         error: error.message || "Backend render request failed.",
         updatedAt: new Date().toISOString()
       }));
+      setRenderHistory((current) =>
+        current.map((item) =>
+          item.id === historyId
+            ? {
+                ...item,
+                status: "failed",
+                completedAt: new Date().toISOString(),
+                error: error.message || "Backend render request failed."
+              }
+            : item
+        )
+      );
       setStatus(error.message || "Backend render request failed.");
     } finally {
       setBackendRendering(false);
@@ -3155,102 +2848,12 @@ function App() {
     setStatus("Applied a punchier camera and reaction setup.");
   };
 
-  const primaryNextAction = (() => {
-    if (!beginnerProgress.hasStartedShort) {
-      return { label: "Start Show", detail: "Pick a rough launch pad.", action: () => startQuickShort("argument") };
-    }
-    if (!beginnerProgress.hasRig) {
-      return { label: "Build Rig", detail: "Make the performer yours.", action: () => setMode("build") };
-    }
-    if (!beginnerProgress.hasSet) {
-      return { label: "Build Space", detail: "Drop something into the space.", action: () => setMode("assets") };
-    }
-    if (!beginnerProgress.hasTake) {
-      return { label: recording ? "Stop Take" : beginnerProgress.hasRehearsed ? "Record Take" : "Go Perform", detail: "Capture the bit.", action: beginnerProgress.hasRehearsed ? toggleTake : () => setMode("perform") };
-    }
-    if (!beginnerProgress.hasCut) {
-      return { label: "Review Take", detail: "Replay and save the scene.", action: () => setMode("edit") };
-    }
-    if (!beginnerProgress.exported) {
-      return { label: "Finish Short", detail: "Render or package the finished handoff.", action: () => setMode("edit") };
-    }
-    return { label: "Submit DoinkTV", detail: "Send the short for review.", action: () => setMode("edit") };
-  })();
-
-  const commandItems = [
-    { id: "next", label: `Next: ${primaryNextAction.label}`, keywords: "next step continue beginner flow do next", action: primaryNextAction.action },
-    { id: "home", label: "Open show dashboard", keywords: "setup home project show", action: () => setMode("home") },
-    { id: "cast", label: "Edit current character", keywords: "cast character rig build customize", action: () => setMode("build") },
-    { id: "playground", label: "Open character playground", keywords: "playground weird mutate original character toybox", action: () => setMode("build") },
-    { id: "mutate", label: "Make current character weirder", keywords: "mutate random weird rough original", action: () => { setMode("build"); applyCharacterMutation("odd-body"); } },
-    { id: "sets", label: "Search settings and props", keywords: "assets objects settings props backgrounds", action: () => openAssetSearch("", "setting") },
-    { id: "shots", label: "Open shot templates", keywords: "shot template blocking marks two shot reaction", action: () => setMode("perform") },
-    { id: "mouth", label: "Find mouth and rig parts", keywords: "mouth face rig part lips", action: () => openAssetSearch("mouth", "rig-part") },
-    { id: "kitchen", label: "Find kitchen scene pieces", keywords: "kitchen diner room background furniture", action: () => openAssetSearch("kitchen", "setting") },
-    { id: "record", label: recording ? "Stop recording take" : "Record a take", keywords: "record stop take performance", action: toggleTake },
-    { id: "review", label: "Review recorded scenes", keywords: "edit takes timeline review finish", action: openReviewMode },
-    { id: "board", label: "Open storyboard mode", keywords: "storyboard panel comic strip planning", action: () => setMode("storyboard") },
-    { id: "save", label: "Save show", keywords: "save autosave show session project", action: () => saveShowSession() },
-    { id: "undo", label: "Undo last creative edit", keywords: "undo revert back history", action: undoLastAction, disabled: !historyPast.length },
-    { id: "redo", label: "Redo creative edit", keywords: "redo forward history", action: redoLastAction, disabled: !historyFuture.length },
-    { id: "export", label: "Export short package", keywords: "finish export publish package video project", action: exportProject },
-    { id: "submit-doinktv", label: "Submit to DoinkTV", keywords: "finish submit doinktv publish review package", action: submitToDoinkTv },
-    { id: "light-polish", label: "Make it look cleaner", keywords: "lighting polish better professional clean", action: () => applyPolishPass("lighting") },
-    { id: "texture-polish", label: "Add mixed-media texture", keywords: "texture paper pattern style weird", action: () => applyPolishPass("texture") },
-    { id: "punch-polish", label: "Punch in for a reaction", keywords: "camera close reaction punch button", action: () => applyPolishPass("camera") }
-  ];
-
-  const runCommand = (command) => {
-    if (command.disabled) return;
-    command.action();
-    setCommandQuery("");
-    setCommandFocused(false);
-    commandInputRef.current?.blur();
-  };
-
-  useEffect(() => {
-    const handleCommandKeys = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setCommandFocused(true);
-        commandInputRef.current?.focus();
-        commandInputRef.current?.select();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        undoLastAction();
-        return;
-      }
-      if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") || ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z")) {
-        event.preventDefault();
-        redoLastAction();
-        return;
-      }
-      if (event.key === "Escape" && commandFocused) {
-        setCommandQuery("");
-        setCommandFocused(false);
-        commandInputRef.current?.blur();
-        return;
-      }
-      if (event.key === "Enter" && commandFocused) {
-        const query = commandQuery.trim().toLowerCase();
-        const queryTokens = query.split(/\s+/).filter(Boolean);
-        const match = (query
-          ? commandItems.find((command) => {
-              const haystack = `${command.label} ${command.keywords}`.toLowerCase();
-              return queryTokens.every((token) => haystack.includes(token));
-            })
-          : commandItems[0]);
-        if (match) {
-          event.preventDefault();
-          runCommand(match);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleCommandKeys);
-    return () => window.removeEventListener("keydown", handleCommandKeys);
+  const primaryNextAction = buildPrimaryNextAction({
+    beginnerProgress,
+    recording,
+    startQuickShort,
+    setMode,
+    toggleTake
   });
 
   const createShowSession = () => {
@@ -3281,6 +2884,7 @@ function App() {
       storyboardPanels,
       productionTimeline,
       takes: takeLibrary.map(summarizeTakeForShow),
+      renderHistory,
       doinkSubmission,
       showToolbox: activeShowToolbox
     };
@@ -3308,7 +2912,7 @@ function App() {
     lightingPreset,
     backgroundTheme,
     objectStyle,
-    activePerformers,
+    castAutosaveKey,
     sceneObjects,
     sceneSets,
     floorMarks,
@@ -3316,15 +2920,15 @@ function App() {
     storyboardPanels,
     productionTimeline,
     takeLibrary,
-    doinkSubmission,
-    activeShowToolbox
+    renderHistory,
+    doinkSubmission
   ]);
 
   const saveShowSession = async () => {
     const session = createShowSession();
     try {
-      const persistedSession = await persistShowSession(session);
-      await persistEpisodeSnapshot(persistedSession.databaseId || persistedSession.id, {
+      const persistedSession = await persistShowSession(SERVER_URL, session);
+      await persistEpisodeSnapshot(SERVER_URL, persistedSession.databaseId || persistedSession.id, {
         ...session,
         id: persistedSession.id
       });
@@ -3361,6 +2965,70 @@ function App() {
     }
   };
 
+  const commandItems = buildCommandItems({
+    primaryNextAction,
+    recording,
+    setMode,
+    toggleTake,
+    openReviewMode,
+    openAssetSearch,
+    applyCharacterMutation,
+    applyPolishPass,
+    saveShowSession,
+    undoLastAction,
+    redoLastAction,
+    canUndo: Boolean(historyPast.length),
+    canRedo: Boolean(historyFuture.length),
+    exportProject,
+    submitToDoinkTv
+  });
+
+  const runCommand = (command) => {
+    if (command.disabled) return;
+    command.action();
+    setCommandQuery("");
+    setCommandFocused(false);
+    commandInputRef.current?.blur();
+  };
+
+  useEffect(() => {
+    const handleCommandKeys = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandFocused(true);
+        commandInputRef.current?.focus();
+        commandInputRef.current?.select();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undoLastAction();
+        return;
+      }
+      if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") || ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z")) {
+        event.preventDefault();
+        redoLastAction();
+        return;
+      }
+      if (event.key === "Escape" && commandFocused) {
+        setCommandQuery("");
+        setCommandFocused(false);
+        commandInputRef.current?.blur();
+        return;
+      }
+      if (event.key === "Enter" && commandFocused) {
+        const match = findCommandMatch(commandItems, commandQuery);
+        if (match) {
+          event.preventDefault();
+          runCommand(match);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleCommandKeys);
+    return () => window.removeEventListener("keydown", handleCommandKeys);
+  });
+
   const loadShowSession = (showId = selectedShowId) => {
     const session = savedShows.find((show) => show.id === showId);
     if (!session) return;
@@ -3379,10 +3047,11 @@ function App() {
     setSceneObjects(session.sceneObjects || []);
     setSelectedSceneObjectId(session.sceneObjects?.[0]?.id || null);
     setSceneSets(session.sceneSets || []);
-    setFloorMarks(session.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, session.scene || sceneCatalog[0].id)));
+    setFloorMarks(floorMarksForSession(session, createDefaultFloorMarks));
     setStoryboardPanels(session.storyboardPanels || []);
     setSelectedStoryboardId(session.storyboardPanels?.[0]?.id || null);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
+    setRenderHistory(session.renderHistory || []);
     setAssetReferences(session.assetReferences || []);
     setDoinkSubmission((current) => ({ ...current, ...(session.doinkSubmission || {}) }));
     setPreviewPerformers(null);
@@ -3435,9 +3104,10 @@ function App() {
     setObjectStyle(session.objectStyle || "soft-material");
     setSceneObjects(session.sceneObjects || []);
     setSceneSets(session.sceneSets || []);
-    setFloorMarks(session.floorMarks || createDefaultFloorMarks(getCatalogItem(sceneCatalog, session.scene || sceneCatalog[0].id)));
+    setFloorMarks(floorMarksForSession(session, createDefaultFloorMarks));
     setStoryboardPanels(session.storyboardPanels || []);
     setProductionTimeline(session.productionTimeline || session.timeline || []);
+    setRenderHistory(session.renderHistory || []);
     setAssetReferences(session.assetReferences || []);
     const castMember = session.cast?.find((performer) => performer.name === name) || session.cast?.[0];
     if (castMember) {
@@ -3541,9 +3211,9 @@ function App() {
                     <FolderOpen size={16} />
                     Load Show
                   </button>
-                  <button type="submit">
+                  <button type="submit" disabled={liveServerState === "joining"}>
                     <Radio size={16} />
-                    Continue Show
+                    {liveServerState === "joining" ? "Entering..." : "Continue Show"}
                   </button>
                 </div>
                 {entryLoadedShowId && (
@@ -3590,9 +3260,15 @@ function App() {
                 ))}
               </select>
             </label>
-            <button type="submit">
+            {liveServerState === "joining" && (
+              <div className="entryContinuePanel joiningEntryPanel" role="status">
+                <strong>Entering room</strong>
+                <small>Setting up the stage and loading the room snapshot.</small>
+              </div>
+            )}
+            <button type="submit" disabled={liveServerState === "joining"}>
               <Radio size={18} />
-              Join Stage
+              {liveServerState === "joining" ? "Entering..." : "Join Stage"}
             </button>
           </form>
         </section>
@@ -3806,6 +3482,14 @@ function App() {
       </section>
 
       <aside className="controlDock">
+        {liveServerState === "joining" && (
+          <div className="dockGroup connectionNotice joiningNotice" role="status">
+            <h2>Entering Room</h2>
+            <strong>Setting up the puppet show.</strong>
+            <small>The stage will appear as soon as the room snapshot lands.</small>
+          </div>
+        )}
+
         {liveServerState === "disconnected" && (
           <div className="dockGroup connectionNotice" role="status">
             <h2>Solo Mode</h2>
@@ -3921,6 +3605,7 @@ function App() {
             activeStyle={activeAnimationStyle}
             episodeStatus={episodeStatus}
             onSaveShow={saveShowSession}
+            onMakeAnotherBit={startAnotherBit}
             onModeChange={setMode}
           />
         )}
@@ -4032,8 +3717,9 @@ function App() {
               onPlay={playSelectedTake}
               onTakeMetaChange={updateSelectedTakeMeta}
               onMarkBestTake={markSelectedTakeBest}
-              onQuickTrim={quickTrimSelectedTake}
-              onSaveTakeAsScene={saveSelectedTakeAsScene}
+            onQuickTrim={quickTrimSelectedTake}
+            onPolishTake={polishSelectedTake}
+            onSaveTakeAsScene={saveSelectedTakeAsScene}
               onKeepTake={keepSelectedTake}
               onMakeAnotherBit={startAnotherBit}
               onExportProject={exportProject}
@@ -4042,6 +3728,7 @@ function App() {
               onBackendRender={requestBackendRender}
               backendRendering={backendRendering}
               renderJob={renderJob}
+              renderHistory={renderHistory}
               finishTarget={finishTarget}
               finishTargetLabel={describeFinishTarget()}
               onFinishTargetChange={setFinishTarget}
@@ -4377,9 +4064,9 @@ function ShowDashboard({
 
       <section className="fiveMinuteTrialPanel" aria-label="Five minute cartoon trial">
         <div>
-          <span className="eyebrow">5-Minute Cartoon Trial</span>
-          <h2>Can this become a finished little short before you overthink it?</h2>
-          <p>One weird setup, one customized rig, one object in the room, one take, one export. Good enough counts.</p>
+          <span className="eyebrow">First Airable Short</span>
+          <h2>Make one tiny thing that is ready enough to watch.</h2>
+          <p>Pick a bit, customize one rig, drop one prop, record one take, polish it lightly, render a review copy, then submit or make another.</p>
         </div>
         <div className="trialMeter">
           <strong>{trialDoneCount}/6</strong>
@@ -5093,6 +4780,7 @@ function ShowBiblePanel({
   activeStyle,
   episodeStatus,
   onSaveShow,
+  onMakeAnotherBit,
   onModeChange
 }) {
   const readiness = toolbox?.readiness || { completeCount: 0, totalCount: 6, percent: 0, steps: [], nextStep: null };
@@ -5200,6 +4888,18 @@ function ShowBiblePanel({
         <span>{quickReuse.primaryProp || toolbox?.props?.slice(0, 2).map((item) => item.name).join(", ") || "Add props"}</span>
         <span>{quickReuse.primarySet || toolbox?.sets?.slice(0, 2).map((item) => item.name).join(", ") || "Save a set"}</span>
         <span>{quickReuse.bestTake || "Mark a best take"}</span>
+      </div>
+      <div className="showKitRepeatPanel">
+        <div>
+          <strong>Make the next one faster</strong>
+          <small>
+            Keep this cast, look, and space. Pup-It will stage a fresh bit and leave the reusable show stuff alone.
+          </small>
+        </div>
+        <button type="button" onClick={() => onMakeAnotherBit()}>
+          <Sparkles size={16} />
+          New Bit From Kit
+        </button>
       </div>
       <div className="showKitSteps">
         {readiness.steps.map((step) => (
@@ -5477,6 +5177,43 @@ function PerformControls({
               <small>{pad.description}</small>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="dockGroup momentBoostPanel">
+        <h2>Moment Boosters</h2>
+        <small className="controlHint">Tiny director shortcuts that make a take feel more like a performed cartoon without asking beginners to edit curves.</small>
+        <div className="momentBoostGrid">
+          <button
+            type="button"
+            onClick={() => {
+              onDirectorAction("hold-for-laugh");
+              onPoseChange("deadpan");
+            }}
+          >
+            <strong>Hold For Laugh</strong>
+            <span>Awkward pause, close enough to read.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDirectorAction("reaction");
+              onExpressionChange("weird");
+            }}
+          >
+            <strong>Reaction Pop</strong>
+            <span>Face change plus camera punctuation.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMacroTrigger("panic");
+              onDirectorAction("lights-shift");
+            }}
+          >
+            <strong>Tiny Chaos</strong>
+            <span>Shake, sting, and performance energy.</span>
+          </button>
         </div>
       </div>
 
@@ -5964,6 +5701,26 @@ function AssetLibraryPanel({
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="dockGroup propDropperPanel">
+        <h2>Prop Dropper</h2>
+        <small className="controlHint">No searching required. Drop one readable object into the space, then move or repaint it.</small>
+        <div className="propDropperGrid" aria-label="Quick prop dropper">
+          {quickPropDroppers.map((prop) => (
+            <button
+              type="button"
+              key={prop.id}
+              onClick={() => onPlaceShape(prop)}
+            >
+              <span
+                className={`propDropperPreview sceneObject-${prop.shape}`}
+                style={{ "--object-tint": prop.tint }}
+              />
+              <strong>{prop.name}</strong>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="dockGroup">

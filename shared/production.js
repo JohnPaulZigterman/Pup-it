@@ -156,6 +156,7 @@ export function createProjectExport({
   storyboardPanels,
   timeline,
   takes,
+  renderHistory = [],
   showToolbox = null,
   exportedAt = new Date().toISOString()
 }) {
@@ -230,7 +231,7 @@ export function createProjectExport({
       videoPath: null,
       preferredPreviewVideoName: bestTake ? `pup-it-${bestTake.id || "take"}-preview.webm` : null,
       preferredThumbnailName: bestTake ? `pup-it-${bestTake.id || "take"}-thumbnail.png` : "pup-it-thumbnail.png",
-      nextRenderer: "browser-preview-now, WebCodecs or FFmpeg worker next",
+      nextRenderer: "backend-render-final",
       deterministicRender: true,
       separateAudioTracks: true
     },
@@ -257,6 +258,7 @@ export function createProjectExport({
         : null
     },
     showToolbox,
+    renderHistory,
     exportedAt,
     storyboardPanels,
     timeline,
@@ -281,6 +283,8 @@ export function createShowToolbox({
   storyboardPanels = [],
   timeline = [],
   takes = [],
+  renderHistory = [],
+  exportHistory = [],
   style = {},
   episodeStatus = "draft",
   doinkSubmission = {}
@@ -314,6 +318,18 @@ export function createShowToolbox({
     durationMs: take.durationMs,
     audioTrackCount: take.audioTrackCount || take.tracks?.audio?.length || 0,
     best: Boolean(take.best)
+  }));
+  const renderItems = renderHistory.map((render) => ({
+    id: render.id,
+    status: render.status,
+    label: render.label,
+    videoPath: render.videoPath || "",
+    completedAt: render.completedAt || null
+  }));
+  const exportItems = exportHistory.map((item) => ({
+    id: item.id,
+    type: item.type,
+    exportedAt: item.exportedAt
   }));
   const submittedStatuses = ["submitted", "ready_for_review", "approved", "scheduled", "published"];
   const hasBestTake = takeItems.some((take) => take.best);
@@ -362,7 +378,7 @@ export function createShowToolbox({
       label: "Finish Branch",
       mode: "edit",
       ready: cutItems.length > 0 || hasBestTake || submittedStatuses.includes(episodeStatus),
-      count: cutItems.length + (hasBestTake ? 1 : 0),
+      count: cutItems.length + renderItems.length + exportItems.length + (hasBestTake ? 1 : 0),
       beginnerVersion: "Mark the best take and render a review copy.",
       proUnlock: "Trim, assemble cuts, package metadata, and submit to DoinkTV.",
       showKitHome: "Cuts and exports"
@@ -410,6 +426,8 @@ export function createShowToolbox({
     boards: boardItems,
     cuts: cutItems,
     takes: takeItems,
+    renders: renderItems,
+    exports: exportItems,
     submission: {
       targetChannel: "DoinkTV",
       preferredBlock: doinkSubmission.preferredBlock || "short",

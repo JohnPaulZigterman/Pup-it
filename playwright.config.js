@@ -5,13 +5,13 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://127.0.0.1:5183",
     trace: "on-first-retry"
   },
   webServer: {
-    command: "npm run dev",
-    url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
+    command: "npm run dev:qa",
+    url: "http://127.0.0.1:5183",
+    reuseExistingServer: false,
     timeout: 120_000
   },
   projects: [

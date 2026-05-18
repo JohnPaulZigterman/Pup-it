@@ -83,6 +83,12 @@ Important environment variables:
 - `PGSSLMODE=require`: optional when connecting to an external Postgres URL that requires SSL.
 - `PLAYWRIGHT_BROWSERS_PATH=0`: recommended on Render so Chromium is installed into the deployed app bundle.
 - `PLAYWRIGHT_CHROMIUM_ARGS`: optional space-separated Chromium launch flags. Production defaults to `--no-sandbox --disable-setuid-sandbox`.
+- `MAX_ROOM_TAKES`: caps in-memory takes per live room. Defaults to `25`.
+- `MAX_MEMORY_RECORDS`: caps memory fallback render/submission records when Postgres is unavailable. Defaults to `100`.
+- `MAX_RENDER_ARTIFACT_DIRS`: caps retained render artifact folders. Defaults to `50`.
+- `RENDER_ARTIFACT_TTL_MS`: removes old render artifacts after this age. Defaults to seven days.
+- `ROOM_IDLE_TTL_MS`: prunes empty in-memory rooms after inactivity. Defaults to three hours.
+- `JSON_BODY_LIMIT`: caps JSON request payload size. Defaults to `5mb`.
 
 Backend rendering depends on Playwright Chromium and `ffmpeg-static`. `npm run render:build` builds the Vite client and installs the Chromium browser binary needed by `server/renderWorker.js`.
 

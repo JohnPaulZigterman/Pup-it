@@ -35,6 +35,7 @@ export function SceneLibraryEditor({
   onTakeMetaChange,
   onMarkBestTake,
   onQuickTrim,
+  onPolishTake,
   onSaveTakeAsScene,
   onKeepTake,
   onMakeAnotherBit,
@@ -44,6 +45,7 @@ export function SceneLibraryEditor({
   onBackendRender,
   backendRendering,
   renderJob,
+  renderHistory = [],
   finishTarget,
   finishTargetLabel,
   onFinishTargetChange,
@@ -164,9 +166,11 @@ export function SceneLibraryEditor({
     { id: "audio", label: "Audio", done: Boolean(audioMux) || audioReady, detail: audioStatus },
     { id: "deliver", label: "Deliver", done: renderSucceeded, detail: finalVideoPath || "WEBM pending" }
   ];
+  const latestRenderHistory = renderHistory.slice(0, 4);
   const finishSpineSteps = [
     { id: "review", label: "Review", done: Boolean(selectedTake || timeline.length), actionLabel: selectedTake ? "Replay" : "Pick Take", action: selectedTake ? onPlay : onRefresh },
     { id: "keep", label: "Keep", done: Boolean(selectedTake?.best || timeline.length), actionLabel: selectedTake?.best || timeline.length ? "Kept" : "Keep Take", action: onKeepTake },
+    { id: "polish", label: "Polish", done: Boolean(selectedTake?.polish), actionLabel: selectedTake?.polish ? "Polished" : "Polish", action: onPolishTake },
     { id: "render", label: "Render", done: renderSucceeded, actionLabel: backendRendering ? "Rendering" : renderSucceeded ? "Rendered" : "Render", action: onBackendRender },
     { id: "package", label: "Package", done: readiness.readyForSubmission, actionLabel: "Package", action: onExportProject },
     { id: "submit", label: "Submit", done: episodeStatus === "submitted", actionLabel: doinkSubmitting ? "Sending" : "Submit", action: onSubmitToDoinkTv }
@@ -233,6 +237,7 @@ export function SceneLibraryEditor({
           {finishSpineSteps.map((step, index) => {
             const disabled =
               (step.id === "keep" && !selectedTake) ||
+              (step.id === "polish" && !selectedTake) ||
               (step.id === "render" && (backendRendering || !hasSubmissionSource)) ||
               (step.id === "submit" && (!hasSubmissionSource || doinkSubmitting || backendRendering));
             return (
@@ -251,7 +256,7 @@ export function SceneLibraryEditor({
             <span className="eyebrow">Finished Short Flow</span>
             <strong>{finalVideoPath ? "Final preview is ready." : "Render one clean review copy."}</strong>
             <small>
-              {finishTargetLabel}. Best take, trim, render, package, submit. Everything needed for DoinkTV lives here.
+              {finishTargetLabel}. Best take, trim, polish, render, package, submit. Everything needed for DoinkTV lives here.
             </small>
           </div>
           <div className="finishTargetPicker" aria-label="Finish target">
@@ -312,7 +317,7 @@ export function SceneLibraryEditor({
             </div>
           </div>
         </div>
-        <div className="renderReliabilityPanel">
+          <div className="renderReliabilityPanel">
           <div className={`renderStageBanner renderStage-${renderStage}`}>
             <span className="eyebrow">Render Check</span>
             <strong>{backendRendering ? "Rendering review copy..." : renderSucceeded ? "Review render ready." : "Ready to render a review copy."}</strong>
@@ -372,12 +377,36 @@ export function SceneLibraryEditor({
               ))}
             </div>
           </div>
+          {latestRenderHistory.length ? (
+            <div className="renderHistoryPanel" aria-label="Render history">
+              <strong>Recent renders</strong>
+              {latestRenderHistory.map((item) => (
+                <span className={`renderHistoryItem renderHistory-${item.status}`} key={item.id}>
+                  <small>{item.status}</small>
+                  <b>{item.label || item.target || "Review render"}</b>
+                  <small>{item.videoPath || item.error || (item.startedAt ? new Date(item.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Queued")}</small>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="renderHistoryPanel empty" aria-label="Render history">
+              <strong>No backend renders yet.</strong>
+              <small>Render Final will add a review copy here so you can tell what was created.</small>
+            </div>
+          )}
           {renderJob?.status === "failed" ? (
             <button type="button" className="wideAction danger" onClick={onBackendRender} disabled={backendRendering}>
               <RefreshCw size={16} />
               Retry Render
             </button>
           ) : null}
+        </div>
+        <div className="airablePackageSummary">
+          <span className="eyebrow">First Airable Package</span>
+          <strong>{renderSucceeded ? "Final WEBM is attached." : "Backend Render Final is the clean output path."}</strong>
+          <small>
+            Pup-It keeps the live take, review video, thumbnail plan, audio tracks, rights notes, and DoinkTV metadata together so the short can leave the room.
+          </small>
         </div>
         <div className="doinkHandoffCard">
           <div>
@@ -546,7 +575,11 @@ export function SceneLibraryEditor({
             </button>
             <button className="wideAction anotherBitButton" onClick={() => onMakeAnotherBit()}>
               <Plus size={16} />
-              Stage Another Bit
+              Do Another Take
+            </button>
+            <button className="wideAction" onClick={onPolishTake}>
+              <Sparkles size={16} />
+              Polish This Take
             </button>
             <div className="libraryActions">
               <button className={playbackActive ? "active" : ""} onClick={onPlay}>
